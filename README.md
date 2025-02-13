@@ -115,5 +115,37 @@ The project uses `pixi.toml` for dependency management and task automation:
 
 3. Keep `pixi.toml` updated when adding new dependencies
 
+### Environment Setup
+
+This project uses environment variables for managing sensitive configuration like API keys. We use `python-dotenv` to manage these variables.
+
+#### Setting up Environment Variables
+
+1. **Copy the environment template**:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Configure your environment**:
+   Edit `.env` and add your actual values:
+   ```bash
+   # Google API Configuration
+   GOOGLE_API_KEY=your_api_key_here  # Replace with your API key
+   ```
+
+#### Environment Variables in Code
+
+The project provides utility functions to handle environment variables:
+
+```python
+from utils import load_env_variables, get_google_api_key
+
+# Load environment variables at startup
+load_env_variables()
+
+# Use the API key
+api_key = get_google_api_key()
+```
+
 ---
 *Note: This README will be updated with setup and running instructions in subsequent iterations.*

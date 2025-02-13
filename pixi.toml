@@ -7,11 +7,24 @@ platforms = ["osx-64"]
 
 [dependencies]
 python = ">=3.9"
+pip = "*"        # Required for pip installations
+
+[tasks]
+lint = { cmd = "pre-commit run --all-files" }
+
+[pypi-dependencies]
+# Core dependencies
+PyMuPDF = "*"             # PDF processing
+python-docx = "*"         # Word document processing
+tqdm = "*"                # Progress bars
+google-generativeai = "*" # Google's Generative AI API
+Pillow = "*"              # Python Imaging Library
+chromadb = "*"            # Vector database for embeddings
+
+# Development dependencies
 pre-commit = "*"
 black = "*"
 flake8 = "*"
 isort = "*"
 mypy = "*"
-
-[tasks]
-lint = { cmd = "pre-commit run --all-files" }
+types-tqdm = "*" # Type stubs for tqdm
