@@ -10,7 +10,9 @@ python = ">=3.9"
 pip = "*"        # Required for pip installations
 
 [tasks]
-lint = { cmd = "pre-commit run --all-files" }
+lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
+format = { cmd = "black . --exclude=.pixi && isort . --skip=.pixi --profile black" }
+check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --skip=.pixi --profile black" }
 
 [pypi-dependencies]
 # Core dependencies

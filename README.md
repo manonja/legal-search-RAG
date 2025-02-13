@@ -78,6 +78,16 @@ This project uses modern Python development tools to ensure code quality and mai
 
 The project is configured with several development tools to maintain code quality:
 
+#### Code Formatting
+
+The project uses Black with a line length of 88 characters. Formatting is automated through:
+
+- VS Code: Files are auto-formatted on save
+- CLI: Run `pixi run format` to format all files
+- Lint check: Run `pixi run lint` to check style
+
+All tools (Black, isort, flake8) are configured to use consistent settings.
+
 #### Pre-commit Hooks
 
 We use pre-commit hooks to ensure code quality before each commit. The following checks are automatically run:
