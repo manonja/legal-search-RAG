@@ -1,0 +1,17 @@
+[project]
+name = "legal-search-rag"
+version = "0.1.0"
+description = "Legal search RAG project"
+channels = ["conda-forge"]
+platforms = ["osx-64"]
+
+[dependencies]
+python = ">=3.9"
+pre-commit = "*"
+black = "*"
+flake8 = "*"
+isort = "*"
+mypy = "*"
+
+[tasks]
+lint = { cmd = "pre-commit run --all-files" }
