@@ -7,11 +7,28 @@ platforms = ["osx-64"]
 
 [dependencies]
 python = ">=3.9"
+pip = "*"        # Required for pip installations
+
+[tasks]
+lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
+format = { cmd = "black . --exclude=.pixi && isort . --skip=.pixi --profile black" }
+check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --skip=.pixi --profile black" }
+process-docs = { cmd = "python process_docs.py" }
+
+[pypi-dependencies]
+# Core dependencies
+PyMuPDF = "*"             # PDF processing
+python-docx = "*"         # Word document processing
+tqdm = "*"                # Progress bars
+google-generativeai = "*" # Google's Generative AI API
+Pillow = "*"              # Python Imaging Library
+chromadb = "*"            # Vector database for embeddings
+python-dotenv = "*"       # Environment variable management
+
+# Development dependencies
 pre-commit = "*"
 black = "*"
 flake8 = "*"
 isort = "*"
 mypy = "*"
-
-[tasks]
-lint = { cmd = "pre-commit run --all-files" }
+types-tqdm = "*" # Type stubs for tqdm

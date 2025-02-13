@@ -73,3 +73,8 @@ cython_debug/
 # ChromaDB (if using local storage)
 .chroma/
 chromadb/
+
+# Environment variables
+.env
+.env.*
+!.env.example
