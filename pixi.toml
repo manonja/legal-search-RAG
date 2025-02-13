@@ -13,6 +13,7 @@ pip = "*"        # Required for pip installations
 lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
 format = { cmd = "black . --exclude=.pixi && isort . --skip=.pixi --profile black" }
 check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --skip=.pixi --profile black" }
+process-docs = { cmd = "python process_docs.py" }
 
 [pypi-dependencies]
 # Core dependencies
@@ -22,6 +23,7 @@ tqdm = "*"                # Progress bars
 google-generativeai = "*" # Google's Generative AI API
 Pillow = "*"              # Python Imaging Library
 chromadb = "*"            # Vector database for embeddings
+python-dotenv = "*"       # Environment variable management
 
 # Development dependencies
 pre-commit = "*"

@@ -12,6 +12,8 @@ import fitz  # PyMuPDF
 import google.generativeai as genai  # type: ignore
 from tqdm import tqdm  # type: ignore
 
+from utils.env import get_google_api_key, get_input_dir, get_output_dir, load_env
+
 
 def configure_gemini():
     """Configure and initialize the Gemini model.
@@ -20,7 +22,7 @@ def configure_gemini():
         GenerativeModel: Configured Gemini model instance ready for text
         generation.
     """
-    genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+    genai.configure(api_key=get_google_api_key())
     return genai.GenerativeModel("gemini-1.5-flash")
 
 
@@ -47,7 +49,7 @@ def extract_docx_text(file_path):
     return text
 
 
-def process_documents(input_dir, output_dir):
+def process_documents(input_dir: str, output_dir: str) -> None:
     """Process legal documents and extract their content using Gemini.
 
     Args:
@@ -106,7 +108,37 @@ def process_documents(input_dir, output_dir):
             print(f"Failed to process {filename}: {e}")
 
 
+def main():
+    """Execute the main document processing workflow.
+
+    This function orchestrates the document processing workflow:
+    1. Loads and validates environment variables
+    2. Sets up input/output directories
+    3. Processes documents using the Gemini API
+
+    Raises:
+        FileNotFoundError: If the .env file is missing
+        ValueError: If required environment variables are not set
+        Exception: For any other unexpected errors during processing
+    """
+    try:
+        # Load and validate environment variables
+        load_env(validate=True)
+
+        # Get input and output directories
+        input_directory = get_input_dir()
+        output_directory = get_output_dir()
+
+        # Process the documents
+        process_documents(input_directory, output_directory)
+
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Configuration error: {e}")
+        exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        exit(1)
+
+
 if __name__ == "__main__":
-    input_directory = "/Users/manonjacquin/Downloads/legaldocs"
-    output_directory = "/Users/manonjacquin/Downloads/processedLegalDocs"
-    process_documents(input_directory, output_directory)
+    main()

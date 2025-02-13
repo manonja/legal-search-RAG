@@ -1,5 +1,5 @@
-"""Utility functions and helpers for the legal-search-rag project."""
+"""Utilities package for the legal document processing system."""
 
-from .env import get_google_api_key, load_env_variables
+from utils.env import get_google_api_key, load_env
 
-__all__ = ["load_env_variables", "get_google_api_key"]
+__all__ = ["get_google_api_key", "load_env"]
