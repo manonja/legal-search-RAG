@@ -14,6 +14,7 @@ lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclu
 format = { cmd = "black . --exclude=.pixi && isort . --skip=.pixi --profile black" }
 check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --skip=.pixi --profile black" }
 process-docs = { cmd = "python process_docs.py" }
+chunk-docs = { cmd = "python chunk.py" }
 
 [pypi-dependencies]
 # Core dependencies
@@ -24,6 +25,7 @@ google-generativeai = "*" # Google's Generative AI API
 Pillow = "*"              # Python Imaging Library
 chromadb = "*"            # Vector database for embeddings
 python-dotenv = "*"       # Environment variable management
+langchain = "*"           # LangChain framework for RAG pipeline
 
 # Development dependencies
 pre-commit = "*"
