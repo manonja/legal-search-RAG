@@ -41,5 +41,3 @@ pre-commit = "*"
 black = "*"
 flake8 = "*"
 isort = "*"
-mypy = "*"
-types-tqdm = "*" # Type stubs for tqdm
