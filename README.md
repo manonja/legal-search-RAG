@@ -11,7 +11,11 @@ The system is built on three main pillars:
 Our document ingestion system employs a sophisticated processing pipeline that handles various document formats while preserving the semantic structure crucial for legal documents:
 
 - **Multi-Format Support**: Robust handling of PDF and DOC/DOCX files using industry-standard libraries (PyMuPDF and python-docx)
-- **Intelligent Text Chunking**: Implementation of context-aware document splitting using spaCy, with special attention to legal document structure (sections, articles, paragraphs)
+- **Intelligent Text Chunking**: Implementation of context-aware document splitting using LangChain's RecursiveCharacterTextSplitter:
+  - 512-character chunks with 50-character overlap
+  - Hierarchical splitting using paragraph and newline separators
+  - Preserves document structure with chunk markers
+  - Run with: `pixi run chunk-docs` (processes files from `~/Downloads/processedLegalDocs`)
 - **Semantic Preservation**: Careful handling of document hierarchies and relationships to maintain context
 
 ### 2. Vector Search Infrastructure
@@ -124,6 +128,22 @@ The project uses `pixi.toml` for dependency management and task automation:
    ```
 
 3. Keep `pixi.toml` updated when adding new dependencies
+
+### Processing Pipeline
+
+1. **Document Processing**:
+   ```bash
+   pixi run process-docs  # Converts and processes raw documents
+   ```
+
+2. **Text Chunking**:
+   ```bash
+   # Using default paths
+   pixi run chunk-docs  # Processes files from ~/Downloads/processedLegalDocs
+
+   # Or with custom paths
+   INPUT_DIR=/custom/input OUTPUT_DIR=/custom/output pixi run chunk-docs
+   ```
 
 ### Environment Setup
 
