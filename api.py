@@ -14,7 +14,7 @@ import uvicorn
 from chromadb.config import Settings
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -126,9 +126,7 @@ def get_request() -> Request:
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(
-    request: Request = Depends(get_request), exc: Exception = None
-) -> JSONResponse:
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle all unhandled exceptions globally.
 
     Args:
@@ -222,11 +220,8 @@ async def search_documents(request: QueryRequest = None) -> QueryResponse:
 
 
 @app.get("/api/health", tags=["System"])
-async def health_check(request: Request = Depends(get_request)) -> Dict[str, Any]:
+async def health_check() -> Dict[str, Any]:
     """Check the health status of the API and its dependencies.
-
-    Args:
-        request: The incoming request
 
     Returns:
         Dict containing API status and version information
