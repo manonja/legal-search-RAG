@@ -99,7 +99,6 @@ We use pre-commit hooks to ensure code quality before each commit. The following
 - **Black**: Code formatting
 - **isort**: Import sorting
 - **Flake8**: Code style and documentation checks
-- **MyPy**: Static type checking
 - **General checks**: Trailing whitespace, file endings, YAML validation
 
 To manually run all checks:
@@ -112,7 +111,7 @@ pixi run lint
 The project uses `pixi.toml` for dependency management and task automation:
 
 - Python 3.9 or higher
-- Development tools (black, flake8, isort, mypy, pre-commit)
+- Development tools (black, flake8, isort, pre-commit)
 - Predefined tasks for common operations
 
 ### Best Practices

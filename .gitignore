@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -46,37 +46,53 @@ ENV/
 *.swp
 *.swo
 .DS_Store
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+.classpath
+*.code-workspace
 
-# Testing
+# Testing and coverage
 .pytest_cache/
 .coverage
+coverage.xml
+*.cover
 htmlcov/
 .tox/
 .nox/
+nosetests.xml
+coverage/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
 
 # Logs and databases
 *.log
 *.sqlite
 *.db
+*.sqlite3
 
 # Local development settings
+.env
 .env.local
-.env.*.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Documentation
 /site
 docs/_build/
+docs/_static/
+docs/_templates/
 
-# mypy
+# Type checking
 .mypy_cache/
 .dmypy.json
 dmypy.json
+.pyre/
+.pytype/
 
 # Rope project settings
 .ropeproject
@@ -87,14 +103,53 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# ChromaDB (if using local storage)
+# Project specific
+cache/
+cache/chroma/
+cache/embeddings/
 .chroma/
 chromadb/
 
-# Environment variables
-.env
-.env.*
-!.env.example
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*~
 
-# Keep type stubs
-!stubs/
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Large media files
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+*.csv
+!requirements/*.txt
+!examples/*.csv
+
+# Secrets and keys
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+
+# Dependencies
+pixi.lock
+
+# Output directories
+output/
+results/
+temp/
+tmp/
+
+# Keep these files
+!.gitkeep
+!.env.example
+!stubs/**/*

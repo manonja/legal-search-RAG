@@ -6,8 +6,8 @@ channels = ["conda-forge"]
 platforms = ["osx-64"]
 
 [dependencies]
-python = ">=3.9"
-pip = "*"        # Required for pip installations
+python = ">=3.9,<3.13" # Pin Python version below 3.13 for better compatibility
+pip = "*"              # Required for pip installations
 
 [tasks]
 lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
@@ -15,6 +15,8 @@ format = { cmd = "black . --exclude=.pixi && isort . --skip=.pixi --profile blac
 check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --skip=.pixi --profile black" }
 process-docs = { cmd = "python process_docs.py" }
 chunk-docs = { cmd = "python chunk.py" }
+embed-docs = { cmd = "python embeddings.py" }                                                                                         # New task for embeddings
+serve-api = { cmd = "uvicorn api:app --reload --host 0.0.0.0 --port 8000" }                                                           # New task for API service
 
 [pypi-dependencies]
 # Core dependencies
@@ -23,14 +25,19 @@ python-docx = "*"         # Word document processing
 tqdm = "*"                # Progress bars
 google-generativeai = "*" # Google's Generative AI API
 Pillow = "*"              # Python Imaging Library
-chromadb = "*"            # Vector database for embeddings
+chromadb = ">=0.4.22"     # Vector database for embeddings
 python-dotenv = "*"       # Environment variable management
 langchain = "*"           # LangChain framework for RAG pipeline
+openai = "*"              # OpenAI API for embeddings
+tokenizers = "*"          # Required for Chroma's embedding functions
+
+# API dependencies
+fastapi = "*"  # FastAPI framework
+uvicorn = "*"  # ASGI server
+pydantic = "*" # Data validation
 
 # Development dependencies
 pre-commit = "*"
 black = "*"
 flake8 = "*"
 isort = "*"
-mypy = "*"
-types-tqdm = "*" # Type stubs for tqdm
