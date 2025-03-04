@@ -25,7 +25,7 @@ python-docx = "*"         # Word document processing
 tqdm = "*"                # Progress bars
 google-generativeai = "*" # Google's Generative AI API
 Pillow = "*"              # Python Imaging Library
-chromadb = ">=0.4.22"     # Vector database for embeddings
+chromadb = ">=0.4.22"     # Vector database with client extras
 python-dotenv = "*"       # Environment variable management
 langchain = "*"           # LangChain framework for RAG pipeline
 openai = "*"              # OpenAI API for embeddings

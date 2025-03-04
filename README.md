@@ -176,5 +176,39 @@ load_env_variables()
 api_key = get_google_api_key()
 ```
 
+### Testing the app in the CLI
+
+Here are some test queries you can try to evaluate different aspects of our system:
+
+1. Procedural Questions:
+"What is the proper procedure for making an objection during trial?"
+"How do I file a motion for summary judgment?"
+"What are the requirements for serving legal documents?"
+
+2. Evidence-related questions
+"What types of evidence are inadmissible in court?"
+"How do I authenticate electronic evidence?"
+"What are the rules regarding hearsay evidence?"
+
+3. Court Protocol Questions:
+"What is the proper way to address a judge?"
+"What are the dress code requirements in court?"
+"How should exhibits be presented in court?"
+
+4. Legal Rights Questions:
+"What are my rights when being questioned by police?"
+"What are the requirements for a valid search warrant?"
+"What are the Miranda rights?"
+
+5. Edge Cases:
+Very short queries: "objection"
+Complex queries: "What are the specific circumstances under which attorney-client privilege can be waived in a corporate setting?"
+Queries with typos: "What is heresay evidence?"
+
+When testing, we pay attention to:
+- Relevance: Are the returned results actually answering the question?
+- Accuracy: Is the information provided correct and up-to-date?
+- Context: Is enough context provided to understand the answer?
+- Similarity Scores: How confident is the system in its answers?
+
 ---
-*Note: This README will be updated with setup and running instructions in subsequent iterations.*

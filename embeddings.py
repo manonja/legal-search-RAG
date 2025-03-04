@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 
 import chromadb
 from chromadb.config import Settings
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from tqdm import tqdm
 
@@ -24,7 +24,7 @@ CACHE_DIR = Path("cache/embeddings")
 CHROMA_PERSIST_DIR = Path("cache/chroma")
 
 # Initialize OpenAI embedding function
-openai_ef = OpenAIEmbeddingFunction(
+openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=os.getenv("OPENAI_API_KEY"),
     model_name=EMBEDDING_MODEL,
 )
