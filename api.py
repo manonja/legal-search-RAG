@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from openai import OpenAI
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -48,7 +48,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://*.retool.com",  # Retool cloud domains
-        "http://localhost:3000",  # Local development
+        "http://localhost:8000",  # Local development
         "https://*.ngrok.io",  # ngrok tunnels
         "https://*.ngrok-free.app",  # ngrok free tier domains
     ],
@@ -88,7 +88,10 @@ except Exception as e:
     raise
 
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    timeout=60.0,  # Increase timeout for longer responses
+)
 
 
 # Request/Response Models
@@ -335,20 +338,29 @@ async def rag_search(request: QueryRequest) -> RagResponse:
 Based on the above legal context, please answer this question:
 {request.query_text}
 
-Please provide a clear, concise answer that
-directly addresses the question while accurately
-reflecting the provided legal context.
-"""
+Please provide a clear, concise answer that directly
+addresses the question while accurately reflecting the
+provided legal context."""
 
-        completion = await client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,  # Keep it factual
-        )
+        try:
+            # Make async API call
+            chat_completion = await client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,  # Keep it factual
+            )
+
+            answer = chat_completion.choices[0].message.content
+
+        except Exception as e:
+            logger.error(f"OpenAI API call failed: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to generate answer: {str(e)}"
+            )
 
         return RagResponse(
             context=formatted_results,
-            answer=completion.choices[0].message.content,
+            answer=answer,
             total_found=len(formatted_results),
         )
 
