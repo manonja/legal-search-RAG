@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Constants
-EMBEDDING_MODEL = "text-embedding-3-small"  # Updated to latest model
+EMBEDDING_MODEL = "text-embedding-ada-002"  # Updated to latest model
 CHROMA_PERSIST_DIR = Path("cache/chroma")
 API_VERSION = "1.0.0"
 
@@ -103,7 +103,7 @@ class QueryRequest(BaseModel):
         default=5, ge=1, le=20, description="Number of results to return"
     )
     min_similarity: float = Field(
-        default=0.0,
+        default=0.8,
         ge=0.0,
         le=1.0,
         description="Minimum similarity threshold (0 to 1)",
@@ -331,16 +331,20 @@ async def rag_search(request: QueryRequest) -> RagResponse:
             ]
         )
 
+        logger.debug(f"""Context for GPT-4:\n{context}""")
+
         # Query GPT-4
-        prompt = f"""Legal context documents:
-{context}
+        prompt = f"""Below are several excerpts from legal documents retrieved
+        based on the query:\n:
+        ------\n{context}\n------\n
 
-Based on the above legal context, please answer this question:
-{request.query_text}
+        Based on the above context (if relevant), please provide a clear
+        and concise answer to the following legal question:\n
+        {request.query_text}\n\n
 
-Please provide a clear, concise answer that directly
-addresses the question while accurately reflecting the
-provided legal context."""
+        If none of the provided context is relevant, please state that no
+        clear answer could be determined from the available documents.
+        """
 
         try:
             # Make async API call
