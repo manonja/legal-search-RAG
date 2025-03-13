@@ -117,7 +117,7 @@ answer = response.json()
 Active development - core features implemented, optimizations ongoing
 
 ## License
-MIT
+Apache-2.0 license
 
 ## Performance Metrics
 - 83% accuracy in legal QA benchmarks
