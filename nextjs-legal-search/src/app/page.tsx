@@ -5,20 +5,20 @@ export default function Home() {
     <div className="container mx-auto px-4 max-w-7xl">
       {/* Hero Section */}
       <section className="text-center py-20">
-        <h1 className="text-5xl font-bold mb-5 leading-tight">
-          Legal Research
+        <h1 className="text-5xl text-gray-800 font-bold mb-5 leading-tight">
+          Legal Research Made Easy
           <br />
           With Generative AI
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-          Search legal documents with semantic similarity and get AI-powered
+          Search legal documents with semantic similarity and AI generated
           answers based on your data.
           <br />
         </p>
         <div>
           <Link
             href="/signup"
-            className="bg-black text-white px-8 py-3 rounded-full font-semibold mr-4 hover:bg-gray-800 transition-colors inline-block"
+            className="bg-gray-800 text-white px-8 py-3 rounded-full font-semibold mr-4 hover:bg-gray-800 transition-colors inline-block"
           >
             Start Free
           </Link>
@@ -33,28 +33,14 @@ export default function Home() {
           className="border border-gray-200 rounded-lg px-6 py-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer"
         >
           <span className="text-xl">🔍</span>
-          <span className="font-medium">Search</span>
+          <span className="font-medium">Document Search</span>
         </Link>
         <Link
           href="/rag-search"
           className="border border-gray-200 rounded-lg px-6 py-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer"
         >
           <span className="text-xl">💬</span>
-          <span className="font-medium">Legal Research Agent</span>
-        </Link>
-        <Link
-          href="/citator"
-          className="border border-gray-200 rounded-lg px-6 py-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer"
-        >
-          <span className="text-xl">📝</span>
-          <span className="font-medium">Citator</span>
-        </Link>
-        <Link
-          href="/coverage"
-          className="border border-gray-200 rounded-lg px-6 py-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer"
-        >
-          <span className="text-xl">📊</span>
-          <span className="font-medium">Full Coverage</span>
+          <span className="font-medium">Ask Legal Questions</span>
         </Link>
       </section>
 

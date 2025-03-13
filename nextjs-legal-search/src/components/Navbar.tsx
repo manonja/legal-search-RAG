@@ -53,7 +53,7 @@ export default function Navbar() {
       {/* Login Button - Right */}
       <Link
         href="/login"
-        className="bg-black text-white px-5 py-2 rounded-full font-semibold hover:bg-gray-800 transition-colors"
+        className="bg-gray-800 text-white px-5 py-2 rounded-full font-semibold hover:bg-gray-800 transition-colors"
       >
         Log in
       </Link>
