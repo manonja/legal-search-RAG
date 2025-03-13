@@ -49,8 +49,10 @@ app.add_middleware(
     allow_origins=[
         "https://*.retool.com",  # Retool cloud domains
         "http://localhost:8000",  # Local development
+        "http://localhost:3000",  # Next.js local development
         "https://*.ngrok.io",  # ngrok tunnels
         "https://*.ngrok-free.app",  # ngrok free tier domains
+        "https://your-nextjs-domain.com",  # Production Next.js domain
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],

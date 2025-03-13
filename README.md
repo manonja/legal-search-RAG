@@ -25,12 +25,19 @@ The core search functionality is powered by a modern vector search implementatio
 - **Efficient Storage**: ChromaDB integration for fast and reliable vector storage and retrieval
 - **Hybrid Search Capabilities**: Combination of semantic and keyword-based search for maximum accuracy
 
-### 3. Interactive Search Interface
-A Retool-based interface that provides:
+### 3. User Interface Options
+The system offers two user interface options:
 
+#### Retool Interface (Original)
 - **Intuitive Query Interface**: Legal-specific search features with intelligent autocompletion
 - **Flexible Search Modes**: Support for both exact phrase matching and semantic search
 - **Rich Results Display**: Context-aware result presentation with relevant highlights
+
+#### Next.js Frontend (New)
+- **Modern UI**: Clean, responsive design built with Next.js and Tailwind CSS
+- **Document Search**: Dedicated page for searching legal documents with real-time results
+- **RAG-Powered Q&A**: Ask legal questions and get AI-generated answers based on your document corpus
+- **Mobile-Friendly**: Fully responsive design that works on all devices
 
 ## Technical Highlights
 
@@ -38,6 +45,7 @@ A Retool-based interface that provides:
 - **Hybrid Search Architecture**: Combination of vector similarity and traditional search methods
 - **Performance Optimization**: Built-in caching and parallel processing capabilities
 - **Privacy-First Design**: Local ChromaDB storage ensuring data privacy and compliance
+- **Modern Frontend**: Next.js application with TypeScript and Tailwind CSS
 
 ## Performance Metrics
 
@@ -55,6 +63,7 @@ The system is designed with scalability in mind, with planned improvements inclu
 - Legal-specific query expansion
 - Response caching optimization
 - Parallel document processing improvements
+- Authentication and user management for the Next.js frontend
 
 ## Development Setup
 
@@ -64,6 +73,7 @@ This project uses modern Python development tools to ensure code quality and mai
 
 - [Pixi](https://pixi.sh) - A fast, modern package manager built on top of Conda
 - Git
+- Node.js 18+ (for Next.js frontend)
 
 ### Getting Started
 
@@ -77,6 +87,28 @@ This project uses modern Python development tools to ensure code quality and mai
    ```bash
    pixi install
    ```
+
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys
+   ```
+
+4. Start the FastAPI backend:
+   ```bash
+   pixi run serve-api
+   ```
+
+5. Set up the Next.js frontend:
+   ```bash
+   cd nextjs-legal-search
+   npm install
+   npm run dev
+   ```
+
+6. Access the applications:
+   - FastAPI Swagger UI: http://localhost:8000
+   - Next.js frontend: http://localhost:3000
 
 ### Development Tools
 
@@ -158,8 +190,8 @@ This project uses environment variables for managing sensitive configuration lik
 2. **Configure your environment**:
    Edit `.env` and add your actual values:
    ```bash
-   # Google API Configuration
-   GOOGLE_API_KEY=your_api_key_here  # Replace with your API key
+   # OpenAI API Configuration
+   OPENAI_API_KEY=your_api_key_here  # Replace with your API key
    ```
 
 #### Environment Variables in Code
@@ -167,48 +199,127 @@ This project uses environment variables for managing sensitive configuration lik
 The project provides utility functions to handle environment variables:
 
 ```python
-from utils import load_env_variables, get_google_api_key
+from utils import load_env_variables, get_openai_api_key
 
 # Load environment variables at startup
 load_env_variables()
 
 # Use the API key
-api_key = get_google_api_key()
+api_key = get_openai_api_key()
 ```
 
-### Testing the app in the CLI
+## Testing the Application
+
+### Running the Application Locally
+
+1. Start the FastAPI backend:
+   ```bash
+   pixi run serve-api
+   ```
+
+2. Start the Next.js frontend:
+   ```bash
+   cd nextjs-legal-search
+   npm run dev
+   ```
+
+3. Access the applications:
+   - FastAPI Swagger UI: http://localhost:8000
+   - Next.js frontend: http://localhost:3000
+
+### Test Scenarios
+
+Here are some scenarios to test the application's functionality:
+
+#### 1. Document Search
+
+1. Navigate to http://localhost:3000/search
+2. Enter a search query like "objection during trial" or "summary judgment"
+3. Observe the search results, including:
+   - Relevant document chunks
+   - Similarity scores
+   - Document metadata
+
+#### 2. RAG-Powered Legal Questions
+
+1. Navigate to http://localhost:3000/rag-search
+2. Ask a legal question like "What is the proper procedure for making an objection during trial?"
+3. Observe the AI-generated answer and the supporting context documents
+
+#### 3. API Direct Access
+
+You can also test the API directly using the Swagger UI or curl:
+
+```bash
+# Health check
+curl http://localhost:8000/api/health
+
+# Document search
+curl -X POST http://localhost:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"query_text": "summary judgment", "n_results": 5}'
+
+# RAG search
+curl -X POST http://localhost:8000/api/rag-search \
+  -H "Content-Type: application/json" \
+  -d '{"query_text": "What is hearsay evidence?", "n_results": 5}'
+```
+
+### Sample Test Queries
 
 Here are some test queries you can try to evaluate different aspects of our system:
 
-1. Procedural Questions:
-"What is the proper procedure for making an objection during trial?"
-"How do I file a motion for summary judgment?"
-"What are the requirements for serving legal documents?"
+1. **Procedural Questions**:
+   - "What is the proper procedure for making an objection during trial?"
+   - "How do I file a motion for summary judgment?"
+   - "What are the requirements for serving legal documents?"
 
-2. Evidence-related questions
-"What types of evidence are inadmissible in court?"
-"How do I authenticate electronic evidence?"
-"What are the rules regarding hearsay evidence?"
+2. **Evidence-related Questions**:
+   - "What types of evidence are inadmissible in court?"
+   - "How do I authenticate electronic evidence?"
+   - "What are the rules regarding hearsay evidence?"
 
-3. Court Protocol Questions:
-"What is the proper way to address a judge?"
-"What are the dress code requirements in court?"
-"How should exhibits be presented in court?"
+3. **Court Protocol Questions**:
+   - "What is the proper way to address a judge?"
+   - "What are the dress code requirements in court?"
+   - "How should exhibits be presented in court?"
 
-4. Legal Rights Questions:
-"What are my rights when being questioned by police?"
-"What are the requirements for a valid search warrant?"
-"What are the Miranda rights?"
+4. **Legal Rights Questions**:
+   - "What are my rights when being questioned by police?"
+   - "What are the requirements for a valid search warrant?"
+   - "What are the Miranda rights?"
 
-5. Edge Cases:
-Very short queries: "objection"
-Complex queries: "What are the specific circumstances under which attorney-client privilege can be waived in a corporate setting?"
-Queries with typos: "What is heresay evidence?"
+5. **Edge Cases**:
+   - Very short queries: "objection"
+   - Complex queries: "What are the specific circumstances under which attorney-client privilege can be waived in a corporate setting?"
+   - Queries with typos: "What is heresay evidence?"
 
-When testing, we pay attention to:
-- Relevance: Are the returned results actually answering the question?
-- Accuracy: Is the information provided correct and up-to-date?
-- Context: Is enough context provided to understand the answer?
-- Similarity Scores: How confident is the system in its answers?
+When testing, pay attention to:
+- **Relevance**: Are the returned results actually answering the question?
+- **Accuracy**: Is the information provided correct and up-to-date?
+- **Context**: Is enough context provided to understand the answer?
+- **Similarity Scores**: How confident is the system in its answers?
+- **Response Time**: How quickly does the system respond to queries?
+
+## Deployment
+
+### Docker Deployment
+
+The project includes Docker configuration for easy deployment:
+
+```bash
+# Build and run both services
+docker-compose up --build -d
+```
+
+This will:
+- Build and run the FastAPI backend
+- Build and run the Next.js frontend
+- Set up Nginx as a reverse proxy
+
+Access the deployed application at:
+- http://localhost (Nginx proxy)
+- http://localhost:8000 (Direct API access)
+- http://localhost:3000 (Direct frontend access)
 
 ---
