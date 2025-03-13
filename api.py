@@ -12,11 +12,12 @@ from typing import Any, Dict, List, Optional, TypeVar, cast
 import chromadb
 import uvicorn
 from chromadb.config import Settings
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Constants
-EMBEDDING_MODEL = "text-embedding-3-small"  # Updated to latest model
+EMBEDDING_MODEL = "text-embedding-ada-002"  # Updated to latest model
 CHROMA_PERSIST_DIR = Path("cache/chroma")
 API_VERSION = "1.0.0"
 
@@ -45,15 +46,24 @@ app = FastAPI(
 # Add CORS middleware for Retool
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[
+        "https://*.retool.com",  # Retool cloud domains
+        "http://localhost:8000",  # Local development
+        "http://localhost:3000",  # Next.js local development
+        "https://*.ngrok.io",  # ngrok tunnels
+        "https://*.ngrok-free.app",  # ngrok free tier domains
+        "https://your-nextjs-domain.com",  # Production Next.js domain
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,  # Cache preflight requests for 24 hours
 )
 
 try:
     # Initialize OpenAI embedding function
-    openai_ef = OpenAIEmbeddingFunction(
+    openai_ef = embedding_functions.OpenAIEmbeddingFunction(
         api_key=os.getenv("OPENAI_API_KEY"),
         model_name=EMBEDDING_MODEL,
     )
@@ -79,6 +89,12 @@ except Exception as e:
     logger.error(f"Failed to initialize Chroma: {str(e)}")
     raise
 
+# Initialize OpenAI client
+client = AsyncOpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    timeout=60.0,  # Increase timeout for longer responses
+)
+
 
 # Request/Response Models
 class QueryRequest(BaseModel):
@@ -89,7 +105,7 @@ class QueryRequest(BaseModel):
         default=5, ge=1, le=20, description="Number of results to return"
     )
     min_similarity: float = Field(
-        default=0.0,
+        default=0.8,
         ge=0.0,
         le=1.0,
         description="Minimum similarity threshold (0 to 1)",
@@ -114,6 +130,14 @@ class QueryResponse(BaseModel):
 
     results: List[SearchResult] = Field(..., description="List of search results")
     total_found: int = Field(..., description="Total number of results")
+
+
+class RagResponse(BaseModel):
+    """Response model for RAG-enhanced search queries."""
+
+    context: List[SearchResult] = Field(..., description="Retrieved context documents")
+    answer: str = Field(..., description="GPT-4 generated answer")
+    total_found: int = Field(..., description="Total number of context documents found")
 
 
 def get_request() -> Request:
@@ -238,6 +262,117 @@ async def health_check() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {"status": "unhealthy", "version": API_VERSION, "error": str(e)}
+
+
+@app.post("/api/rag-search", response_model=RagResponse, tags=["Search"])
+async def rag_search(request: QueryRequest) -> RagResponse:
+    """Search documents and generate answer using GPT-4.
+
+    This endpoint combines vector search with GPT-4 processing to provide
+    context-aware answers to legal questions.
+
+    Args:
+        request: Search parameters including query text and filters
+
+    Returns:
+        RagResponse containing context documents and GPT-4 generated answer
+
+    Raises:
+        HTTPException: If the search or GPT-4 processing fails
+    """
+    try:
+        if not request:
+            raise HTTPException(status_code=400, detail="Missing request body")
+
+        logger.info(f"Processing RAG search request: {request.query_text}")
+
+        # Query Chroma
+        results = collection.query(
+            query_texts=[request.query_text],
+            n_results=request.n_results,
+            where=request.metadata_filter,
+            include=["documents", "metadatas", "distances"],
+        )
+
+        if not results or not results.get("documents"):
+            logger.warning("No results found for query")
+            return RagResponse(
+                context=[], answer="No relevant documents found.", total_found=0
+            )
+
+        # Process results
+        formatted_results = []
+        for idx, (doc, metadata, distance) in enumerate(
+            zip(
+                results["documents"][0],
+                results["metadatas"][0],
+                results["distances"][0],
+            )
+        ):
+            # Convert distance to similarity score (0 to 1)
+            similarity = 1 - (distance / 2)
+
+            # Skip results below similarity threshold
+            if similarity < request.min_similarity:
+                continue
+
+            formatted_results.append(
+                SearchResult(
+                    chunk=doc,
+                    metadata=cast(Dict[str, Any], metadata),
+                    similarity=similarity,
+                    rank=idx + 1,
+                )
+            )
+
+        # Prepare context for GPT-4
+        context = "\n\n".join(
+            [
+                f"Document {r.rank} (Similarity: {r.similarity:.2%}):\n{r.chunk}"
+                for r in formatted_results
+            ]
+        )
+
+        logger.debug(f"""Context for GPT-4:\n{context}""")
+
+        # Query GPT-4
+        prompt = f"""Below are several excerpts from legal documents retrieved
+        based on the query:\n:
+        ------\n{context}\n------\n
+
+        Based on the above context (if relevant), please provide a clear
+        and concise answer to the following legal question:\n
+        {request.query_text}\n\n
+
+        If none of the provided context is relevant, please state that no
+        clear answer could be determined from the available documents.
+        """
+
+        try:
+            # Make async API call
+            chat_completion = await client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,  # Keep it factual
+            )
+
+            answer = chat_completion.choices[0].message.content
+
+        except Exception as e:
+            logger.error(f"OpenAI API call failed: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to generate answer: {str(e)}"
+            )
+
+        return RagResponse(
+            context=formatted_results,
+            answer=answer,
+            total_found=len(formatted_results),
+        )
+
+    except Exception as e:
+        logger.error(f"RAG search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"RAG search failed: {str(e)}")
 
 
 if __name__ == "__main__":
