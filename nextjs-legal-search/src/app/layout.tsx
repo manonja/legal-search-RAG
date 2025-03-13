@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="container mx-auto px-4 max-w-7xl">
           <Navbar />
           <main className="flex-grow">{children}</main>
           <footer className="bg-white py-6 border-t">
