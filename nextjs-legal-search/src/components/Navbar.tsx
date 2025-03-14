@@ -33,7 +33,7 @@ export default function Navbar() {
       </Link>
 
       {/* Navigation Items - Center */}
-      <div className="hidden md:flex items-center justify-center space-x-8 flex-1 mx-10">
+      <div className="flex items-center justify-center space-x-8 flex-1 mx-10">
         {navItems.map((item) => (
           <Link
             key={item.href}
@@ -49,14 +49,6 @@ export default function Navbar() {
           </Link>
         ))}
       </div>
-
-      {/* Login Button - Right */}
-      <Link
-        href="/login"
-        className="bg-gray-800 text-white px-5 py-2 rounded-full font-semibold hover:bg-gray-800 transition-colors"
-      >
-        Log in
-      </Link>
     </nav>
   );
 }
