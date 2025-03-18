@@ -11,6 +11,7 @@ export default function SearchPage() {
   const [totalFound, setTotalFound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,6 +20,7 @@ export default function SearchPage() {
 
     setIsLoading(true);
     setError(null);
+    setHasSearched(true);
 
     try {
       const request: QueryRequest = {
@@ -125,7 +127,7 @@ export default function SearchPage() {
         </section>
       ) : (
         !isLoading &&
-        query && (
+        hasSearched && (
           <div className="text-center py-10">
             <p className="text-gray-600 text-lg">
               No results found. Try a different search term.

@@ -11,8 +11,8 @@ export default function Navbar() {
   const navItems = [
     { name: "Document Search", href: "/search" },
     { name: "Ask Legal Questions", href: "/rag-search" },
-    { name: "About", href: "/about" },
     { name: "Book Demo", href: "/book-demo" },
+    { name: "About", href: "/about" },
   ];
 
   return (

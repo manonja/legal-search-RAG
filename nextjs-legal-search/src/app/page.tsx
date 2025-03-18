@@ -6,7 +6,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="text-center py-20">
         <h1 className="text-5xl text-gray-800 font-bold mb-5 leading-tight">
-          Legal Research Made Easy
+          Legal Search Made Easy
           <br />
           With Generative AI
         </h1>
@@ -20,9 +20,8 @@ export default function Home() {
             href="/signup"
             className="bg-gray-800 text-white px-8 py-3 rounded-full font-semibold mr-4 hover:bg-gray-800 transition-colors inline-block"
           >
-            Start Free
+            Book demo
           </Link>
-          <span className="text-gray-600">2-week free trial.</span>
         </div>
       </section>
 
