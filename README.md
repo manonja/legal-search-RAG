@@ -3,7 +3,7 @@
 ![Legal Search Banner](assets/images/app-screenshot.png)
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yourusername/legal-search-rag)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.9+-yellow.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.95.0-009688.svg)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-13.0+-black.svg)](https://nextjs.org/)
@@ -79,9 +79,8 @@ pixi run chunk-docs
 #### Document Search (http://localhost:3000/search)
 Use these keywords or phrases to find relevant document sections:
 - "summary judgment"
-- "objection during trial"
+- "objection trial"
 - "hearsay evidence"
-- "motion to dismiss"
 
 #### Legal Q&A (http://localhost:3000/rag-search)
 Ask complete questions to get AI-generated answers:
@@ -126,7 +125,7 @@ answer = response.json()
 Active development - core features implemented, optimizations ongoing
 
 ## License
-MIT
+Apache 2.0
 
 ## Performance Metrics
 - 83% accuracy in legal QA benchmarks
