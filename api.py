@@ -4,8 +4,10 @@ This module provides REST API endpoints for Retool to interact with the
 Chroma vector database.
 """
 
+import hashlib
 import logging
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TypeVar, cast
 
@@ -97,6 +99,10 @@ client = AsyncOpenAI(
     timeout=60.0,  # Increase timeout for longer responses
 )
 
+# Cache for storing query results
+query_cache: Dict[str, Dict] = {}
+CACHE_DURATION = timedelta(hours=24)  # Cache duration for query results
+
 
 # Request/Response Models
 class QueryRequest(BaseModel):
@@ -104,10 +110,10 @@ class QueryRequest(BaseModel):
 
     query_text: str = Field(..., min_length=1, description="The text to search for")
     n_results: int = Field(
-        default=5, ge=1, le=20, description="Number of results to return"
+        default=3, ge=1, le=20, description="Number of results to return"
     )
     min_similarity: float = Field(
-        default=0.8,
+        default=0.7,
         ge=0.0,
         le=1.0,
         description="Minimum similarity threshold (0 to 1)",
@@ -286,6 +292,44 @@ async def health_check() -> Dict[str, Any]:
         return {"status": "unhealthy", "version": API_VERSION, "error": str(e)}
 
 
+def get_query_hash(query_text: str) -> str:
+    """Generate a hash for the query text to use as cache key."""
+    return hashlib.md5(query_text.encode()).hexdigest()
+
+
+def is_cache_valid(cache_entry: Dict) -> bool:
+    """Check if a cache entry is still valid."""
+    if not cache_entry:
+        return False
+    cache_time = datetime.fromisoformat(cache_entry.get("timestamp", ""))
+    return datetime.now() - cache_time < CACHE_DURATION
+
+
+async def process_document_chunk(
+    chunk: Dict, collection: chromadb.Collection
+) -> Optional[Dict]:
+    """Process a single document chunk asynchronously."""
+    try:
+        # Extract metadata
+        metadata = chunk.get("metadata", {})
+        source = metadata.get("source", "")
+        title = metadata.get("title", "")
+        similarity = chunk.get("distance", 0.0)
+
+        # Get the document content
+        content = chunk.get("document", "")
+
+        return {
+            "source": source,
+            "title": title,
+            "similarity": similarity,
+            "content": content,
+        }
+    except Exception as e:
+        logger.error(f"Error processing document chunk: {e}")
+        return None
+
+
 @app.post("/api/rag-search", response_model=RagResponse, tags=["Search"])
 async def rag_search(request: QueryRequest) -> RagResponse:
     """Search documents and generate answer using GPT-4.
@@ -308,7 +352,14 @@ async def rag_search(request: QueryRequest) -> RagResponse:
 
         logger.info(f"Processing RAG search request: {request.query_text}")
 
-        # Query Chroma
+        # Check cache first
+        query_hash = get_query_hash(request.query_text)
+        cached_result = query_cache.get(query_hash)
+        if cached_result and is_cache_valid(cached_result):
+            logger.info("Returning cached result")
+            return RagResponse(**cached_result["data"])
+
+        # Query Chroma with optimized parameters
         results = collection.query(
             query_texts=[request.query_text],
             n_results=request.n_results,
@@ -366,52 +417,87 @@ async def rag_search(request: QueryRequest) -> RagResponse:
         # Prepare context for GPT-4
         context = "\n\n".join(
             [
-                f"Document {r.rank} (Similarity: {r.similarity:.2%}):\n{r.chunk}"
+                (
+                    f"Document {r.rank} (Similarity: {r.similarity:.2%}):\n"
+                    f"Source: {r.metadata.get('source', 'Unknown Document')}\n"
+                    f"{r.chunk}"
+                )
                 for r in formatted_results
             ]
         )
 
         logger.debug(f"""Context for GPT-4:\n{context}""")
 
-        # Query GPT-4
-        prompt = f"""Below are several excerpts from legal documents retrieved
-        based on the query:\n:
-        ------\n{context}\n------\n
+        # Query GPT-4 with optimized prompt
+        system_message = (
+            "You are a legal research assistant providing answers based on the "
+            "provided legal documents.\nYour responses should be comprehensive but "
+            "concise, including:\n1. A brief summary (2-3 sentences)\n2. Key legal "
+            "concepts (bullet points)\n3. Relevant case law (if mentioned)\n4. "
+            "Practical considerations (if applicable)\n5. Source attribution with "
+            "clickable links\n\n"
+            "Format your response in markdown with appropriate headers. For each "
+            "source you reference, include a clickable link using the format:\n"
+            "[Source Name](source:filename.txt)\n\n"
+            'For example, if you reference information from "Medical Malpractice '
+            'Guide.txt", include a link like:\n'
+            "[Medical Malpractice Guide](source:Medical Malpractice Guide.txt)\n\n"
+            "This will allow users to click directly on the source to view the "
+            "full document."
+        )
 
-        Based on the above context (if relevant), please provide a clear
-        and concise answer to the following legal question:\n
-        {request.query_text}\n\n
-
-        If none of the provided context is relevant, please state that no
-        clear answer could be determined from the available documents.
-        """
+        user_prompt = (
+            "Based on the following legal document excerpts, please provide a "
+            "concise answer to this legal question:\n\n"
+            f"{request.query_text}\n\n"
+            "Document excerpts:\n"
+            "------\n"
+            f"{context}\n"
+            "------\n\n"
+            "Please structure your response to be clear and concise, focusing on "
+            "the most relevant information. Include clickable links to the source "
+            "documents where you reference them."
+        )
 
         try:
-            # Make async API call
+            # Make async API call with optimized parameters
             chat_completion = await client.chat.completions.create(
                 model="gpt-4",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,  # Keep it factual
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.0,
+                max_tokens=1000,  # Limit response length
             )
 
             answer = chat_completion.choices[0].message.content
 
-        except Exception as e:
-            logger.error(f"OpenAI API call failed: {str(e)}")
-            raise HTTPException(
-                status_code=500, detail=f"Failed to generate answer: {str(e)}"
-            )
+            # Cache the result
+            response_data = {
+                "context": [
+                    result.dict() for result in formatted_results
+                ],  # Convert SearchResult objects to dicts
+                "answer": answer,
+                "total_found": len(formatted_results),
+                "document_sources": [
+                    source.dict() for source in document_sources.values()
+                ],
+            }
+            query_cache[query_hash] = {
+                "data": response_data,
+                "timestamp": datetime.now().isoformat(),
+            }
 
-        return RagResponse(
-            context=formatted_results,
-            answer=answer,
-            total_found=len(formatted_results),
-            document_sources=list(document_sources.values()),
-        )
+            return RagResponse(**response_data)
+
+        except Exception as e:
+            logger.error(f"Error in GPT-4 API call: {e}")
+            raise HTTPException(status_code=500, detail="Error generating response")
 
     except Exception as e:
-        logger.error(f"RAG search failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"RAG search failed: {str(e)}")
+        logger.error(f"Error in rag_search: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def get_document_path(document_id: str) -> Path:
@@ -423,16 +509,45 @@ def get_document_path(document_id: str) -> Path:
     Returns:
         Path to the processed document
     """
+    # Remove any URL encoding
+    document_id = document_id.replace("%20", " ")
+
+    logger.info(f"Looking for document: {document_id}")
+
+    # Look in processed docs directory first
     docs_root = Path(get_docs_root())
+    logger.info(f"Searching in processed docs directory: {docs_root}")
+
     # First try the exact path if it exists
     if (docs_root / document_id).exists():
+        logger.info(f"Found document at exact path: {docs_root / document_id}")
         return docs_root / document_id
 
-    # Then try finding it by name only
+    # Then try finding it by name only, including in subdirectories
     for file in docs_root.rglob("*"):
         if file.name == document_id:
+            logger.info(f"Found document by name: {file}")
             return file
 
+    # If not found in processed docs, look in chunked docs directory
+    chunks_dir = Path(
+        os.getenv("CHUNKS_DIR", os.path.expanduser("~/Downloads/chunkedLegalDocs"))
+    )
+    logger.info(f"Searching in chunked docs directory: {chunks_dir}")
+
+    # First try the exact path if it exists
+    if (chunks_dir / document_id).exists():
+        logger.info(f"Found document at exact path: {chunks_dir / document_id}")
+        return chunks_dir / document_id
+
+    # Then try finding it by name only, including in subdirectories
+    for file in chunks_dir.rglob("*"):
+        if file.name == document_id:
+            logger.info(f"Found document by name: {file}")
+            return file
+
+    # If we get here, we didn't find the document
+    logger.error(f"Document not found: {document_id}")
     raise FileNotFoundError(f"Document not found: {document_id}")
 
 

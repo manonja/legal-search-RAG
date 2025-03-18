@@ -1,7 +1,6 @@
 "use client";
 
-import DocumentModal from "@/components/DocumentModal";
-import { api, QueryRequest, RagResponse, SearchResult } from "@/lib/api";
+import { api, QueryRequest, RagResponse } from "@/lib/api";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -11,9 +10,6 @@ export default function RagSearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<SearchResult | null>(
-    null
-  );
 
   // Function to highlight matching text
   const highlightText = (text: string, searchQuery: string) => {
@@ -48,7 +44,6 @@ export default function RagSearchPage() {
     setIsLoading(true);
     setError(null);
     setResponse(null);
-    setSelectedDocument(null);
 
     try {
       const request: QueryRequest = {
@@ -69,8 +64,18 @@ export default function RagSearchPage() {
     }
   };
 
-  const handleViewDocument = (result: SearchResult) => {
-    setSelectedDocument(result);
+  const renderAnswer = (answer: string) => {
+    // Split the answer into sections
+    const sections = answer.split("\n\n").filter((section) => section.trim());
+
+    return sections.map((section, index) => {
+      // Regular markdown content
+      return (
+        <div key={index} className="mb-4">
+          <ReactMarkdown>{section}</ReactMarkdown>
+        </div>
+      );
+    });
   };
 
   return (
@@ -132,7 +137,7 @@ export default function RagSearchPage() {
                 Answer
               </h2>
               <div className="prose max-w-none text-gray-700">
-                <ReactMarkdown>{response.answer}</ReactMarkdown>
+                {renderAnswer(response.answer)}
               </div>
             </div>
 
@@ -189,12 +194,6 @@ export default function RagSearchPage() {
                       <span className="text-sm text-gray-500">
                         {result.metadata.source || "Unknown Document"}
                       </span>
-                      <button
-                        onClick={() => handleViewDocument(result)}
-                        className="text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        View Original Document
-                      </button>
                     </div>
                     <div className="flex gap-3 mb-4 flex-wrap">
                       <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
@@ -216,13 +215,6 @@ export default function RagSearchPage() {
           </div>
         </section>
       )}
-
-      {/* Document Modal */}
-      <DocumentModal
-        isOpen={!!selectedDocument}
-        onClose={() => setSelectedDocument(null)}
-        document={selectedDocument}
-      />
     </div>
   );
 }
