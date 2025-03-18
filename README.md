@@ -2,6 +2,12 @@
 
 ![Legal Search Banner](assets/images/app-screenshot.png)
 
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yourusername/legal-search-rag)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9+-yellow.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.95.0-009688.svg)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-13.0+-black.svg)](https://nextjs.org/)
+
 ## Project Description
 A Retrieval-Augmented Generation (RAG) system specifically designed for legal document search, combining vector search with LLM capabilities to provide accurate answers to legal queries based on your document corpus.
 
@@ -12,6 +18,9 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 - **RAG-Powered Q&A**: Ask legal questions and get AI-generated answers based on your document corpus
 - **Privacy-First**: Local ChromaDB storage ensuring data privacy and compliance
 
+## Screenshots
+![Search Interface](assets/images/search-interface.png)
+![RAG Results](assets/images/rag-results.png)
 
 ## Installation
 
@@ -117,7 +126,7 @@ answer = response.json()
 Active development - core features implemented, optimizations ongoing
 
 ## License
-Apache-2.0 license
+MIT
 
 ## Performance Metrics
 - 83% accuracy in legal QA benchmarks

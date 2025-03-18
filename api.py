@@ -20,6 +20,8 @@ from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
+from utils.env import get_docs_root
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,6 +140,15 @@ class RagResponse(BaseModel):
     context: List[SearchResult] = Field(..., description="Retrieved context documents")
     answer: str = Field(..., description="GPT-4 generated answer")
     total_found: int = Field(..., description="Total number of context documents found")
+
+
+class DocumentResponse(BaseModel):
+    """Response model for full document retrieval."""
+
+    content: str = Field(..., description="Full document content")
+    metadata: Dict[str, Any] = Field(..., description="Document metadata")
+    source: str = Field(..., description="Document source path")
+    chunks: List[str] = Field(..., description="List of chunks from this document")
 
 
 def get_request() -> Request:
@@ -373,6 +384,75 @@ async def rag_search(request: QueryRequest) -> RagResponse:
     except Exception as e:
         logger.error(f"RAG search failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"RAG search failed: {str(e)}")
+
+
+def get_document_path(document_id: str) -> Path:
+    """Get the full path to a document from its ID.
+
+    Args:
+        document_id: Document identifier (filename)
+
+    Returns:
+        Path to the processed document
+    """
+    docs_root = Path(get_docs_root())
+    # First try the exact path if it exists
+    if (docs_root / document_id).exists():
+        return docs_root / document_id
+
+    # Then try finding it by name only
+    for file in docs_root.rglob("*"):
+        if file.name == document_id:
+            return file
+
+    raise FileNotFoundError(f"Document not found: {document_id}")
+
+
+@app.get(
+    "/api/documents/{document_id}", response_model=DocumentResponse, tags=["Documents"]
+)
+async def get_document(document_id: str) -> DocumentResponse:
+    """Retrieve a full document by its ID.
+
+    Args:
+        document_id: Document identifier (filename)
+
+    Returns:
+        DocumentResponse containing the full document and metadata
+
+    Raises:
+        HTTPException: If document is not found or can't be accessed
+    """
+    try:
+        # Get the document path
+        try:
+            doc_path = get_document_path(document_id)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        # Load full document content
+        try:
+            with open(doc_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to read document: {str(e)}"
+            )
+
+        # Return document response
+        return DocumentResponse(
+            content=content,
+            metadata={"filename": doc_path.name},
+            source=str(doc_path),
+            chunks=[],  # Empty chunks since we're not using Chroma here
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve document: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
