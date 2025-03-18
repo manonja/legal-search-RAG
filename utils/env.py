@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Required environment variables
-REQUIRED_ENV_VARS = ["GOOGLE_API_KEY"]
+REQUIRED_ENV_VARS = ["GOOGLE_API_KEY", "DOCS_ROOT"]
 
 
 def get_env_file_path() -> Path:
@@ -95,3 +95,18 @@ def get_output_dir() -> str:
         str: The output directory path.
     """
     return os.getenv("OUTPUT_DIR", os.path.expanduser("~/Downloads/processedLegalDocs"))
+
+
+def get_docs_root() -> Path:
+    """Get the root directory for document storage.
+
+    Returns:
+        Path: Absolute path to the documents directory
+
+    Raises:
+        ValueError: If DOCS_ROOT is not set
+    """
+    docs_root = os.getenv("DOCS_ROOT")
+    if not docs_root:
+        raise ValueError("DOCS_ROOT environment variable is not set")
+    return Path(docs_root).expanduser().resolve()

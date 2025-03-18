@@ -20,6 +20,8 @@ from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
+from utils.env import get_docs_root
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,6 +140,15 @@ class RagResponse(BaseModel):
     context: List[SearchResult] = Field(..., description="Retrieved context documents")
     answer: str = Field(..., description="GPT-4 generated answer")
     total_found: int = Field(..., description="Total number of context documents found")
+
+
+class DocumentResponse(BaseModel):
+    """Response model for full document retrieval."""
+
+    content: str = Field(..., description="Full document content")
+    metadata: Dict[str, Any] = Field(..., description="Document metadata")
+    source: str = Field(..., description="Document source path")
+    chunks: List[str] = Field(..., description="List of chunks from this document")
 
 
 def get_request() -> Request:
@@ -373,6 +384,114 @@ async def rag_search(request: QueryRequest) -> RagResponse:
     except Exception as e:
         logger.error(f"RAG search failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"RAG search failed: {str(e)}")
+
+
+def get_document_path(source: str) -> Path:
+    """Get the full path to a document from its source identifier.
+
+    Args:
+        source: Source path from metadata
+
+    Returns:
+        Path: Full path to the document
+
+    Raises:
+        ValueError: If source path is invalid
+    """
+    try:
+        # Get the configured documents root directory
+        docs_root = get_docs_root()
+
+        # Convert source to Path and resolve against docs root
+        doc_path = Path(source)
+        if not doc_path.is_absolute():
+            doc_path = docs_root / doc_path
+
+        # Ensure the resolved path is within docs_root for security
+        try:
+            doc_path.relative_to(docs_root)
+        except ValueError:
+            raise ValueError(
+                f"Document path {doc_path} is outside docs root {docs_root}"
+            )
+
+        return doc_path
+    except Exception as e:
+        raise ValueError(f"Invalid source path: {source}") from e
+
+
+def load_document_content(path: Path) -> str:
+    """Load the full content of a document.
+
+    Args:
+        path: Path to the document
+
+    Returns:
+        str: Document content
+
+    Raises:
+        FileNotFoundError: If document doesn't exist
+        IOError: If document can't be read
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Document not found: {path}")
+    except IOError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read document: {e}")
+
+
+@app.get(
+    "/api/documents/{document_id}", response_model=DocumentResponse, tags=["Documents"]
+)
+async def get_document(document_id: str) -> DocumentResponse:
+    """Retrieve a full document by its ID.
+
+    This endpoint returns the complete content of a document along with its metadata
+    and the list of chunks used for search.
+
+    Args:
+        document_id: Document identifier from metadata.source
+
+    Returns:
+        DocumentResponse containing the full document and metadata
+
+    Raises:
+        HTTPException: If document is not found or can't be accessed
+    """
+    try:
+        # Query Chroma to get all chunks for this document
+        results = collection.query(
+            query_texts=[""],  # Empty query to match all
+            where={"source": document_id},
+            include=["documents", "metadatas"],
+        )
+
+        if not results or not results["documents"]:
+            raise HTTPException(
+                status_code=404, detail=f"Document not found in index: {document_id}"
+            )
+
+        # Get document path from first chunk's metadata
+        doc_path = get_document_path(document_id)
+
+        # Load full document content
+        content = load_document_content(doc_path)
+
+        # Return response with full content and metadata
+        return DocumentResponse(
+            content=content,
+            metadata=results["metadatas"][0],  # First chunk's metadata
+            source=document_id,
+            chunks=results["documents"][0],  # All chunks from this document
+        )
+
+    except Exception as e:
+        logger.error(f"Error retrieving document {document_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve document: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
