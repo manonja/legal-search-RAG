@@ -1,5 +1,6 @@
 "use client";
 
+import SearchResultCard from "@/components/SearchResultCard";
 import { api, QueryRequest, SearchResult } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -31,6 +32,11 @@ export default function SearchPage() {
 
       const response = await api.searchDocuments(request);
 
+      console.log(
+        "Search results metadata:",
+        response.results.map((r) => r.metadata)
+      );
+
       setResults(response.results);
       setTotalFound(response.total_found);
     } catch (err) {
@@ -58,7 +64,7 @@ export default function SearchPage() {
 
       {/* Search Form */}
       <form onSubmit={handleSearch} className="mb-8">
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center p-4">
             <span className="mr-3 text-gray-500">🔍</span>
             <input
@@ -88,41 +94,26 @@ export default function SearchPage() {
 
       {/* Results Section */}
       {results.length > 0 ? (
-        <section className="border border-gray-200 rounded-xl overflow-hidden my-10">
+        <section className="border border-gray-200 rounded-xl overflow-hidden my-10 shadow-sm">
           <div className="p-5">
             <div className="flex justify-between items-center mb-5 text-sm text-gray-500">
               <span>Found {totalFound} results</span>
-              <div className="flex items-center gap-1 cursor-pointer">
-                Sort by: Relevance ▼
+              <div className="flex items-center gap-1">
+                <span>Sort by: Relevance</span>
+                <span className="text-gray-400">▼</span>
               </div>
             </div>
 
-            {results.map((result, index) => (
-              <div
-                key={index}
-                className="mb-8 pb-5 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0"
-              >
-                <div className="flex gap-3 text-sm text-gray-500 mb-3">
-                  <span>{result.metadata.source || "Unknown Document"}</span>
-                </div>
-                <h3 className="text-xl font-semibold mb-3 text-gray-900">
-                  {result.metadata.title || `Result ${index + 1}`}
-                </h3>
-                <div className="flex gap-3 mb-4 flex-wrap">
-                  <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                    Similarity: {(result.similarity * 100).toFixed(1)}%
-                  </span>
-                  {result.metadata.page_number && (
-                    <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                      Page: {result.metadata.page_number}
-                    </span>
-                  )}
-                </div>
-                <p className="text-gray-700 mb-4 leading-relaxed">
-                  {result.chunk}
-                </p>
-              </div>
-            ))}
+            <div className="divide-y divide-gray-100">
+              {results.map((result, index) => (
+                <SearchResultCard
+                  key={index}
+                  result={result}
+                  query={query}
+                  index={index}
+                />
+              ))}
+            </div>
           </div>
         </section>
       ) : (
