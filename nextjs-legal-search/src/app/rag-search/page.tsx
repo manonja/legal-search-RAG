@@ -1,6 +1,7 @@
 "use client";
 
-import { api, QueryRequest, RagResponse } from "@/lib/api";
+import DocumentModal from "@/components/DocumentModal";
+import { api, QueryRequest, RagResponse, SearchResult } from "@/lib/api";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -10,6 +11,34 @@ export default function RagSearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<SearchResult | null>(
+    null
+  );
+
+  // Function to highlight matching text
+  const highlightText = (text: string, searchQuery: string) => {
+    if (!searchQuery.trim()) return text;
+
+    // Create regex pattern from search terms
+    const terms = searchQuery
+      .trim()
+      .split(/\s+/)
+      .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|");
+
+    const regex = new RegExp(`(${terms})`, "gi");
+    const parts = text.split(regex);
+
+    return parts.map((part, i) =>
+      regex.test(part) ? (
+        <span key={i} className="bg-yellow-100 font-medium">
+          {part}
+        </span>
+      ) : (
+        part
+      )
+    );
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,6 +48,7 @@ export default function RagSearchPage() {
     setIsLoading(true);
     setError(null);
     setResponse(null);
+    setSelectedDocument(null);
 
     try {
       const request: QueryRequest = {
@@ -37,6 +67,10 @@ export default function RagSearchPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleViewDocument = (result: SearchResult) => {
+    setSelectedDocument(result);
   };
 
   return (
@@ -102,10 +136,39 @@ export default function RagSearchPage() {
               </div>
             </div>
 
+            {/* Document Sources Section */}
+            <div className="mb-8 pb-5 border-b border-gray-200">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-800">
+                  Source Documents
+                </h3>
+                <span className="text-sm text-gray-500">
+                  {response.document_sources.length} unique document
+                  {response.document_sources.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {response.document_sources.map((source, index) => (
+                  <div
+                    key={index}
+                    className="bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium text-gray-900">
+                        {source.title}
+                      </h4>
+                      <span className="text-sm text-gray-500">
+                        {(source.similarity * 100).toFixed(1)}% match
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-medium text-gray-800">
-                Based on {response.total_found} document
-                {response.total_found !== 1 ? "s" : ""}
+                Context Details
               </h3>
               <button
                 onClick={() => setShowContext(!showContext)}
@@ -122,10 +185,16 @@ export default function RagSearchPage() {
                     key={index}
                     className="mb-8 pb-5 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0"
                   >
-                    <div className="flex gap-3 text-sm text-gray-500 mb-3">
-                      <span>
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm text-gray-500">
                         {result.metadata.source || "Unknown Document"}
                       </span>
+                      <button
+                        onClick={() => handleViewDocument(result)}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        View Original Document
+                      </button>
                     </div>
                     <div className="flex gap-3 mb-4 flex-wrap">
                       <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
@@ -138,7 +207,7 @@ export default function RagSearchPage() {
                       )}
                     </div>
                     <p className="text-gray-700 mb-4 leading-relaxed">
-                      {result.chunk}
+                      {highlightText(result.chunk, query)}
                     </p>
                   </div>
                 ))}
@@ -147,6 +216,13 @@ export default function RagSearchPage() {
           </div>
         </section>
       )}
+
+      {/* Document Modal */}
+      <DocumentModal
+        isOpen={!!selectedDocument}
+        onClose={() => setSelectedDocument(null)}
+        document={selectedDocument}
+      />
     </div>
   );
 }

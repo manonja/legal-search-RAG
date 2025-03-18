@@ -134,12 +134,23 @@ class QueryResponse(BaseModel):
     total_found: int = Field(..., description="Total number of results")
 
 
+class DocumentSource(BaseModel):
+    """Model representing a document source with metadata."""
+
+    source: str = Field(..., description="Document source path")
+    title: str = Field(..., description="Document title")
+    similarity: float = Field(..., description="Similarity score (0 to 1)")
+
+
 class RagResponse(BaseModel):
     """Response model for RAG-enhanced search queries."""
 
     context: List[SearchResult] = Field(..., description="Retrieved context documents")
     answer: str = Field(..., description="GPT-4 generated answer")
     total_found: int = Field(..., description="Total number of context documents found")
+    document_sources: List[DocumentSource] = Field(
+        ..., description="List of unique document sources"
+    )
 
 
 class DocumentResponse(BaseModel):
@@ -308,11 +319,15 @@ async def rag_search(request: QueryRequest) -> RagResponse:
         if not results or not results.get("documents"):
             logger.warning("No results found for query")
             return RagResponse(
-                context=[], answer="No relevant documents found.", total_found=0
+                context=[],
+                answer="No relevant documents found.",
+                total_found=0,
+                document_sources=[],
             )
 
         # Process results
         formatted_results = []
+        document_sources = {}  # Use dict to track unique sources
         for idx, (doc, metadata, distance) in enumerate(
             zip(
                 results["documents"][0],
@@ -327,14 +342,26 @@ async def rag_search(request: QueryRequest) -> RagResponse:
             if similarity < request.min_similarity:
                 continue
 
-            formatted_results.append(
-                SearchResult(
-                    chunk=doc,
-                    metadata=cast(Dict[str, Any], metadata),
-                    similarity=similarity,
-                    rank=idx + 1,
-                )
+            # Create search result
+            result = SearchResult(
+                chunk=doc,
+                metadata=cast(Dict[str, Any], metadata),
+                similarity=similarity,
+                rank=idx + 1,
             )
+            formatted_results.append(result)
+
+            # Track document sources
+            source = metadata.get("source", "Unknown Document")
+            if (
+                source not in document_sources
+                or similarity > document_sources[source].similarity
+            ):
+                document_sources[source] = DocumentSource(
+                    source=source,
+                    title=metadata.get("title", source),
+                    similarity=similarity,
+                )
 
         # Prepare context for GPT-4
         context = "\n\n".join(
@@ -379,6 +406,7 @@ async def rag_search(request: QueryRequest) -> RagResponse:
             context=formatted_results,
             answer=answer,
             total_found=len(formatted_results),
+            document_sources=list(document_sources.values()),
         )
 
     except Exception as e:
