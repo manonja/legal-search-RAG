@@ -11,14 +11,19 @@ export default function Home() {
           With Generative AI
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-          Search legal documents with semantic similarity and AI generated
+          Search legal documents with semantic similarity and get AI-generated
           answers based on your data.
-          <br />
         </p>
-        <div>
+        <div className="flex justify-center gap-4">
           <Link
-            href="/signup"
-            className="bg-gray-800 text-white px-8 py-3 rounded-full font-semibold mr-4 hover:bg-gray-800 transition-colors inline-block"
+            href="/search"
+            className="bg-gray-800 text-white px-8 py-3 rounded-full font-semibold hover:bg-gray-700 transition-colors inline-block"
+          >
+            Try it now
+          </Link>
+          <Link
+            href="/book-demo"
+            className="bg-white text-gray-800 px-8 py-3 rounded-full font-semibold border border-gray-300 hover:bg-gray-50 transition-colors inline-block"
           >
             Book demo
           </Link>
@@ -26,110 +31,165 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="flex justify-center gap-5 my-12 flex-wrap">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-8 my-16">
         <Link
           href="/search"
-          className="border border-gray-200 rounded-lg px-6 py-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer"
+          className="group border border-gray-200 rounded-xl p-8 hover:shadow-lg transition-all cursor-pointer bg-white"
         >
-          <span className="text-xl">🔍</span>
-          <span className="font-medium">Document Search</span>
+          <div className="flex items-start gap-4">
+            <span className="text-3xl">🔍</span>
+            <div>
+              <h3 className="text-xl font-semibold mb-3 text-gray-900 group-hover:text-gray-700">
+                Document Search
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Search through your legal documents using semantic similarity to
+                find exactly what you need. Our advanced search understands
+                context and meaning, not just keywords.
+              </p>
+              <div className="mt-4 text-gray-800 font-medium flex items-center gap-2">
+                Try Document Search
+                <svg
+                  className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
         </Link>
+
         <Link
           href="/rag-search"
-          className="border border-gray-200 rounded-lg px-6 py-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer"
+          className="group border border-gray-200 rounded-xl p-8 hover:shadow-lg transition-all cursor-pointer bg-white"
         >
-          <span className="text-xl">💬</span>
-          <span className="font-medium">Ask Legal Questions</span>
+          <div className="flex items-start gap-4">
+            <span className="text-3xl">💬</span>
+            <div>
+              <h3 className="text-xl font-semibold mb-3 text-gray-900 group-hover:text-gray-700">
+                Ask Legal Questions
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Get AI-generated answers to your legal questions based on your
+                document corpus. Our RAG system provides accurate, context-aware
+                responses with source citations.
+              </p>
+              <div className="mt-4 text-gray-800 font-medium flex items-center gap-2">
+                Try RAG Search
+                <svg
+                  className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
         </Link>
       </section>
 
-      {/* Search Section */}
-      <section className="border border-gray-200 rounded-xl overflow-hidden my-10">
-        <div className="flex items-center p-4 border-b border-gray-200">
-          <span className="mr-3 text-gray-500">🔍</span>
-          <input
-            type="text"
-            className="flex-1 border-none outline-none text-base"
-            placeholder="Search legal documents..."
-            defaultValue="non-compete AND enforc*"
-          />
-        </div>
+      {/* Demo Section */}
+      <section className="border border-gray-200 rounded-xl overflow-hidden my-16 bg-white">
+        <div className="p-8">
+          <h2 className="text-2xl font-semibold mb-6 text-gray-900">
+            Try an Example Search
+          </h2>
+          <div className="flex items-center p-4 border border-gray-200 rounded-xl mb-6">
+            <span className="mr-3 text-gray-500">🔍</span>
+            <input
+              type="text"
+              className="flex-1 bg-transparent border-none outline-none text-base"
+              placeholder="Search legal documents..."
+              defaultValue="malpractice"
+              readOnly
+            />
+          </div>
 
-        <div className="p-5">
           <div className="flex justify-between items-center mb-5 text-sm text-gray-500">
-            <span>5651 Results</span>
-            <div className="flex items-center gap-1 cursor-pointer">
-              Sort by: Relevance ▼
+            <span>Found 10 results</span>
+            <div className="flex items-center gap-1">
+              <span>Sort by: Relevance</span>
+              <span className="text-gray-400">▼</span>
             </div>
           </div>
 
-          <div className="mb-8 pb-5 border-b border-gray-200">
-            <div className="flex gap-3 text-sm text-gray-500 mb-3">
-              <span>14 F.3d 941</span>
-              <span>|</span>
-              <span>4th Cir.</span>
-              <span>|</span>
-              <span>1993</span>
+          <div className="space-y-6">
+            <div className="border-b border-gray-100 pb-6">
+              <h3 className="text-xl font-semibold mb-3 text-gray-900">
+                Malpractice cases can also be a complex issue, requiring medical
+                expert opinions and often dealing...
+              </h3>
+              <div className="text-sm text-gray-500 mb-4">
+                Similarity: 86.0%
+              </div>
+              <p className="text-gray-700 leading-relaxed">
+                3 malpractice cases can also be a complex issue, requiring
+                medical expert opinions and often dealing with competing causes
+                and interrelated medical conditions.
+              </p>
+              <p className="inline-block mt-4 text-blue-600 hover:text-blue-700">
+                View Full Document
+              </p>
             </div>
-            <h3 className="text-xl font-semibold mb-3 text-gray-900">
-              Php Healthcare Corporation v. Emsa Limited Partnership
-            </h3>
-            <div className="flex gap-3 mb-4 flex-wrap">
-              <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                Overview
-              </span>
-              <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                Non-Compete
-              </span>
-              <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                Enforceability
-              </span>
-            </div>
-            <p className="text-gray-700 mb-4 leading-relaxed">
-              "The only issue before us, as the parties agree, Appellant's Br.
-              2; Appellee's Br. 1, is whether the district court erred in ruling
-              that the 'limitation on practice' provision in EMSA's contracts
-              with its Millington physician-employees was invalid and
-              unenforceable under Florida law."
-            </p>
-            <div className="text-sm text-gray-500 flex items-center gap-2">
-              <span>17m ago</span>
-            </div>
-          </div>
 
-          <div className="mb-8 pb-5 border-b border-gray-200">
-            <div className="flex gap-3 text-sm text-gray-500 mb-3">
-              <span>203 F. App'x 450</span>
-              <span>|</span>
-              <span>4th Cir.</span>
-              <span>|</span>
-              <span>2006</span>
+            <div className="border-b border-gray-100 pb-6">
+              <h3 className="text-xl font-semibold mb-3 text-gray-900">
+                Causation in Medical Malpractice Cases (ON)
+              </h3>
+              <div className="text-sm text-gray-500 mb-4">
+                Similarity: 85.4%
+              </div>
+              <p className="text-gray-700 leading-relaxed">
+                2 1. The standard of care in medical malpractice claims is
+                established by the practice of other expert physicians or health
+                care providers, and is therefore not within the general
+                knowledge of most lawyers (see: *Crits v. Sylvester*, [1956]
+                O.J. No. 526 (C.A.)). As such, it is difficult or impossible for
+                a lawyer to make an informed assessment of the viability of a
+                potential case without assistance from an expert or multiple
+                experts. Causation in...
+              </p>
+              <div className="flex items-center gap-2 mt-4">
+                <p className="text-blue-600 hover:text-blue-700">
+                  View Full Document
+                </p>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold mb-3 text-gray-900">
-              McGough v. Nalco Company
-            </h3>
-            <div className="flex gap-3 mb-4 flex-wrap">
-              <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                Overview
-              </span>
-              <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                Non-Compete
-              </span>
-              <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                Injunction
-              </span>
-              <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                Trade Secrets
-              </span>
-            </div>
-            <p className="text-gray-700 mb-4 leading-relaxed">
-              "A preliminary injunction is an 'extraordinary remedy' involving
-              the exercise of very far-reaching power to be granted only
-              sparingly and in limited circumstances."
-            </p>
-            <div className="text-sm text-gray-500 flex items-center gap-2">
-              <span>16m ago</span>
-            </div>
+
+            <Link
+              href="/search"
+              className="inline-flex items-center text-gray-800 font-medium hover:text-gray-600 transition-colors"
+            >
+              Try your own search
+              <svg
+                className="w-4 h-4 ml-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </Link>
           </div>
         </div>
       </section>

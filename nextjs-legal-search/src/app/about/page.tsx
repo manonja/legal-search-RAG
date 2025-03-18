@@ -10,7 +10,7 @@ export default function AboutPage() {
       </section>
 
       {/* Content Section */}
-      <section className="border border-gray-200 rounded-xl overflow-hidden my-10">
+      <section className="border border-gray-200 rounded-xl overflow-hidden my-10 bg-white">
         <div className="p-16">
           <div className="prose max-w-none text-gray-700">
             <h2 className="text-2xl font-semibold mb-4 text-gray-900">

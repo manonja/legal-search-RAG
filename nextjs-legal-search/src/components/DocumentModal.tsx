@@ -114,7 +114,7 @@ export default function DocumentModal({
                                 {fullDocument.chunks.map((chunk, index) => (
                                   <div
                                     key={index}
-                                    className="text-sm text-gray-600 bg-gray-50 p-3 rounded"
+                                    className="text-sm text-gray-600 p-3 rounded"
                                   >
                                     {chunk}
                                   </div>

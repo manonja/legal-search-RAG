@@ -156,7 +156,7 @@ export default function RagSearchPage() {
                 {response.document_sources.map((source, index) => (
                   <div
                     key={index}
-                    className="bg-gray-50 p-4 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="p-4 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-medium text-gray-900">
