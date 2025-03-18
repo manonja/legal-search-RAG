@@ -386,60 +386,26 @@ async def rag_search(request: QueryRequest) -> RagResponse:
         raise HTTPException(status_code=500, detail=f"RAG search failed: {str(e)}")
 
 
-def get_document_path(source: str) -> Path:
-    """Get the full path to a document from its source identifier.
+def get_document_path(document_id: str) -> Path:
+    """Get the full path to a document from its ID.
 
     Args:
-        source: Source path from metadata
+        document_id: Document identifier (filename)
 
     Returns:
-        Path: Full path to the document
-
-    Raises:
-        ValueError: If source path is invalid
+        Path to the processed document
     """
-    try:
-        # Get the configured documents root directory
-        docs_root = get_docs_root()
+    docs_root = Path(get_docs_root())
+    # First try the exact path if it exists
+    if (docs_root / document_id).exists():
+        return docs_root / document_id
 
-        # Convert source to Path and resolve against docs root
-        doc_path = Path(source)
-        if not doc_path.is_absolute():
-            doc_path = docs_root / doc_path
+    # Then try finding it by name only
+    for file in docs_root.rglob("*"):
+        if file.name == document_id:
+            return file
 
-        # Ensure the resolved path is within docs_root for security
-        try:
-            doc_path.relative_to(docs_root)
-        except ValueError:
-            raise ValueError(
-                f"Document path {doc_path} is outside docs root {docs_root}"
-            )
-
-        return doc_path
-    except Exception as e:
-        raise ValueError(f"Invalid source path: {source}") from e
-
-
-def load_document_content(path: Path) -> str:
-    """Load the full content of a document.
-
-    Args:
-        path: Path to the document
-
-    Returns:
-        str: Document content
-
-    Raises:
-        FileNotFoundError: If document doesn't exist
-        IOError: If document can't be read
-    """
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Document not found: {path}")
-    except IOError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read document: {e}")
+    raise FileNotFoundError(f"Document not found: {document_id}")
 
 
 @app.get(
@@ -448,11 +414,8 @@ def load_document_content(path: Path) -> str:
 async def get_document(document_id: str) -> DocumentResponse:
     """Retrieve a full document by its ID.
 
-    This endpoint returns the complete content of a document along with its metadata
-    and the list of chunks used for search.
-
     Args:
-        document_id: Document identifier from metadata.source
+        document_id: Document identifier (filename)
 
     Returns:
         DocumentResponse containing the full document and metadata
@@ -461,34 +424,32 @@ async def get_document(document_id: str) -> DocumentResponse:
         HTTPException: If document is not found or can't be accessed
     """
     try:
-        # Query Chroma to get all chunks for this document
-        results = collection.query(
-            query_texts=[""],  # Empty query to match all
-            where={"source": document_id},
-            include=["documents", "metadatas"],
-        )
-
-        if not results or not results["documents"]:
-            raise HTTPException(
-                status_code=404, detail=f"Document not found in index: {document_id}"
-            )
-
-        # Get document path from first chunk's metadata
-        doc_path = get_document_path(document_id)
+        # Get the document path
+        try:
+            doc_path = get_document_path(document_id)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
 
         # Load full document content
-        content = load_document_content(doc_path)
+        try:
+            with open(doc_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to read document: {str(e)}"
+            )
 
-        # Return response with full content and metadata
+        # Return document response
         return DocumentResponse(
             content=content,
-            metadata=results["metadatas"][0],  # First chunk's metadata
-            source=document_id,
-            chunks=results["documents"][0],  # All chunks from this document
+            metadata={"filename": doc_path.name},
+            source=str(doc_path),
+            chunks=[],  # Empty chunks since we're not using Chroma here
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error retrieving document {document_id}: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to retrieve document: {str(e)}"
         )
