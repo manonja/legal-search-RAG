@@ -1,3 +1,4 @@
+import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -20,16 +21,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <div className="container mx-auto px-4 max-w-7xl">
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} min-h-full flex flex-col`}>
+        <div className="container mx-auto px-4 max-w-7xl flex flex-col flex-grow">
           <Navbar />
           <main className="flex-grow">{children}</main>
-          <footer className="bg-white py-6 border-t">
-            <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-              © {new Date().getFullYear()} Prae8. All rights reserved.
-            </div>
-          </footer>
+          <Footer />
         </div>
       </body>
     </html>
