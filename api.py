@@ -5,15 +5,16 @@ Chroma vector database.
 """
 
 import hashlib
+import json
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TypeVar, cast
 
 import chromadb
 import uvicorn
-from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
@@ -22,22 +23,119 @@ from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
+# Import from local modules
+from api_modules.admin import router as admin_router
+from middleware.cost_control import CostControlMiddleware
 from utils.env import get_docs_root
+from utils.usage_db import init_usage_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# Add a filter to suppress ChromaDB warnings about existing embedding IDs
+class ChromaWarningFilter(logging.Filter):
+    """Filter to suppress specific ChromaDB warnings about existing embedding IDs."""
+
+    def filter(self, record):
+        """Filter out warnings about adding existing embedding IDs.
+
+        Args:
+            record: The log record to check
+
+        Returns:
+            bool: False for messages to be filtered out, True otherwise
+        """
+        # Filter out the specific warning about adding existing embedding IDs
+        return not (
+            record.levelname == "WARNING"
+            and "Add of existing embedding ID:" in record.getMessage()
+        )
+
+
+# Apply the filter to the ChromaDB logger
+chroma_logger = logging.getLogger("chromadb.segment.impl.vector.local_persistent_hnsw")
+chroma_logger.addFilter(ChromaWarningFilter())
 
 # Load environment variables
 load_dotenv()
 
 # Constants
 EMBEDDING_MODEL = "text-embedding-ada-002"  # Updated to latest model
-CHROMA_PERSIST_DIR = Path("cache/chroma")
+CHROMA_PERSIST_DIR = os.path.join(os.path.dirname(__file__), "cache", "chroma")
+DOCUMENTS_DIR = os.getenv(
+    "DOCUMENTS_DIR", os.path.join(os.path.dirname(__file__), "..", "data")
+)
+CACHE_PATH = os.path.join(os.path.dirname(__file__), "cache", "query_cache.json")
+COLLECTION_NAME = "legal_docs"
 API_VERSION = "1.0.0"
 
 # Type variables
 T = TypeVar("T", bound=BaseModel)
+
+
+# Process a document and add its chunks to the collection
+def process_document(doc_path: Path) -> None:
+    """Process a document and add its chunks to Chroma.
+
+    Args:
+        doc_path: Path to the document file
+    """
+    try:
+        # Get document name from path
+        doc_name = doc_path.stem.replace("chunked_", "")
+        logger.info(f"Processing document: {doc_name}")
+
+        # Read document content
+        with open(doc_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Split into chunks (assuming document is pre-chunked and separated by markers)
+        chunks = content.split("\n\n--- CHUNK ---\n\n")
+        if len(chunks) == 1:  # No markers, treat as a single chunk
+            chunks = [content]
+
+        # Prepare data for Chroma
+        chunk_ids = []
+        chunk_texts = []
+        chunk_metadatas = []
+
+        # Process each chunk
+        for i, chunk in enumerate(chunks):
+            if not chunk.strip():
+                continue
+
+            # Generate a unique ID for this chunk
+            chunk_id = (
+                f"{doc_name}_chunk_{i+1}"  # Start from 1 instead of 0 for consistency
+            )
+
+            # Add to batch
+            chunk_ids.append(chunk_id)
+            chunk_texts.append(chunk)
+            chunk_metadatas.append(
+                {
+                    "filename": str(
+                        doc_path
+                    ),  # Changed from 'source' to 'filename' to match existing format
+                    "chunk_index": i,
+                }
+            )
+
+        # Use upsert instead of add to avoid duplicate ID warnings
+        if chunk_ids:
+            collection.upsert(
+                ids=chunk_ids,
+                documents=chunk_texts,
+                metadatas=chunk_metadatas,
+            )
+            logger.info(f"Upserted {len(chunk_ids)} chunks from {doc_name}")
+
+    except Exception as e:
+        logger.error(f"Error processing document {doc_path}: {e}")
+        logger.exception(e)  # Log full traceback for debugging
+
 
 # Initialize FastAPI app with metadata
 app = FastAPI(
@@ -65,6 +163,25 @@ app.add_middleware(
     max_age=86400,  # Cache preflight requests for 24 hours
 )
 
+# Add cost control middleware
+app.add_middleware(CostControlMiddleware)
+
+# Include admin router
+app.include_router(admin_router)
+
+
+# Initialize usage database
+@app.on_event("startup")
+async def startup_event():
+    """Initialize components on application startup."""
+    try:
+        # Initialize usage database
+        init_usage_db()
+        logger.info("Usage database initialized")
+    except Exception as e:
+        logger.error(f"Error initializing usage database: {e}")
+
+
 try:
     # Initialize OpenAI embedding function
     openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -72,21 +189,38 @@ try:
         model_name=EMBEDDING_MODEL,
     )
 
-    # Initialize Chroma client
-    chroma_client = chromadb.PersistentClient(
-        path=str(CHROMA_PERSIST_DIR),
-        settings=Settings(
-            anonymized_telemetry=False,
-            allow_reset=True,
-            is_persistent=True,
-        ),
-    )
+    # Initialize Chroma client and collection
+    logger.info("Initializing Chroma client and collection")
+    chroma_dir = Path(CHROMA_PERSIST_DIR)
+    chroma_dir.mkdir(parents=True, exist_ok=True)
+    client = chromadb.PersistentClient(path=str(chroma_dir))
 
-    # Get or create collection
-    collection = chroma_client.get_or_create_collection(
-        name="legal_docs",
-        embedding_function=openai_ef,
-    )
+    # Check if collection exists before creating it
+    try:
+        collection = client.get_collection(
+            COLLECTION_NAME, embedding_function=openai_ef
+        )
+        logger.info(
+            f"Collection '{COLLECTION_NAME}' already exists with "
+            f"{collection.count()} embeddings"
+        )
+        # Skip document loading for existing collections
+    except ValueError:
+        # Only create collection if it doesn't exist
+        logger.info(f"Creating new collection '{COLLECTION_NAME}'")
+        collection = client.create_collection(
+            name=COLLECTION_NAME,
+            embedding_function=openai_ef,
+            metadata={"hnsw:space": "cosine"},
+        )
+
+        # Load documents and create embeddings only for new collection
+        documents_dir = Path(DOCUMENTS_DIR)
+        if documents_dir.exists():
+            for doc_file in documents_dir.glob("chunked_*.txt"):
+                # Process each document file
+                process_document(doc_file)
+
     logger.info("Successfully initialized Chroma client and collection")
 
 except Exception as e:
@@ -102,6 +236,9 @@ client = AsyncOpenAI(
 # Cache for storing query results
 query_cache: Dict[str, Dict] = {}
 CACHE_DURATION = timedelta(hours=24)  # Cache duration for query results
+
+# Initialize cache directories
+os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
 
 
 # Request/Response Models
@@ -148,14 +285,57 @@ class DocumentSource(BaseModel):
     similarity: float = Field(..., description="Similarity score (0 to 1)")
 
 
-class RagResponse(BaseModel):
-    """Response model for RAG-enhanced search queries."""
+class SourceDocument(BaseModel):
+    """Source document model with metadata."""
 
-    context: List[SearchResult] = Field(..., description="Retrieved context documents")
-    answer: str = Field(..., description="GPT-4 generated answer")
-    total_found: int = Field(..., description="Total number of context documents found")
-    document_sources: List[DocumentSource] = Field(
-        ..., description="List of unique document sources"
+    content: str = Field(..., description="Document content or title")
+    metadata: Dict[str, Any] = Field(..., description="Document metadata")
+    similarity: float = Field(..., description="Similarity score (0-1)")
+
+
+class UsageInfo(BaseModel):
+    """Usage information for an API call."""
+
+    input_tokens: int = Field(..., description="Number of input tokens used")
+    output_tokens: int = Field(..., description="Number of output tokens generated")
+    total_tokens: int = Field(..., description="Total tokens used")
+    cost: float = Field(..., description="Estimated cost of the API call")
+
+
+class RagRequest(BaseModel):
+    """Request model for RAG search and answer generation."""
+
+    query: str = Field(..., description="The query text to search for")
+    model: Optional[str] = Field("gpt-4", description="The OpenAI model to use")
+    temperature: Optional[float] = Field(0.0, description="Temperature for generation")
+    max_tokens: Optional[int] = Field(1000, description="Maximum tokens to generate")
+    n_results: Optional[int] = Field(5, description="Number of results to return")
+    min_similarity: Optional[float] = Field(
+        0.7, description="Minimum similarity threshold (0-1)"
+    )
+    conversation_id: Optional[str] = Field(
+        None, description="Conversation ID for follow-up questions"
+    )
+    messages: Optional[List[Dict[str, str]]] = Field(
+        None, description="Message history for the conversation"
+    )
+    metadata_filter: Optional[Dict[str, Any]] = Field(
+        None, description="Metadata filter for document search"
+    )
+
+
+class RagResponse(BaseModel):
+    """Response model for RAG search and answer generation."""
+
+    answer: str = Field(..., description="The generated answer")
+    source_documents: List[SourceDocument] = Field(
+        ..., description="Source documents used for context"
+    )
+    conversation_id: str = Field(
+        ..., description="Conversation ID for follow-up questions"
+    )
+    usage: Optional[UsageInfo] = Field(
+        None, description="Usage information for the API call"
     )
 
 
@@ -292,17 +472,52 @@ async def health_check() -> Dict[str, Any]:
         return {"status": "unhealthy", "version": API_VERSION, "error": str(e)}
 
 
-def get_query_hash(query_text: str) -> str:
-    """Generate a hash for the query text to use as cache key."""
-    return hashlib.md5(query_text.encode()).hexdigest()
+def get_query_hash(request: RagRequest) -> str:
+    """Generate a hash for the query to use as a cache key.
+
+    Args:
+        request: The RAG request object
+
+    Returns:
+        A hash string representing the query
+    """
+    # Include relevant parameters that affect the result
+    query_params = {
+        "query": request.query,
+        "model": request.model,
+        "temperature": request.temperature,
+        "max_tokens": request.max_tokens,
+        "n_results": request.n_results,
+        "min_similarity": request.min_similarity,
+        "metadata_filter": request.metadata_filter,
+    }
+    # Convert to string and hash
+    param_str = json.dumps(query_params, sort_keys=True)
+    return hashlib.md5(param_str.encode()).hexdigest()
 
 
-def is_cache_valid(cache_entry: Dict) -> bool:
-    """Check if a cache entry is still valid."""
-    if not cache_entry:
+def is_cache_valid(cached_result: Dict) -> bool:
+    """Check if a cached result is still valid.
+
+    Args:
+        cached_result: The cached result to check
+
+    Returns:
+        True if the result is still valid, False otherwise
+    """
+    # Get cache timestamp
+    timestamp = cached_result.get("timestamp")
+    if not timestamp:
         return False
-    cache_time = datetime.fromisoformat(cache_entry.get("timestamp", ""))
-    return datetime.now() - cache_time < CACHE_DURATION
+
+    # Parse timestamp
+    try:
+        cache_time = datetime.fromisoformat(timestamp)
+    except ValueError:
+        return False
+
+    # Check if cache is expired (more than 24 hours old)
+    return (datetime.now() - cache_time).total_seconds() < 86400  # 24 hours
 
 
 async def process_document_chunk(
@@ -331,7 +546,7 @@ async def process_document_chunk(
 
 
 @app.post("/api/rag-search", response_model=RagResponse, tags=["Search"])
-async def rag_search(request: QueryRequest) -> RagResponse:
+async def rag_search(request: RagRequest) -> RagResponse:
     """Search documents and generate answer using GPT-4.
 
     This endpoint combines vector search with GPT-4 processing to provide
@@ -350,10 +565,14 @@ async def rag_search(request: QueryRequest) -> RagResponse:
         if not request:
             raise HTTPException(status_code=400, detail="Missing request body")
 
-        logger.info(f"Processing RAG search request: {request.query_text}")
+        # Generate a conversation ID if not provided
+        if not request.conversation_id:
+            request.conversation_id = str(uuid.uuid4())
+
+        logger.info(f"Processing RAG search request: {request.query}")
 
         # Check cache first
-        query_hash = get_query_hash(request.query_text)
+        query_hash = get_query_hash(request)
         cached_result = query_cache.get(query_hash)
         if cached_result and is_cache_valid(cached_result):
             logger.info("Returning cached result")
@@ -361,7 +580,7 @@ async def rag_search(request: QueryRequest) -> RagResponse:
 
         # Query Chroma with optimized parameters
         results = collection.query(
-            query_texts=[request.query_text],
+            query_texts=[request.query],
             n_results=request.n_results,
             where=request.metadata_filter,
             include=["documents", "metadatas", "distances"],
@@ -370,10 +589,10 @@ async def rag_search(request: QueryRequest) -> RagResponse:
         if not results or not results.get("documents"):
             logger.warning("No results found for query")
             return RagResponse(
-                context=[],
                 answer="No relevant documents found.",
-                total_found=0,
-                document_sources=[],
+                source_documents=[],
+                conversation_id=request.conversation_id,
+                usage=None,
             )
 
         # Process results
@@ -449,7 +668,7 @@ async def rag_search(request: QueryRequest) -> RagResponse:
         user_prompt = (
             "Based on the following legal document excerpts, please provide a "
             "concise answer to this legal question:\n\n"
-            f"{request.query_text}\n\n"
+            f"{request.query}\n\n"
             "Document excerpts:\n"
             "------\n"
             f"{context}\n"
@@ -462,27 +681,36 @@ async def rag_search(request: QueryRequest) -> RagResponse:
         try:
             # Make async API call with optimized parameters
             chat_completion = await client.chat.completions.create(
-                model="gpt-4",
+                model=request.model,
                 messages=[
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.0,
-                max_tokens=1000,  # Limit response length
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
             )
 
             answer = chat_completion.choices[0].message.content
 
             # Cache the result
             response_data = {
-                "context": [
-                    result.dict() for result in formatted_results
-                ],  # Convert SearchResult objects to dicts
                 "answer": answer,
-                "total_found": len(formatted_results),
-                "document_sources": [
-                    source.dict() for source in document_sources.values()
+                "source_documents": [
+                    SourceDocument(
+                        content=source.title,
+                        metadata={"filename": source.source},
+                        similarity=source.similarity,
+                    )
+                    for source in document_sources.values()
                 ],
+                "conversation_id": request.conversation_id,
+                "usage": {
+                    "input_tokens": chat_completion.usage.prompt_tokens,
+                    "output_tokens": chat_completion.usage.completion_tokens,
+                    "total_tokens": chat_completion.usage.total_tokens,
+                    "cost": chat_completion.usage.total_tokens
+                    * 0.000002,  # Assuming $0.000002 per token
+                },
             }
             query_cache[query_hash] = {
                 "data": response_data,
