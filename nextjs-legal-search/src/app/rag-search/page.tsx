@@ -1,6 +1,6 @@
 "use client";
 
-import { api, QueryRequest, RagResponse } from "@/lib/api";
+import { api, RagRequest, RagResponse } from "@/lib/api";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -10,6 +10,10 @@ export default function RagSearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<
+    Array<{ role: string; content: string }>
+  >([]);
 
   // Function to highlight matching text
   const highlightText = (text: string, searchQuery: string) => {
@@ -43,17 +47,36 @@ export default function RagSearchPage() {
 
     setIsLoading(true);
     setError(null);
-    setResponse(null);
 
     try {
-      const request: QueryRequest = {
-        query_text: query,
+      const request: RagRequest = {
+        query: query,
         n_results: 5,
         min_similarity: 0.7,
+        model: "gpt-4",
+        temperature: 0,
+        max_tokens: 1000,
       };
+
+      // Add conversation ID if this is a follow-up question
+      if (conversationId) {
+        request.conversation_id = conversationId;
+        request.messages = conversationHistory;
+      }
 
       const result = await api.ragSearch(request);
       setResponse(result);
+
+      // Update conversation history
+      setConversationId(result.conversation_id);
+      setConversationHistory([
+        ...conversationHistory,
+        { role: "user", content: query },
+        { role: "assistant", content: result.answer },
+      ]);
+
+      // Clear the query input for the next question
+      setQuery("");
     } catch (err) {
       console.error("RAG search error:", err);
       setError(
@@ -64,154 +87,164 @@ export default function RagSearchPage() {
     }
   };
 
-  const renderAnswer = (answer: string) => {
-    // Split the answer into sections
-    const sections = answer.split("\n\n").filter((section) => section.trim());
-
-    return sections.map((section, index) => {
-      // Regular markdown content
-      return (
-        <div key={index} className="mb-4">
-          <ReactMarkdown>{section}</ReactMarkdown>
-        </div>
-      );
-    });
-  };
-
   return (
-    <div className="container mx-auto px-4 max-w-7xl">
-      {/* Header Section */}
-      <section className="text-center py-10">
-        <h1 className="text-4xl text-gray-800 font-bold mb-5">
-          Ask Legal Questions
-        </h1>
-        <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
-          Get AI-generated answers to your legal questions based on document
-          context.
-        </p>
-      </section>
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold text-center mb-6">
+        Ask Legal Questions
+      </h1>
 
-      {/* Search Form */}
-      <form onSubmit={handleSearch} className="mb-8">
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
-          <div className="flex items-center p-4">
-            <span className="mr-3 text-gray-500">💬</span>
+      <div className="max-w-3xl mx-auto mb-8">
+        <form onSubmit={handleSearch} className="flex flex-col gap-4">
+          <div className="relative">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask a legal question..."
-              className="flex-1 border-none outline-none text-base"
-              required
+              placeholder={
+                conversationId
+                  ? "Ask a follow-up question..."
+                  : "What would you like to know about legal matters?"
+              }
+              className="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <button
               type="submit"
-              className="bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
               disabled={isLoading}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400"
             >
               {isLoading ? "Processing..." : "Ask"}
             </button>
           </div>
+        </form>
+      </div>
+
+      {conversationHistory.length > 0 && (
+        <div className="max-w-3xl mx-auto mb-8">
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <h2 className="text-lg font-medium mb-4">Conversation History</h2>
+            <div className="space-y-4">
+              {conversationHistory.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`p-3 rounded-lg ${msg.role === "user" ? "bg-blue-100 ml-10" : "bg-white border border-gray-200 mr-10"}`}
+                >
+                  <p className="text-sm font-medium mb-1">
+                    {msg.role === "user" ? "You" : "Assistant"}
+                  </p>
+                  <p>{msg.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </form>
+      )}
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
+            <p>{error}</p>
+          </div>
         </div>
       )}
 
-      {isLoading && (
-        <div className="text-center py-10">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-800"></div>
-          <p className="mt-4 text-gray-600">Generating answer...</p>
-        </div>
-      )}
-
-      {/* Results Section */}
       {response && (
-        <section className="border border-gray-200 rounded-xl overflow-hidden my-10">
-          <div className="p-5">
-            <div className="mb-8 pb-5 border-b border-gray-200">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900">
-                Answer
-              </h2>
-              <div className="prose max-w-none text-gray-700">
-                {renderAnswer(response.answer)}
+        <section className="max-w-3xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="p-6">
+              <div className="prose max-w-none">
+                <ReactMarkdown>{response.answer}</ReactMarkdown>
               </div>
-            </div>
 
-            {/* Document Sources Section */}
-            <div className="mb-8 pb-5 border-b border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-800">
-                  Source Documents
-                </h3>
-                <span className="text-sm text-gray-500">
-                  {response.document_sources.length} unique document
-                  {response.document_sources.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {response.document_sources.map((source, index) => (
-                  <div
-                    key={index}
-                    className="p-4 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-gray-900">
-                        {source.title}
-                      </h4>
-                      <span className="text-sm text-gray-500">
-                        {(source.similarity * 100).toFixed(1)}% match
-                      </span>
+              {/* Add token usage information */}
+              {response.usage && (
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                  <div className="flex justify-between items-center text-sm text-gray-500">
+                    <div>
+                      Tokens: {response.usage.input_tokens} input +{" "}
+                      {response.usage.output_tokens} output ={" "}
+                      {response.usage.total_tokens} total
+                    </div>
+                    <div className="font-medium">
+                      Cost: ${response.usage.cost.toFixed(4)}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              )}
 
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-lg font-medium text-gray-800">
-                Context Details
-              </h3>
-              <button
-                onClick={() => setShowContext(!showContext)}
-                className="bg-gray-100 px-4 py-2 rounded-full text-sm text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                {showContext ? "Hide Context" : "Show Context"}
-              </button>
-            </div>
-
-            {showContext && (
-              <div className="space-y-6 mt-4">
-                {response.context.map((result, index) => (
-                  <div
-                    key={index}
-                    className="mb-8 pb-5 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0"
-                  >
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm text-gray-500">
-                        {result.metadata.source || "Unknown Document"}
-                      </span>
-                    </div>
-                    <div className="flex gap-3 mb-4 flex-wrap">
-                      <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                        Similarity: {(result.similarity * 100).toFixed(1)}%
-                      </span>
-                      {result.metadata.page_number && (
-                        <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                          Page: {result.metadata.page_number}
+              <div className="mb-8 pb-5 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-800">
+                    Source Documents
+                  </h3>
+                  <span className="text-sm text-gray-500">
+                    {response.source_documents.length} source
+                    {response.source_documents.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {response.source_documents.map((source, index) => (
+                    <div
+                      key={index}
+                      className="p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-gray-900">
+                          {source.metadata.filename || "Unknown Source"}
+                        </h4>
+                        <span className="text-sm text-gray-500">
+                          {(source.similarity * 100).toFixed(1)}% match
                         </span>
-                      )}
+                      </div>
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {source.content}
+                      </p>
                     </div>
-                    <p className="text-gray-700 mb-4 leading-relaxed">
-                      {highlightText(result.chunk, query)}
-                    </p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            )}
+
+              <div className="flex justify-between items-center mb-5">
+                <h3 className="text-lg font-medium text-gray-800">
+                  Context Details
+                </h3>
+                <button
+                  onClick={() => setShowContext(!showContext)}
+                  className="bg-gray-100 px-4 py-2 rounded-full text-sm text-gray-700 hover:bg-gray-200 transition-colors"
+                >
+                  {showContext ? "Hide Context" : "Show Context"}
+                </button>
+              </div>
+
+              {showContext && (
+                <div className="space-y-6 mt-4">
+                  {response.source_documents.map((result, index) => (
+                    <div
+                      key={index}
+                      className="mb-8 pb-5 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0"
+                    >
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm text-gray-500">
+                          {result.metadata.filename || "Unknown Document"}
+                        </span>
+                      </div>
+                      <div className="flex gap-3 mb-4 flex-wrap">
+                        <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
+                          Similarity: {(result.similarity * 100).toFixed(1)}%
+                        </span>
+                        {result.metadata.page_number && (
+                          <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
+                            Page: {result.metadata.page_number}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-700 mb-4 leading-relaxed">
+                        {highlightText(result.content, query)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </section>
       )}

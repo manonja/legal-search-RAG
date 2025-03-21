@@ -17,6 +17,12 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 - **Modern Interface**: Next.js frontend
 - **RAG-Powered Q&A**: Ask legal questions and get AI-generated answers based on your document corpus
 - **Privacy-First**: Local ChromaDB storage ensuring data privacy and compliance
+- **OpenAI API Cost Controls**:
+  - Token counting and cost estimation
+  - Per-query, daily, and monthly cost thresholds
+  - Quota management system for limiting usage
+  - Usage tracking and reporting dashboard
+  - Cost warnings for expensive requests
 
 ## Screenshots
 ![Search Interface](assets/images/search-interface.png)
@@ -131,3 +137,102 @@ Apache 2.0
 - 83% accuracy in legal QA benchmarks
 - Sub-2 second latency for query processing
 - Comprehensive testing protocol covering various legal query types
+
+## Project Structure
+
+- `api.py` - FastAPI backend with RAG search endpoints
+- `utils/` - Utility modules:
+  - `token_counter.py` - Token counting and cost estimation utilities
+  - `usage_db.py` - SQLite database for tracking usage and quota
+- `middleware/` - FastAPI middleware:
+  - `cost_control.py` - Middleware for enforcing cost controls
+- `api/` - API modules:
+  - `admin.py` - Admin endpoints for monitoring usage
+
+## Environment Variables
+
+Create a `.env` file with the following variables:
+
+```
+OPENAI_API_KEY=your_openai_api_key
+ADMIN_API_KEY=your_admin_key_for_dashboard
+USAGE_DB_PATH=usage.db
+```
+
+## Running the Application
+
+### Backend
+```bash
+uvicorn api:app --reload
+```
+
+### Frontend
+```bash
+cd nextjs-legal-search
+npm run dev
+```
+
+## Cost Control Features
+
+### Token Counting and Cost Estimation
+
+The system includes utilities to count tokens and estimate costs before making API calls:
+
+```python
+from utils.token_counter import estimate_tokens_and_cost
+
+# Estimate cost before making API call
+cost_estimate = estimate_tokens_and_cost(messages, model, max_tokens)
+```
+
+### Usage Tracking
+
+All API calls are logged to a SQLite database with token usage and cost information:
+
+```python
+from utils.usage_db import log_api_usage
+
+# Log API usage after completion
+log_api_usage(
+    conversation_id=conversation_id,
+    query_text=query,
+    model=model,
+    input_tokens=input_tokens,
+    output_tokens=output_tokens,
+    total_tokens=total_tokens,
+    cost=actual_cost
+)
+```
+
+### Cost Thresholds
+
+The system enforces cost thresholds at different levels:
+
+- **Per-query threshold**: Warns or blocks expensive individual queries
+- **Daily threshold**: Limits total daily spending
+- **Monthly threshold**: Ensures you stay within a monthly budget
+
+### Monthly Query Quota
+
+Implement a quota system to limit the number of queries per month:
+
+```python
+from utils.usage_db import check_quota_exceeded
+
+# Check if quota is exceeded
+if check_quota_exceeded():
+    raise HTTPException(status_code=429, detail="Monthly quota exceeded")
+```
+
+### Admin Dashboard
+
+Access the admin dashboard at `/admin` to:
+
+- View current usage statistics
+- Monitor costs and token usage
+- Update quota and threshold settings
+- Project monthly costs based on current usage
+
+## Deployment
+
+See the deployment documentation for instructions on deploying to Render.com or other platforms.
