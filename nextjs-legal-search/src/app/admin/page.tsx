@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 // Admin API endpoints
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const REFRESH_INTERVAL = 30000; // Refresh every 30 seconds
 
 interface UsageData {
   month: string;
@@ -56,6 +57,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string>("");
   const [authenticated, setAuthenticated] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const fetchDashboardData = async () => {
     try {
@@ -64,6 +66,8 @@ export default function AdminDashboard() {
         headers: {
           "X-API-Key": apiKey,
         },
+        // Prevent caching of dashboard data
+        cache: "no-store",
       });
 
       if (!response.ok) {
@@ -75,6 +79,7 @@ export default function AdminDashboard() {
       const data = await response.json();
       setDashboardData(data.data);
       setAuthenticated(true);
+      setLastUpdated(new Date());
     } catch (err: any) {
       setError(err.message);
       if (err.message.includes("401")) {
@@ -134,34 +139,71 @@ export default function AdminDashboard() {
     // Only fetch if API key is set
     if (apiKey) {
       fetchDashboardData();
+
+      // Set up auto-refresh interval
+      const intervalId = setInterval(() => {
+        fetchDashboardData();
+      }, REFRESH_INTERVAL);
+
+      // Cleanup interval on unmount
+      return () => clearInterval(intervalId);
     }
   }, [apiKey]);
 
+  // Add event listener for custom search events
+  useEffect(() => {
+    const handleSearch = () => {
+      if (authenticated) {
+        fetchDashboardData();
+      }
+    };
+
+    window.addEventListener("search-performed", handleSearch);
+    return () => window.removeEventListener("search-performed", handleSearch);
+  }, [authenticated]);
+
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow p-6">
-          <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Enter API Key to Access Dashboard
-            </label>
-            <div className="flex gap-4">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="border border-gray-300 rounded-md px-4 py-2 flex-grow"
-                placeholder="Enter your admin API key"
-              />
-              <button
-                onClick={() => fetchDashboardData()}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                Login
-              </button>
+      <div className="container mx-auto px-4 max-w-7xl">
+        <section className="text-center py-10">
+          <h1 className="text-4xl text-gray-800 font-bold mb-5">
+            Admin Dashboard
+          </h1>
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+            Access the admin dashboard to monitor API usage and manage settings.
+          </p>
+        </section>
+
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="p-6">
+            <h2 className="text-xl font-medium text-gray-800 mb-4">
+              Authentication Required
+            </h2>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-600 mb-2">
+                Enter API Key to Access Dashboard
+              </label>
+              <div className="flex gap-4">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  placeholder="Enter your admin API key"
+                />
+                <button
+                  onClick={() => fetchDashboardData()}
+                  className="bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
+                >
+                  Login
+                </button>
+              </div>
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mt-4">
+                  {error}
+                </div>
+              )}
             </div>
-            {error && <p className="text-red-500 mt-2">{error}</p>}
           </div>
         </div>
       </div>
@@ -170,27 +212,41 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6 flex items-center justify-center">
-        <div className="text-xl font-medium">Loading dashboard data...</div>
+      <div className="container mx-auto px-4 max-w-7xl">
+        <section className="text-center py-10">
+          <h1 className="text-4xl text-gray-800 font-bold mb-5">
+            Admin Dashboard
+          </h1>
+          <div className="text-center py-10">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-800"></div>
+            <p className="mt-4 text-gray-600">Loading dashboard data...</p>
+          </div>
+        </section>
       </div>
     );
   }
 
   if (!dashboardData) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow p-6">
-          <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
-          <div className="text-red-500">
-            {error || "Failed to load dashboard data. Please try again."}
+      <div className="container mx-auto px-4 max-w-7xl">
+        <section className="text-center py-10">
+          <h1 className="text-4xl text-gray-800 font-bold mb-5">
+            Admin Dashboard
+          </h1>
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-6">
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4">
+                {error || "Failed to load dashboard data. Please try again."}
+              </div>
+              <button
+                onClick={() => fetchDashboardData()}
+                className="bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => fetchDashboardData()}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        </div>
+        </section>
       </div>
     );
   }
@@ -204,354 +260,252 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+    <div className="container mx-auto px-4 max-w-7xl">
+      <section className="text-center py-10">
+        <h1 className="text-4xl text-gray-800 font-bold mb-5">
+          Admin Dashboard
+        </h1>
+        <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+          Monitor API usage, manage quotas, and configure system settings.
+        </p>
+      </section>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow p-6">
+          <h3 className="text-lg font-medium text-gray-800 mb-4">
+            Monthly Usage
+          </h3>
+          <div className="flex justify-between items-end">
+            <div>
+              <div className="text-3xl font-bold text-gray-900">
+                {dashboardData.current_usage.total_queries}
+              </div>
+              <div className="text-sm text-gray-500">queries this month</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-semibold text-gray-900">
+                ${dashboardData.current_usage.total_cost.toFixed(2)}
+              </div>
+              <div className="text-sm text-gray-500">total cost</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow p-6">
+          <h3 className="text-lg font-medium text-gray-800 mb-4">
+            Quota Status
+          </h3>
+          <div className="flex justify-between items-end">
+            <div>
+              <div className="text-3xl font-bold text-gray-900">
+                {dashboardData.quota.remaining}
+              </div>
+              <div className="text-sm text-gray-500">queries remaining</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-semibold text-gray-900">
+                {dashboardData.quota.percentage_used}%
+              </div>
+              <div className="text-sm text-gray-500">quota used</div>
+            </div>
+          </div>
+          <div className="mt-4 bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-gray-800 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${dashboardData.quota.percentage_used}%` }}
+            ></div>
+          </div>
+        </div>
+
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow p-6">
+          <h3 className="text-lg font-medium text-gray-800 mb-4">
+            Cost Metrics
+          </h3>
+          <div className="flex justify-between items-end">
+            <div>
+              <div className="text-3xl font-bold text-gray-900">
+                ${dashboardData.cost_per_query.toFixed(4)}
+              </div>
+              <div className="text-sm text-gray-500">per query</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-semibold text-gray-900">
+                ${dashboardData.projected_monthly_cost.toFixed(2)}
+              </div>
+              <div className="text-sm text-gray-500">projected cost</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Usage Details */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-8">
+        <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">API Usage Dashboard</h1>
+            <h2 className="text-xl font-medium text-gray-800">Usage Details</h2>
             <div className="text-sm text-gray-500">
-              Last updated:{" "}
-              {new Date(dashboardData.generated_at).toLocaleString()}
+              Last updated: {lastUpdated.toLocaleString()}
+              {authenticated && (
+                <button
+                  onClick={fetchDashboardData}
+                  className="ml-2 text-gray-600 hover:text-gray-800"
+                  title="Refresh data"
+                >
+                  🔄
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-              <h3 className="text-lg font-medium mb-2">Monthly Usage</h3>
-              <div className="flex justify-between items-end">
-                <div>
-                  <div className="text-3xl font-bold">
-                    {dashboardData.current_usage.total_queries}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    queries this month
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold">
-                    ${dashboardData.current_usage.total_cost.toFixed(2)}
-                  </div>
-                  <div className="text-sm text-gray-500">total cost</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-              <h3 className="text-lg font-medium mb-2">Quota</h3>
-              <div className="flex justify-between items-end">
-                <div>
-                  <div className="text-3xl font-bold">
-                    {dashboardData.quota.remaining}
-                  </div>
-                  <div className="text-sm text-gray-500">queries remaining</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold">
-                    {dashboardData.quota.percentage_used}%
-                  </div>
-                  <div className="text-sm text-gray-500">quota used</div>
-                </div>
-              </div>
-
-              {/* Simple CSS progress bar */}
-              <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+          {/* Daily Usage Chart */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium text-gray-800 mb-4">
+              Daily Usage
+            </h3>
+            <div className="h-64 relative">
+              {dashboardData.current_usage.daily_breakdown.map((day, index) => (
                 <div
-                  className="bg-green-600 h-2.5 rounded-full"
-                  style={{ width: `${dashboardData.quota.percentage_used}%` }}
-                ></div>
-              </div>
+                  key={index}
+                  className="absolute bottom-0 bg-gray-800 hover:bg-gray-700 transition-colors rounded-t"
+                  style={{
+                    left: `${(index / dashboardData.current_usage.daily_breakdown.length) * 100}%`,
+                    width: `${100 / dashboardData.current_usage.daily_breakdown.length}%`,
+                    height: `${(day.queries / maxQueries) * 100}%`,
+                  }}
+                  title={`${day.day}: ${day.queries} queries, $${day.cost.toFixed(2)}`}
+                />
+              ))}
             </div>
+          </div>
 
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-              <h3 className="text-lg font-medium mb-2">Projected Cost</h3>
-              <div className="flex justify-between items-end">
-                <div>
-                  <div className="text-3xl font-bold">
-                    ${dashboardData.projected_monthly_cost.toFixed(2)}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    projected this month
-                  </div>
+          {/* Month over Month Comparison */}
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-lg font-medium text-gray-800 mb-4">
+              Month over Month
+            </h3>
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <div className="text-sm text-gray-500 mb-1">Queries</div>
+                <div className="text-xl font-semibold text-gray-900">
+                  {dashboardData.month_over_month.queries > 0 ? "+" : ""}
+                  {dashboardData.month_over_month.queries}%
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold">
-                    ${dashboardData.cost_per_query.toFixed(4)}
-                  </div>
-                  <div className="text-sm text-gray-500">avg. per query</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500 mb-1">Tokens</div>
+                <div className="text-xl font-semibold text-gray-900">
+                  {dashboardData.month_over_month.tokens > 0 ? "+" : ""}
+                  {dashboardData.month_over_month.tokens}%
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500 mb-1">Cost</div>
+                <div className="text-xl font-semibold text-gray-900">
+                  {dashboardData.month_over_month.cost > 0 ? "+" : ""}
+                  {dashboardData.month_over_month.cost}%
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Usage Charts - Daily Usage */}
+      {/* Settings */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="p-6">
+          <h2 className="text-xl font-medium text-gray-800 mb-6">Settings</h2>
+
+          {/* Quota Settings */}
           <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Daily Usage</h2>
-            <div className="h-80 w-full border rounded-lg p-4 bg-white">
-              <div className="flex justify-between mb-2 text-sm text-gray-500">
-                <div>Daily breakdown</div>
-                <div className="flex gap-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-indigo-500 rounded-full mr-1"></div>
-                    <span>Queries</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
-                    <span>Cost ($)</span>
-                  </div>
-                </div>
+            <h3 className="text-lg font-medium text-gray-800 mb-4">
+              Quota Settings
+            </h3>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-600 mb-2">
+                  Monthly Query Limit
+                </label>
+                <input
+                  type="number"
+                  value={dashboardData.quota.limit}
+                  onChange={(e) => handleUpdateQuota(parseInt(e.target.value))}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
               </div>
-
-              <div className="relative h-64 flex">
-                {/* Y-axis labels */}
-                <div className="w-12 h-full flex flex-col justify-between text-xs text-gray-500">
-                  <div>Max</div>
-                  <div>0</div>
-                </div>
-
-                {/* X-axis and bars */}
-                <div className="flex-1 border-l border-b border-gray-200 relative">
-                  {/* Horizontal grid lines */}
-                  <div className="absolute w-full h-1/4 border-t border-gray-100"></div>
-                  <div className="absolute w-full h-2/4 border-t border-gray-100"></div>
-                  <div className="absolute w-full h-3/4 border-t border-gray-100"></div>
-
-                  {/* Bars for daily data */}
-                  <div className="absolute inset-0 flex items-end">
-                    {dashboardData.current_usage.daily_breakdown.map(
-                      (day, index) => (
-                        <div
-                          key={day.day}
-                          className="flex-1 flex flex-col items-center"
-                        >
-                          {/* Query bar */}
-                          <div
-                            className="w-5 bg-indigo-500 mb-1"
-                            style={{
-                              height: `${(day.queries / maxQueries) * 100}%`,
-                              opacity: day.queries === 0 ? 0 : 1,
-                            }}
-                          ></div>
-
-                          {/* Cost bar */}
-                          <div
-                            className="w-5 bg-green-500 mb-1"
-                            style={{
-                              height: `${(day.cost / maxCost) * 100}%`,
-                              opacity: day.cost === 0 ? 0 : 1,
-                            }}
-                          ></div>
-
-                          {/* X-axis label */}
-                          <div className="text-xs text-gray-500 mt-1 transform -rotate-45 origin-top-left">
-                            {day.day.split("-")[2]}
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                </div>
-              </div>
+              <button
+                onClick={() => handleUpdateQuota(dashboardData.quota.limit)}
+                className="bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
+              >
+                Update Quota
+              </button>
             </div>
           </div>
 
-          {/* Token Usage */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Token Usage</h2>
-            <div className="h-80 w-full border rounded-lg p-4 bg-white">
-              <div className="flex justify-between mb-2 text-sm text-gray-500">
-                <div>Token Distribution</div>
-                <div className="flex gap-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-indigo-500 rounded-full mr-1"></div>
-                    <span>Input Tokens</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
-                    <span>Output Tokens</span>
-                  </div>
-                </div>
+          {/* Threshold Settings */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-800 mb-4">
+              Cost Thresholds
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">
+                  Per Query ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={dashboardData.thresholds.per_query}
+                  onChange={(e) =>
+                    handleUpdateThresholds({
+                      ...dashboardData.thresholds,
+                      per_query: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
               </div>
-
-              <div className="relative h-64">
-                {/* Simple horizontal bar chart */}
-                <div className="h-24 flex flex-col justify-around mt-8">
-                  <div>
-                    <div className="mb-1 text-sm">
-                      Input Tokens: {dashboardData.current_usage.input_tokens}
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-6">
-                      <div
-                        className="bg-indigo-500 h-6 rounded-full px-2 text-white text-xs flex items-center"
-                        style={{
-                          width: `${(dashboardData.current_usage.input_tokens / (dashboardData.current_usage.input_tokens + dashboardData.current_usage.output_tokens)) * 100}%`,
-                        }}
-                      >
-                        {Math.round(
-                          (dashboardData.current_usage.input_tokens /
-                            (dashboardData.current_usage.input_tokens +
-                              dashboardData.current_usage.output_tokens)) *
-                            100
-                        )}
-                        %
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="mb-1 text-sm">
-                      Output Tokens: {dashboardData.current_usage.output_tokens}
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-6">
-                      <div
-                        className="bg-green-500 h-6 rounded-full px-2 text-white text-xs flex items-center"
-                        style={{
-                          width: `${(dashboardData.current_usage.output_tokens / (dashboardData.current_usage.input_tokens + dashboardData.current_usage.output_tokens)) * 100}%`,
-                        }}
-                      >
-                        {Math.round(
-                          (dashboardData.current_usage.output_tokens /
-                            (dashboardData.current_usage.input_tokens +
-                              dashboardData.current_usage.output_tokens)) *
-                            100
-                        )}
-                        %
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Total tokens */}
-                <div className="mt-6 text-center">
-                  <div className="text-sm text-gray-500">Total Tokens</div>
-                  <div className="text-2xl font-bold">
-                    {dashboardData.current_usage.total_tokens}
-                  </div>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">
+                  Daily ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={dashboardData.thresholds.daily}
+                  onChange={(e) =>
+                    handleUpdateThresholds({
+                      ...dashboardData.thresholds,
+                      daily: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">
+                  Monthly ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={dashboardData.thresholds.monthly}
+                  onChange={(e) =>
+                    handleUpdateThresholds({
+                      ...dashboardData.thresholds,
+                      monthly: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
               </div>
             </div>
-          </div>
-
-          {/* Settings Section */}
-          <div className="border-t pt-6 mt-6">
-            <h2 className="text-xl font-semibold mb-4">Settings</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Quota Management */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-medium mb-3">
-                  Monthly Query Quota
-                </h3>
-                <div className="flex items-end gap-4">
-                  <div className="flex-grow">
-                    <label className="block text-sm text-gray-500 mb-1">
-                      Current limit: {dashboardData.quota.limit}
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      defaultValue={dashboardData.quota.limit}
-                      id="quotaInput"
-                      className="border border-gray-300 rounded px-3 py-2 w-full"
-                    />
-                  </div>
-                  <button
-                    onClick={() => {
-                      const input = document.getElementById(
-                        "quotaInput"
-                      ) as HTMLInputElement;
-                      const value = parseInt(input.value);
-                      if (value > 0) {
-                        handleUpdateQuota(value);
-                      }
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  >
-                    Update
-                  </button>
-                </div>
-              </div>
-
-              {/* Cost Thresholds */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-medium mb-3">Cost Thresholds</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">
-                      Per Query ($)
-                    </label>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      defaultValue={dashboardData.thresholds.per_query}
-                      id="perQueryThreshold"
-                      className="border border-gray-300 rounded px-3 py-2 w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">
-                      Daily ($)
-                    </label>
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      defaultValue={dashboardData.thresholds.daily}
-                      id="dailyThreshold"
-                      className="border border-gray-300 rounded px-3 py-2 w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">
-                      Monthly ($)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      defaultValue={dashboardData.thresholds.monthly}
-                      id="monthlyThreshold"
-                      className="border border-gray-300 rounded px-3 py-2 w-full"
-                    />
-                  </div>
-                  <button
-                    onClick={() => {
-                      const perQuery = parseFloat(
-                        (
-                          document.getElementById(
-                            "perQueryThreshold"
-                          ) as HTMLInputElement
-                        ).value
-                      );
-                      const daily = parseFloat(
-                        (
-                          document.getElementById(
-                            "dailyThreshold"
-                          ) as HTMLInputElement
-                        ).value
-                      );
-                      const monthly = parseFloat(
-                        (
-                          document.getElementById(
-                            "monthlyThreshold"
-                          ) as HTMLInputElement
-                        ).value
-                      );
-
-                      handleUpdateThresholds({
-                        per_query: perQuery,
-                        daily: daily,
-                        monthly: monthly,
-                      });
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full"
-                  >
-                    Update Thresholds
-                  </button>
-                </div>
-              </div>
-            </div>
+            <button
+              onClick={() => handleUpdateThresholds(dashboardData.thresholds)}
+              className="mt-4 bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
+            >
+              Update Thresholds
+            </button>
           </div>
         </div>
       </div>
