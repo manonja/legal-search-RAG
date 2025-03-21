@@ -6,8 +6,9 @@ channels = ["conda-forge"]
 platforms = ["osx-64"]
 
 [dependencies]
-python = ">=3.9,<3.13" # Pin Python version below 3.13 for better compatibility
-pip = "*"              # Required for pip installations
+python = ">=3.9,<3.13"     # Pin Python version below 3.13 for better compatibility
+pip = "*"                  # Required for pip installations
+tiktoken = ">=0.9.0,<0.10"
 
 [tasks]
 lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
@@ -16,7 +17,7 @@ check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --ski
 process-docs = { cmd = "python process_docs.py" }
 chunk-docs = { cmd = "python chunk.py" }
 embed-docs = { cmd = "python embeddings.py" }                                                                                         # New task for embeddings
-serve-api = { cmd = "uvicorn api:app --reload --host 0.0.0.0 --port 8000" }                                                           # New task for API service
+serve-api = { cmd = "uvicorn api:app --reload --host 0.0.0.0 --port 8000" }                                                           # API service task
 
 [pypi-dependencies]
 # Core dependencies

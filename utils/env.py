@@ -1,9 +1,12 @@
 """Environment variable utilities for configuration management."""
 
+import logging
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Required environment variables
 REQUIRED_ENV_VARS = ["GOOGLE_API_KEY", "DOCS_ROOT"]
@@ -97,16 +100,33 @@ def get_output_dir() -> str:
     return os.getenv("OUTPUT_DIR", os.path.expanduser("~/Downloads/processedLegalDocs"))
 
 
-def get_docs_root() -> Path:
-    """Get the root directory for document storage.
+def get_docs_root() -> str:
+    """Get the root directory for legal documents.
 
     Returns:
-        Path: Absolute path to the documents directory
-
-    Raises:
-        ValueError: If DOCS_ROOT is not set
+        Path to the documents directory
     """
-    docs_root = os.getenv("DOCS_ROOT")
-    if not docs_root:
-        raise ValueError("DOCS_ROOT environment variable is not set")
-    return Path(docs_root).expanduser().resolve()
+    docs_root = os.getenv("DOCS_ROOT", os.path.expanduser("~/Downloads/legalDocs"))
+    logger.info(f"Using documents root: {docs_root}")
+
+    # Create directory if it doesn't exist
+    os.makedirs(docs_root, exist_ok=True)
+
+    return docs_root
+
+
+def get_chunks_dir() -> str:
+    """Get the directory where chunked documents are stored.
+
+    Returns:
+        Path to the chunked documents directory
+    """
+    chunks_dir = os.getenv(
+        "CHUNKS_DIR", os.path.expanduser("~/Downloads/chunkedLegalDocs")
+    )
+    logger.info(f"Using chunks directory: {chunks_dir}")
+
+    # Create directory if it doesn't exist
+    os.makedirs(chunks_dir, exist_ok=True)
+
+    return chunks_dir
