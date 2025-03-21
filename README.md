@@ -235,4 +235,45 @@ Access the admin dashboard at `/admin` to:
 
 ## Deployment
 
-See the deployment documentation for instructions on deploying to Render.com or other platforms.
+The system can be deployed in several ways:
+
+### Local Deployment
+For testing and development, you can run the application locally:
+
+```bash
+# Start the FastAPI backend
+pixi run serve-api
+
+# Start the Next.js frontend
+cd nextjs-legal-search
+npm run dev
+```
+
+### Docker Deployment
+For containerized deployment:
+
+```bash
+# Build and start all services
+docker-compose up -d
+```
+
+### Cloud Deployment
+For production deployment, we support several cloud providers:
+
+1. **Render**: Easy deployment with automatic SSL and Docker support
+2. **Railway**: Developer-friendly platform with flexible scaling options
+
+We provide a deployment script to automate most of the process:
+
+```bash
+./scripts/deploy_to_cloud.sh [provider]
+```
+
+See [Cloud Deployment Guide](docs/cloud_deployment.md) for detailed instructions.
+
+#### Key Cloud Deployment Features
+- **S3 Document Storage**: Persistent storage for documents
+- **Container-based Deployment**: Consistent environments
+- **Automated Deployment Scripts**: Streamline the deployment process
+- **Cost-efficient**: Minimal resource requirements (~$15-25/month)
+- **Easy Sharing**: Simple to share with clients or team members

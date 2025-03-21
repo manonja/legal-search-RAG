@@ -101,17 +101,16 @@ def get_output_dir() -> str:
 
 
 def get_docs_root() -> str:
-    """Get the root directory for legal documents.
+    """Get the documents root directory.
 
     Returns:
-        Path to the documents directory
+        Document directory path
     """
-    docs_root = os.getenv("DOCS_ROOT", os.path.expanduser("~/Downloads/legalDocs"))
-    logger.info(f"Using documents root: {docs_root}")
-
-    # Create directory if it doesn't exist
-    os.makedirs(docs_root, exist_ok=True)
-
+    docs_root = os.getenv(
+        "DOCS_ROOT", os.path.expanduser("~/Downloads/processedLegalDocs")
+    )
+    # Ensure directory exists
+    Path(docs_root).mkdir(parents=True, exist_ok=True)
     return docs_root
 
 
@@ -130,3 +129,40 @@ def get_chunks_dir() -> str:
     os.makedirs(chunks_dir, exist_ok=True)
 
     return chunks_dir
+
+
+def get_s3_config():
+    """Get S3 configuration from environment variables.
+
+    Returns:
+        Dictionary with S3 configuration or None if not configured
+    """
+    use_s3 = os.getenv("USE_S3_STORAGE", "false").lower() == "true"
+    if not use_s3:
+        return None
+
+    bucket = os.getenv("S3_BUCKET_NAME")
+    if not bucket:
+        return None
+
+    return {
+        "bucket": bucket,
+        "prefix": os.getenv("S3_PREFIX", "legal-search-data"),
+        "region": os.getenv("AWS_REGION", "us-west-2"),
+        "access_key": os.getenv("AWS_ACCESS_KEY_ID"),
+        "secret_key": os.getenv("AWS_SECRET_ACCESS_KEY"),
+    }
+
+
+def is_s3_configured():
+    """Check if S3 storage is properly configured.
+
+    Returns:
+        Boolean indicating if S3 is configured
+    """
+    config = get_s3_config()
+    return (
+        config is not None
+        and config["access_key"] is not None
+        and config["secret_key"] is not None
+    )

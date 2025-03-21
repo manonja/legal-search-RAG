@@ -71,8 +71,64 @@ CACHE_PATH = os.path.join(os.path.dirname(__file__), "cache", "query_cache.json"
 COLLECTION_NAME = "legal_docs"
 API_VERSION = "1.0.0"
 
+# S3 configuration (for cloud deployment)
+USE_S3_STORAGE = os.getenv("USE_S3_STORAGE", "false").lower() == "true"
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "")
+S3_PREFIX = os.getenv("S3_PREFIX", "legal-search-data")
+AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+
 # Type variables
 T = TypeVar("T", bound=BaseModel)
+
+
+def initialize_chroma_client():
+    """Initialize ChromaDB client based on environment configuration.
+
+    Returns:
+        chromadb.Client: Configured client for either local or S3 storage
+    """
+    logger.info("Initializing Chroma client")
+
+    if USE_S3_STORAGE and S3_BUCKET_NAME:
+        try:
+            import boto3
+            from chromadb.config import Settings
+
+            logger.info(f"Using S3 storage: s3://{S3_BUCKET_NAME}/{S3_PREFIX}")
+
+            # Configure S3 persistence settings
+            settings = Settings(
+                chroma_api_impl="rest",
+                chroma_server_host="localhost",
+                chroma_server_http_port=8000,
+                anonymized_telemetry=False,
+                allow_reset=True,
+                persist_directory=CHROMA_PERSIST_DIR,  # Temporary local cache
+            )
+
+            # Create the client with S3 persistence
+            chroma_dir = Path(CHROMA_PERSIST_DIR)
+            chroma_dir.mkdir(parents=True, exist_ok=True)
+
+            # Configure S3 client
+            s3_client = boto3.client(
+                "s3",
+                region_name=AWS_REGION,
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            )
+
+            return chromadb.PersistentClient(path=str(chroma_dir), settings=settings)
+
+        except ImportError:
+            logger.warning("boto3 not installed, falling back to local storage")
+            # Fall back to local storage if boto3 is not available
+
+    # Default to local storage
+    logger.info(f"Using local storage: {CHROMA_PERSIST_DIR}")
+    chroma_dir = Path(CHROMA_PERSIST_DIR)
+    chroma_dir.mkdir(parents=True, exist_ok=True)
+    return chromadb.PersistentClient(path=str(chroma_dir))
 
 
 # Process a document and add its chunks to the collection
@@ -191,9 +247,7 @@ try:
 
     # Initialize Chroma client and collection
     logger.info("Initializing Chroma client and collection")
-    chroma_dir = Path(CHROMA_PERSIST_DIR)
-    chroma_dir.mkdir(parents=True, exist_ok=True)
-    client = chromadb.PersistentClient(path=str(chroma_dir))
+    client = initialize_chroma_client()
 
     # Check if collection exists before creating it
     try:
@@ -779,6 +833,74 @@ def get_document_path(document_id: str) -> Path:
     raise FileNotFoundError(f"Document not found: {document_id}")
 
 
+async def get_document_content(document_id: str) -> tuple[str, dict]:
+    """Get document content and metadata from either local storage or S3.
+
+    Args:
+        document_id: Document identifier (filename)
+
+    Returns:
+        Tuple of (document content, metadata dictionary)
+
+    Raises:
+        FileNotFoundError: If document cannot be found
+        IOError: If document cannot be read
+    """
+    if USE_S3_STORAGE and S3_BUCKET_NAME:
+        try:
+            import boto3
+
+            # Initialize S3 client
+            s3_client = boto3.client(
+                "s3",
+                region_name=AWS_REGION,
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            )
+
+            # First check if the document exists with the given ID
+            try:
+                key = f"{S3_PREFIX}/documents/{document_id}"
+                logger.info(f"Attempting to fetch document from S3: {key}")
+                response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+                content = response["Body"].read().decode("utf-8")
+                metadata = response.get("Metadata", {})
+                metadata["filename"] = document_id
+                metadata["source"] = f"s3://{S3_BUCKET_NAME}/{key}"
+                return content, metadata
+            except s3_client.exceptions.NoSuchKey:
+                # Try with chunked_ prefix
+                key = f"{S3_PREFIX}/documents/chunked_{document_id}"
+                try:
+                    logger.info(f"Attempting to fetch chunked document from S3: {key}")
+                    response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+                    content = response["Body"].read().decode("utf-8")
+                    metadata = response.get("Metadata", {})
+                    metadata["filename"] = document_id
+                    metadata["source"] = f"s3://{S3_BUCKET_NAME}/{key}"
+                    return content, metadata
+                except s3_client.exceptions.NoSuchKey:
+                    logger.warning(f"Document not found in S3: {document_id}")
+                    # Fall back to local storage
+        except ImportError:
+            logger.warning("boto3 not installed, falling back to local storage")
+        except Exception as e:
+            logger.error(f"Error accessing S3: {str(e)}")
+            # Fall back to local storage if there's an S3 error
+
+    # Default to local storage access
+    try:
+        doc_path = get_document_path(document_id)
+        with open(doc_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        metadata = {"filename": doc_path.name, "source": str(doc_path)}
+        return content, metadata
+    except FileNotFoundError:
+        raise
+    except Exception as e:
+        raise IOError(f"Failed to read document: {str(e)}")
+
+
 @app.get(
     "/api/documents/{document_id}", response_model=DocumentResponse, tags=["Documents"]
 )
@@ -795,17 +917,12 @@ async def get_document(document_id: str) -> DocumentResponse:
         HTTPException: If document is not found or can't be accessed
     """
     try:
-        # Get the document path
+        # Get the document content and metadata
         try:
-            doc_path = get_document_path(document_id)
+            content, metadata = await get_document_content(document_id)
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
-
-        # Load full document content
-        try:
-            with open(doc_path, "r", encoding="utf-8") as f:
-                content = f.read()
-        except Exception as e:
+        except IOError as e:
             raise HTTPException(
                 status_code=500, detail=f"Failed to read document: {str(e)}"
             )
@@ -813,8 +930,8 @@ async def get_document(document_id: str) -> DocumentResponse:
         # Return document response
         return DocumentResponse(
             content=content,
-            metadata={"filename": doc_path.name},
-            source=str(doc_path),
+            metadata=metadata,
+            source=metadata.get("source", ""),
             chunks=[],  # Empty chunks since we're not using Chroma here
         )
 
