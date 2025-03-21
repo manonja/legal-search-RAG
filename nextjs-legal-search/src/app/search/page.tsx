@@ -39,6 +39,9 @@ export default function SearchPage() {
 
       setResults(response.results);
       setTotalFound(response.total_found);
+
+      // Emit search event
+      window.dispatchEvent(new Event("search-performed"));
     } catch (err) {
       console.error("Search error:", err);
       setError("An error occurred while searching. Please try again.");

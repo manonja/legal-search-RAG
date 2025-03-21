@@ -77,6 +77,9 @@ export default function RagSearchPage() {
 
       // Clear the query input for the next question
       setQuery("");
+
+      // Emit search event
+      window.dispatchEvent(new Event("search-performed"));
     } catch (err) {
       console.error("RAG search error:", err);
       setError(
@@ -88,14 +91,23 @@ export default function RagSearchPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold text-center mb-6">
-        Ask Legal Questions
-      </h1>
+    <div className="container mx-auto px-4 max-w-7xl">
+      {/* Header Section */}
+      <section className="text-center py-10">
+        <h1 className="text-4xl text-gray-800 font-bold mb-5">
+          Legal Assistant
+        </h1>
+        <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+          Ask questions about legal documents and get AI-powered answers with
+          source references.
+        </p>
+      </section>
 
-      <div className="max-w-3xl mx-auto mb-8">
-        <form onSubmit={handleSearch} className="flex flex-col gap-4">
-          <div className="relative">
+      {/* Search Form */}
+      <form onSubmit={handleSearch} className="mb-8">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center p-4">
+            <span className="mr-3 text-gray-500">💬</span>
             <input
               type="text"
               value={query}
@@ -105,33 +117,57 @@ export default function RagSearchPage() {
                   ? "Ask a follow-up question..."
                   : "What would you like to know about legal matters?"
               }
-              className="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 border-none outline-none text-base"
+              required
             />
             <button
               type="submit"
+              className="bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
               disabled={isLoading}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400"
             >
               {isLoading ? "Processing..." : "Ask"}
             </button>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="text-center py-10">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-800"></div>
+          <p className="mt-4 text-gray-600">Processing your question...</p>
+        </div>
+      )}
 
       {conversationHistory.length > 0 && (
-        <div className="max-w-3xl mx-auto mb-8">
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-8">
+          <div className="p-5">
             <h2 className="text-lg font-medium mb-4">Conversation History</h2>
             <div className="space-y-4">
               {conversationHistory.map((msg, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg ${msg.role === "user" ? "bg-blue-100 ml-10" : "bg-white border border-gray-200 mr-10"}`}
+                  className={`p-4 rounded-lg ${
+                    msg.role === "user"
+                      ? "bg-gray-50 ml-10"
+                      : "bg-white border border-gray-200 mr-10"
+                  }`}
                 >
-                  <p className="text-sm font-medium mb-1">
+                  <p className="text-sm font-medium text-gray-600 mb-2">
                     {msg.role === "user" ? "You" : "Assistant"}
                   </p>
-                  <p>{msg.content}</p>
+                  <div className="text-gray-800">
+                    {msg.role === "assistant" ? (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -139,71 +175,64 @@ export default function RagSearchPage() {
         </div>
       )}
 
-      {error && (
-        <div className="max-w-3xl mx-auto">
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
-            <p>{error}</p>
-          </div>
-        </div>
-      )}
-
       {response && (
-        <section className="max-w-3xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-6">
-              <div className="prose max-w-none">
-                <ReactMarkdown>{response.answer}</ReactMarkdown>
-              </div>
+        <section className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="p-6">
+            {/* Answer Section */}
+            <div className="prose max-w-none mb-6">
+              <ReactMarkdown>{response.answer}</ReactMarkdown>
+            </div>
 
-              {/* Add token usage information */}
-              {response.usage && (
-                <div className="mt-6 pt-4 border-t border-gray-100">
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <div>
-                      Tokens: {response.usage.input_tokens} input +{" "}
-                      {response.usage.output_tokens} output ={" "}
-                      {response.usage.total_tokens} total
+            {/* Usage Information */}
+            {response.usage && (
+              <div className="flex justify-between items-center text-sm text-gray-500 border-t border-gray-100 pt-4 mb-6">
+                <div>
+                  Tokens: {response.usage.input_tokens} input +{" "}
+                  {response.usage.output_tokens} output ={" "}
+                  {response.usage.total_tokens} total
+                </div>
+                <div className="font-medium">
+                  Cost: ${response.usage.cost.toFixed(4)}
+                </div>
+              </div>
+            )}
+
+            {/* Source Documents */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-800">
+                  Source Documents
+                </h3>
+                <span className="text-sm text-gray-500">
+                  {response.source_documents.length} source
+                  {response.source_documents.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="space-y-4">
+                {response.source_documents.map((source, index) => (
+                  <div
+                    key={index}
+                    className="p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium text-gray-900">
+                        {source.metadata.filename || "Unknown Source"}
+                      </h4>
+                      <span className="text-sm text-gray-500">
+                        {(source.similarity * 100).toFixed(1)}% match
+                      </span>
                     </div>
-                    <div className="font-medium">
-                      Cost: ${response.usage.cost.toFixed(4)}
-                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {source.content}
+                    </p>
                   </div>
-                </div>
-              )}
-
-              <div className="mb-8 pb-5 border-b border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-800">
-                    Source Documents
-                  </h3>
-                  <span className="text-sm text-gray-500">
-                    {response.source_documents.length} source
-                    {response.source_documents.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  {response.source_documents.map((source, index) => (
-                    <div
-                      key={index}
-                      className="p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium text-gray-900">
-                          {source.metadata.filename || "Unknown Source"}
-                        </h4>
-                        <span className="text-sm text-gray-500">
-                          {(source.similarity * 100).toFixed(1)}% match
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {source.content}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                ))}
               </div>
+            </div>
 
-              <div className="flex justify-between items-center mb-5">
+            {/* Context Details */}
+            <div className="border-t border-gray-100 pt-6">
+              <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-800">
                   Context Details
                 </h3>
@@ -216,11 +245,11 @@ export default function RagSearchPage() {
               </div>
 
               {showContext && (
-                <div className="space-y-6 mt-4">
+                <div className="space-y-6">
                   {response.source_documents.map((result, index) => (
                     <div
                       key={index}
-                      className="mb-8 pb-5 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0"
+                      className="pb-6 border-b border-gray-100 last:border-b-0 last:pb-0"
                     >
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-sm text-gray-500">
@@ -237,7 +266,7 @@ export default function RagSearchPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-gray-700 mb-4 leading-relaxed">
+                      <p className="text-gray-700 leading-relaxed">
                         {highlightText(result.content, query)}
                       </p>
                     </div>
