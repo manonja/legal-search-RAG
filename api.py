@@ -1,6 +1,6 @@
 """FastAPI service for legal document RAG system.
 
-This module provides REST API endpoints for Retool to interact with the
+This module provides REST API endpoints to interact with the
 Chroma vector database.
 """
 
@@ -172,13 +172,13 @@ app = FastAPI(
     docs_url="/",  # Swagger UI at root endpoint
 )
 
-# Add CORS middleware for Retool
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://*.retool.com",  # Retool cloud domains
         "http://localhost:8000",  # Local development
         "http://localhost:3000",  # Next.js local development
+        "http://localhost:8001",  # Next.js local development (tenant port)
         "https://*.ngrok.io",  # ngrok tunnels
         "https://*.ngrok-free.app",  # ngrok free tier domains
         "https://your-nextjs-domain.com",  # Production Next.js domain
