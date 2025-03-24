@@ -20,6 +20,8 @@ load_dotenv()
 EMBEDDING_MODEL = "text-embedding-ada-002"
 CHROMA_PERSIST_DIR = Path("cache/chroma")
 DEFAULT_NUM_RESULTS = 5  # Number of chunks to retrieve per query
+TENANT_ID = os.getenv("TENANT_ID", "default")
+COLLECTION_NAME = f"legal_docs_{TENANT_ID}"
 
 # Initialize OpenAI embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -54,7 +56,7 @@ def get_collection(client: chromadb.PersistentClient) -> chromadb.Collection:
         Collection: Chroma collection for legal documents
     """
     return client.get_collection(
-        name="legal_docs",
+        name=COLLECTION_NAME,
         embedding_function=openai_ef,
     )
 

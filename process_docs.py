@@ -12,8 +12,6 @@ import fitz  # PyMuPDF
 import google.generativeai as genai  # type: ignore
 from tqdm import tqdm  # type: ignore
 
-from utils.env import get_google_api_key, get_input_dir, get_output_dir, load_env
-
 
 def configure_gemini():
     """Configure and initialize the Gemini model.
@@ -22,7 +20,11 @@ def configure_gemini():
         GenerativeModel: Configured Gemini model instance ready for text
         generation.
     """
-    genai.configure(api_key=get_google_api_key())
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY environment variable must be set")
+
+    genai.configure(api_key=api_key)
     return genai.GenerativeModel("gemini-1.5-flash")
 
 
@@ -112,27 +114,25 @@ def main():
     """Execute the main document processing workflow.
 
     This function orchestrates the document processing workflow:
-    1. Loads and validates environment variables
-    2. Sets up input/output directories
-    3. Processes documents using the Gemini API
+    1. Gets input/output directories from environment variables
+    2. Processes documents using the Gemini API
 
     Raises:
-        FileNotFoundError: If the .env file is missing
         ValueError: If required environment variables are not set
         Exception: For any other unexpected errors during processing
     """
     try:
-        # Load and validate environment variables
-        load_env(validate=True)
+        # Get input and output directories from environment variables
+        input_directory = os.getenv("INPUT_DIR")
+        output_directory = os.getenv("OUTPUT_DIR")
 
-        # Get input and output directories
-        input_directory = get_input_dir()
-        output_directory = get_output_dir()
+        if not input_directory or not output_directory:
+            raise ValueError("INPUT_DIR and OUTPUT_DIR environment variables must be set")
 
         # Process the documents
         process_documents(input_directory, output_directory)
 
-    except (FileNotFoundError, ValueError) as e:
+    except ValueError as e:
         print(f"Configuration error: {e}")
         exit(1)
     except Exception as e:

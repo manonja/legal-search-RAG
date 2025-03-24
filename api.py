@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,6 +16,8 @@ from typing import Any, Dict, List, Optional, TypeVar, cast
 
 import chromadb
 import uvicorn
+from chromadb.config import Settings
+from chromadb.errors import InvalidCollectionException
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
@@ -36,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # Add a filter to suppress ChromaDB warnings about existing embedding IDs
 class ChromaWarningFilter(logging.Filter):
-    """Filter to suppress specific ChromaDB warnings about existing embedding IDs."""
+    """A filter to remove specific ChromaDB warnings."""
 
     def filter(self, record):
         """Filter out warnings about adding existing embedding IDs.
@@ -68,15 +71,12 @@ DOCUMENTS_DIR = os.getenv(
     "DOCUMENTS_DIR", os.path.join(os.path.dirname(__file__), "..", "data")
 )
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "cache", "query_cache.json")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "legal_docs")
 TENANT_ID = os.getenv("TENANT_ID", "default")
-API_VERSION = "1.0.0"
+DOCS_ROOT = os.getenv("DOCS_ROOT", "./docs")
 
-# S3 configuration (for cloud deployment)
-USE_S3_STORAGE = os.getenv("USE_S3_STORAGE", "false").lower() == "true"
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "")
-S3_PREFIX = os.getenv("S3_PREFIX", "legal-search-data")
-AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+# Define the collection name for ChromaDB
+COLLECTION_NAME = f"legal_docs_{TENANT_ID}"
+API_VERSION = "1.0.0"
 
 # Type variables
 T = TypeVar("T", bound=BaseModel)
@@ -86,58 +86,20 @@ def initialize_chroma_client():
     """Initialize ChromaDB client based on environment configuration.
 
     Returns:
-        chromadb.Client: Configured client for either local or S3 storage
+        chromadb.Client: Configured client for local storage
     """
     logger.info("Initializing Chroma client")
 
-    # Ensure tenant-specific persistence directory
-    tenant_persist_dir = os.path.join(CHROMA_PERSIST_DIR, TENANT_ID)
-
-    if USE_S3_STORAGE and S3_BUCKET_NAME:
-        try:
-            import boto3
-            from chromadb.config import Settings
-
-            logger.info(
-                f"Using S3 storage for tenant {TENANT_ID}: s3://{S3_BUCKET_NAME}/{S3_PREFIX}/{TENANT_ID}"
-            )
-
-            # Configure S3 persistence settings
-            settings = Settings(
-                chroma_api_impl="rest",
-                chroma_server_host="localhost",
-                chroma_server_http_port=8000,
-                anonymized_telemetry=False,
-                allow_reset=True,
-                persist_directory=tenant_persist_dir,  # Tenant-specific local cache
-            )
-
-            # Create the client with S3 persistence
-            chroma_dir = Path(tenant_persist_dir)
-            chroma_dir.mkdir(parents=True, exist_ok=True)
-
-            # Configure S3 client with tenant-specific prefix
-            s3_client = boto3.client(
-                "s3",
-                region_name=AWS_REGION,
-                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-            )
-
-            # Ensure tenant-specific S3 prefix
-            tenant_s3_prefix = f"{S3_PREFIX}/{TENANT_ID}"
-
-            return chromadb.PersistentClient(path=str(chroma_dir), settings=settings)
-
-        except ImportError:
-            logger.warning("boto3 not installed, falling back to local storage")
-            # Fall back to local storage if boto3 is not available
-
-    # Default to local storage with tenant isolation
-    logger.info(f"Using local storage for tenant {TENANT_ID}: {tenant_persist_dir}")
-    chroma_dir = Path(tenant_persist_dir)
+    # Create path - use the main Chroma directory, not a tenant-specific subdirectory
+    chroma_dir = Path(CHROMA_PERSIST_DIR)
     chroma_dir.mkdir(parents=True, exist_ok=True)
-    return chromadb.PersistentClient(path=str(chroma_dir))
+
+    logger.info(f"Using local storage: {chroma_dir}")
+
+    return chromadb.PersistentClient(
+        path=str(chroma_dir),
+        settings=Settings(anonymized_telemetry=False, allow_reset=True),
+    )
 
 
 # Process a document and add its chunks to the collection
@@ -173,7 +135,7 @@ def process_document(doc_path: Path) -> None:
 
             # Generate a unique ID for this chunk
             chunk_id = (
-                f"{doc_name}_chunk_{i+1}"  # Start from 1 instead of 0 for consistency
+                f"{doc_name}_chunk_{i + 1}"  # Start from 1 instead of 0 for consistency
             )
 
             # Add to batch
@@ -268,7 +230,7 @@ try:
             f"{collection.count()} embeddings"
         )
         # Skip document loading for existing collections
-    except ValueError:
+    except (ValueError, InvalidCollectionException):
         # Only create collection if it doesn't exist
         logger.info(f"Creating new collection '{COLLECTION_NAME}'")
         collection = client.create_collection(
@@ -686,9 +648,8 @@ async def rag_search(request: RagRequest) -> RagResponse:
 
             # Track document sources
             source = metadata.get("source", "Unknown Document")
-            if (
-                source not in document_sources
-                or similarity > document_sources[source].similarity
+            if source not in document_sources or (
+                similarity > document_sources[source].similarity
             ):
                 document_sources[source] = DocumentSource(
                     source=source,
@@ -771,8 +732,10 @@ async def rag_search(request: RagRequest) -> RagResponse:
                     "input_tokens": chat_completion.usage.prompt_tokens,
                     "output_tokens": chat_completion.usage.completion_tokens,
                     "total_tokens": chat_completion.usage.total_tokens,
-                    "cost": chat_completion.usage.total_tokens
-                    * 0.000002,  # Assuming $0.000002 per token
+                    "cost": (
+                        chat_completion.usage.total_tokens
+                        * 0.000002  # Assuming $0.000002 per token
+                    ),
                 },
             }
             query_cache[query_hash] = {
@@ -842,8 +805,62 @@ def get_document_path(document_id: str) -> Path:
     raise FileNotFoundError(f"Document not found: {document_id}")
 
 
+async def find_document(document_id: str) -> Path:
+    """Find a document by its ID in various directories.
+
+    Args:
+        document_id: Document identifier (filename)
+
+    Returns:
+        Path to the document file
+
+    Raises:
+        FileNotFoundError: If document cannot be found
+    """
+    # Remove any URL encoding
+    document_id = document_id.replace("%20", " ")
+
+    logger.info(f"Looking for document: {document_id}")
+
+    # Look in processed docs directory first
+    docs_root = Path(get_docs_root())
+    logger.info(f"Searching in processed docs directory: {docs_root}")
+
+    # First try the exact path if it exists
+    if (docs_root / document_id).exists():
+        logger.info(f"Found document at exact path: {docs_root / document_id}")
+        return docs_root / document_id
+
+    # Then try finding it by name only, including in subdirectories
+    for file in docs_root.rglob("*"):
+        if file.name == document_id:
+            logger.info(f"Found document by name: {file}")
+            return file
+
+    # If not found in processed docs, look in chunked docs directory
+    chunks_dir = Path(
+        os.getenv("CHUNKS_DIR", os.path.expanduser("~/Downloads/chunkedLegalDocs"))
+    )
+    logger.info(f"Searching in chunked docs directory: {chunks_dir}")
+
+    # First try the exact path if it exists
+    if (chunks_dir / document_id).exists():
+        logger.info(f"Found document at exact path: {chunks_dir / document_id}")
+        return chunks_dir / document_id
+
+    # Then try finding it by name only, including in subdirectories
+    for file in chunks_dir.rglob("*"):
+        if file.name == document_id:
+            logger.info(f"Found document by name: {file}")
+            return file
+
+    # If we get here, we didn't find the document
+    logger.error(f"Document not found: {document_id}")
+    raise FileNotFoundError(f"Document not found: {document_id}")
+
+
 async def get_document_content(document_id: str) -> tuple[str, dict]:
-    """Get document content and metadata from either local storage or S3.
+    """Get document content and metadata from local storage.
 
     Args:
         document_id: Document identifier (filename)
@@ -855,59 +872,27 @@ async def get_document_content(document_id: str) -> tuple[str, dict]:
         FileNotFoundError: If document cannot be found
         IOError: If document cannot be read
     """
-    if USE_S3_STORAGE and S3_BUCKET_NAME:
-        try:
-            import boto3
-
-            # Initialize S3 client
-            s3_client = boto3.client(
-                "s3",
-                region_name=AWS_REGION,
-                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-            )
-
-            # First check if the document exists with the given ID
-            try:
-                key = f"{S3_PREFIX}/documents/{document_id}"
-                logger.info(f"Attempting to fetch document from S3: {key}")
-                response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
-                content = response["Body"].read().decode("utf-8")
-                metadata = response.get("Metadata", {})
-                metadata["filename"] = document_id
-                metadata["source"] = f"s3://{S3_BUCKET_NAME}/{key}"
-                return content, metadata
-            except s3_client.exceptions.NoSuchKey:
-                # Try with chunked_ prefix
-                key = f"{S3_PREFIX}/documents/chunked_{document_id}"
-                try:
-                    logger.info(f"Attempting to fetch chunked document from S3: {key}")
-                    response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
-                    content = response["Body"].read().decode("utf-8")
-                    metadata = response.get("Metadata", {})
-                    metadata["filename"] = document_id
-                    metadata["source"] = f"s3://{S3_BUCKET_NAME}/{key}"
-                    return content, metadata
-                except s3_client.exceptions.NoSuchKey:
-                    logger.warning(f"Document not found in S3: {document_id}")
-                    # Fall back to local storage
-        except ImportError:
-            logger.warning("boto3 not installed, falling back to local storage")
-        except Exception as e:
-            logger.error(f"Error accessing S3: {str(e)}")
-            # Fall back to local storage if there's an S3 error
-
-    # Default to local storage access
     try:
-        doc_path = get_document_path(document_id)
-        with open(doc_path, "r", encoding="utf-8") as f:
+        # Try to locate the document file
+        doc_file = await find_document(document_id)
+        logger.info(f"Found document at: {doc_file}")
+
+        # Read the file content
+        with open(doc_file, "r", encoding="utf-8") as f:
             content = f.read()
-        metadata = {"filename": doc_path.name, "source": str(doc_path)}
+
+        # Get basic metadata
+        metadata = {
+            "filename": doc_file.name,
+            "size": doc_file.stat().st_size,
+            "last_modified": datetime.fromtimestamp(doc_file.stat().st_mtime).isoformat(),
+            "source": f"local:{doc_file}"
+        }
+
         return content, metadata
-    except FileNotFoundError:
-        raise
     except Exception as e:
-        raise IOError(f"Failed to read document: {str(e)}")
+        logger.error(f"Error reading document {document_id}: {str(e)}")
+        raise
 
 
 @app.get(
@@ -950,6 +935,48 @@ async def get_document(document_id: str) -> DocumentResponse:
         raise HTTPException(
             status_code=500, detail=f"Failed to retrieve document: {str(e)}"
         )
+
+
+def upload_document(file_path: str) -> dict:
+    """Upload a document to the document store.
+
+    Args:
+        file_path: Path to the document file
+
+    Returns:
+        dict: Information about the uploaded document
+
+    Raises:
+        FileNotFoundError: If document cannot be found
+        IOError: If document cannot be read
+    """
+    # Handle only local file storage
+    try:
+        # Ensure file exists
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Document not found: {file_path}")
+
+        # Copy to documents directory
+        document_name = os.path.basename(file_path)
+        destination = os.path.join(DOCUMENTS_DIR, document_name)
+
+        # Create directory if it doesn't exist
+        os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+
+        # Copy file
+        shutil.copy2(file_path, destination)
+        logger.info(f"Document uploaded to {destination}")
+
+        # Return document info
+        return {
+            "filename": document_name,
+            "path": destination,
+            "size": os.path.getsize(destination),
+            "upload_time": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Error uploading document: {str(e)}")
+        raise
 
 
 if __name__ == "__main__":

@@ -22,6 +22,8 @@ load_dotenv()
 EMBEDDING_MODEL = "text-embedding-ada-002"
 CACHE_DIR = Path("cache/embeddings")
 CHROMA_PERSIST_DIR = Path("cache/chroma")
+TENANT_ID = os.getenv("TENANT_ID", "default")
+COLLECTION_NAME = f"legal_docs_{TENANT_ID}"
 
 # Initialize OpenAI embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -77,7 +79,7 @@ def process_chunks(chunks_dir: Path) -> None:
 
     # Create or get collection with OpenAI embedding function
     collection = chroma_client.get_or_create_collection(
-        name="legal_docs",
+        name=COLLECTION_NAME,
         metadata={"description": "Legal document embeddings"},
         embedding_function=openai_ef,
     )
