@@ -154,6 +154,7 @@ create_tenant_env() {
 deploy_tenant() {
     local tenant_id=$1
     local env_file=".env.$tenant_id"
+    local use_watch=${2:-false}
 
     echo -e "${BLUE}Deploying tenant: ${GREEN}$tenant_id${NC}"
 
@@ -164,7 +165,14 @@ deploy_tenant() {
     fi
 
     # Deploy using docker-compose with build flag to ensure images are built with current configuration
-    ENV_FILE="$env_file" docker-compose --env-file "$env_file" up -d --build
+    if [ "$use_watch" = true ]; then
+        echo -e "${YELLOW}Deploying with watch mode enabled...${NC}"
+        ENV_FILE="$env_file" docker-compose --env-file "$env_file" up -d --build
+        echo -e "${GREEN}Starting watch mode...${NC}"
+        ENV_FILE="$env_file" docker-compose --env-file "$env_file" watch
+    else
+        ENV_FILE="$env_file" docker-compose --env-file "$env_file" up -d --build
+    fi
 
     echo -e "${GREEN}Tenant $tenant_id deployed successfully!${NC}"
 
@@ -180,6 +188,10 @@ deploy_tenant() {
     echo -e "${YELLOW}To view logs:${NC}"
     echo -e "  API logs: ${BLUE}docker logs legal-search-api-$tenant_id${NC}"
     echo -e "  Frontend logs: ${BLUE}docker logs legal-search-frontend-$tenant_id${NC}"
+
+    if [ "$use_watch" = true ]; then
+        echo -e "${YELLOW}Watch mode is active. Code changes will be automatically synced and containers restarted.${NC}"
+    fi
 
     return 0
 }

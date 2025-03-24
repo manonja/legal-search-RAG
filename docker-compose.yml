@@ -14,6 +14,21 @@ services:
       - TENANT_ID=${TENANT_ID:-default}
     volumes:
       - legal_search_data:/app/cache
+      - ./:/app
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./api.py
+          target: /app/api.py
+        - action: sync+restart
+          path: ./api_modules
+          target: /app/api_modules
+        - action: sync+restart
+          path: ./utils
+          target: /app/utils
+        - action: sync+restart
+          path: ./middleware
+          target: /app/middleware
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]

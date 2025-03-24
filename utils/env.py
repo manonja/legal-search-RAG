@@ -219,6 +219,8 @@ def is_s3_configured():
         Boolean indicating if S3 is configured
     """
     config = get_s3_config()
-    return (config is not None and
-            config["access_key"] is not None and
-            config["secret_key"] is not None)
+    return (
+        config is not None
+        and config["access_key"] is not None
+        and config["secret_key"] is not None
+    )
