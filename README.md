@@ -17,6 +17,7 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 - **Modern Interface**: Next.js frontend
 - **RAG-Powered Q&A**: Ask legal questions and get AI-generated answers based on your document corpus
 - **Privacy-First**: Local ChromaDB storage ensuring data privacy and compliance
+- **Multi-Tenant Support**: Deploy isolated instances for different users or document sets
 - **OpenAI API Cost Controls**:
   - Token counting and cost estimation
   - Per-query, daily, and monthly cost thresholds
@@ -28,14 +29,16 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 ![Search Interface](assets/images/search-interface.png)
 ![RAG Results](assets/images/rag-results.png)
 
-## Installation
+## Quick Start
 
-### Prerequisites
+### Option 1: Single-User Development Setup
+
+#### Prerequisites
 - [Pixi](https://pixi.sh) - A fast, modern package manager built on top of Conda
 - Git
 - Node.js 18+ (for Next.js frontend)
 
-### Setup
+#### Setup
 1. Clone the repository:
    ```bash
    git clone <repository-url>
@@ -50,20 +53,70 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 3. Set up environment variables:
    ```bash
    cp .env.example .env
-   # Edit .env with your API keys
+   # Edit .env to add your OPENAI_API_KEY and GOOGLE_API_KEY
    ```
 
-4. Start the FastAPI backend:
+4. Add your legal documents (PDF/DOCX) to the input directory:
+   ```bash
+   mkdir -p ~/Downloads/legaldocs
+   cp /path/to/your/legal/documents/*.pdf ~/Downloads/legaldocs/
+   ```
+
+5. Process documents (extract, chunk, and embed):
+   ```bash
+   pixi run process-docs    # Convert documents to text
+   pixi run chunk-docs      # Split into chunks
+   pixi run embed-docs      # Generate embeddings
+   ```
+
+6. Start the API server:
    ```bash
    pixi run serve-api
    ```
 
-5. Set up the Next.js frontend:
+7. In a new terminal, start the Next.js frontend:
    ```bash
    cd nextjs-legal-search
    npm install
    npm run dev
    ```
+
+8. Open your browser to http://localhost:3000
+
+### Option 2: Multi-Tenant Deployment with Docker
+
+For deployments with multiple users or isolated document sets:
+
+#### Quick Start (Recommended for New Users)
+1. Make sure Docker and Docker Compose are installed
+2. Run our interactive quick start script:
+   ```bash
+   ./scripts/quick_start.sh
+   ```
+3. Follow the prompts to create a new tenant, add documents, and process them
+4. Access your system at the URL provided at the end of the script
+
+#### Manual Deployment
+1. Run the tenant deployment script:
+   ```bash
+   ./scripts/deploy_tenant.sh
+   ```
+2. Follow the interactive prompts to create a new tenant
+3. Add documents to the tenant's input directory using our helper script:
+   ```bash
+   ./scripts/add_documents.sh tenant_name
+   ```
+   Or manually:
+   ```bash
+   cp /path/to/your/documents/*.pdf tenants/tenant_name/docs/input/
+   ```
+4. Process the documents:
+   ```bash
+   ./scripts/process_tenant_docs.sh tenant_name
+   ```
+5. Access the tenant's interface at the URL provided after deployment
+
+For full details, see our [Multi-Tenant Deployment Guide](MULTI_TENANT_DEPLOYMENT.md).
 
 ## Usage
 
