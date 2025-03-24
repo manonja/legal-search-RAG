@@ -1,5 +1,5 @@
-# Use Python 3.9 slim image as base
-FROM python:3.9-slim
+# Use a Python base image with conda pre-installed (Mambaforge)
+FROM condaforge/mambaforge:latest
 
 # Set working directory
 WORKDIR /app
@@ -17,23 +17,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install pixi
+RUN curl -fsSL https://pixi.sh/install.sh | bash && \
+    echo 'export PATH="$HOME/.pixi/bin:$PATH"' >> ~/.bashrc
 
-# Install Gunicorn
-RUN pip install --no-cache-dir gunicorn
+# Make sure pixi is in the PATH
+ENV PATH="/root/.pixi/bin:$PATH"
+
+# Copy pixi configuration files
+COPY pixi.toml pixi.lock ./
+
+# Initialize environment with pixi
+RUN pixi install
 
 # Create cache directory for ChromaDB and query cache
 RUN mkdir -p /app/cache/chroma /app/cache/usage
 
-# Create non-root user and switch to it
+# Create non-root user
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
-USER appuser
 
 # Copy application code
 COPY --chown=appuser:appuser . .
+
+# Switch to non-root user
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -42,5 +50,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE $PORT
 
-# Start the application with Gunicorn
-CMD gunicorn api:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120
+# Start the application with Gunicorn through pixi
+CMD ["/bin/bash", "-c", "source ~/.pixi/env && pixi run serve-api"]

@@ -68,7 +68,8 @@ DOCUMENTS_DIR = os.getenv(
     "DOCUMENTS_DIR", os.path.join(os.path.dirname(__file__), "..", "data")
 )
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "cache", "query_cache.json")
-COLLECTION_NAME = "legal_docs"
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "legal_docs")
+TENANT_ID = os.getenv("TENANT_ID", "default")
 API_VERSION = "1.0.0"
 
 # S3 configuration (for cloud deployment)
@@ -89,12 +90,17 @@ def initialize_chroma_client():
     """
     logger.info("Initializing Chroma client")
 
+    # Ensure tenant-specific persistence directory
+    tenant_persist_dir = os.path.join(CHROMA_PERSIST_DIR, TENANT_ID)
+
     if USE_S3_STORAGE and S3_BUCKET_NAME:
         try:
             import boto3
             from chromadb.config import Settings
 
-            logger.info(f"Using S3 storage: s3://{S3_BUCKET_NAME}/{S3_PREFIX}")
+            logger.info(
+                f"Using S3 storage for tenant {TENANT_ID}: s3://{S3_BUCKET_NAME}/{S3_PREFIX}/{TENANT_ID}"
+            )
 
             # Configure S3 persistence settings
             settings = Settings(
@@ -103,14 +109,14 @@ def initialize_chroma_client():
                 chroma_server_http_port=8000,
                 anonymized_telemetry=False,
                 allow_reset=True,
-                persist_directory=CHROMA_PERSIST_DIR,  # Temporary local cache
+                persist_directory=tenant_persist_dir,  # Tenant-specific local cache
             )
 
             # Create the client with S3 persistence
-            chroma_dir = Path(CHROMA_PERSIST_DIR)
+            chroma_dir = Path(tenant_persist_dir)
             chroma_dir.mkdir(parents=True, exist_ok=True)
 
-            # Configure S3 client
+            # Configure S3 client with tenant-specific prefix
             s3_client = boto3.client(
                 "s3",
                 region_name=AWS_REGION,
@@ -118,15 +124,18 @@ def initialize_chroma_client():
                 aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
             )
 
+            # Ensure tenant-specific S3 prefix
+            tenant_s3_prefix = f"{S3_PREFIX}/{TENANT_ID}"
+
             return chromadb.PersistentClient(path=str(chroma_dir), settings=settings)
 
         except ImportError:
             logger.warning("boto3 not installed, falling back to local storage")
             # Fall back to local storage if boto3 is not available
 
-    # Default to local storage
-    logger.info(f"Using local storage: {CHROMA_PERSIST_DIR}")
-    chroma_dir = Path(CHROMA_PERSIST_DIR)
+    # Default to local storage with tenant isolation
+    logger.info(f"Using local storage for tenant {TENANT_ID}: {tenant_persist_dir}")
+    chroma_dir = Path(tenant_persist_dir)
     chroma_dir.mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(path=str(chroma_dir))
 

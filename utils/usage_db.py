@@ -8,8 +8,13 @@ from typing import Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
-# Path to SQLite database file
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache", "usage.db")
+# Get tenant ID from environment variable, default to 'default'
+TENANT_ID = os.getenv("TENANT_ID", "default")
+
+# Path to SQLite database file - now tenant-specific
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "cache", f"usage_{TENANT_ID}.db"
+)
 
 
 def init_usage_db() -> None:
@@ -19,6 +24,8 @@ def init_usage_db() -> None:
     """
     # Create parent directory if it doesn't exist
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
+    logger.info(f"Initializing usage database for tenant {TENANT_ID} at {DB_PATH}")
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()

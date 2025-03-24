@@ -3,14 +3,15 @@ version: '3.8'
 services:
   api:
     build: .
-    image: legal-search-rag-api:latest
-    container_name: legal-search-api
+    image: legal-search-rag-api:${TENANT_ID:-default}
+    container_name: legal-search-api-${TENANT_ID:-default}
     ports:
       - "${API_PORT:-8000}:8000"
     env_file:
-      - .env
+      - ${ENV_FILE:-.env}
     environment:
       - PORT=8000
+      - TENANT_ID=${TENANT_ID:-default}
     volumes:
       - legal_search_data:/app/cache
     restart: unless-stopped
@@ -27,13 +28,14 @@ services:
 
   frontend:
     build: ./nextjs-legal-search
-    image: legal-search-rag-frontend:latest
-    container_name: legal-search-frontend
+    image: legal-search-rag-frontend:${TENANT_ID:-default}
+    container_name: legal-search-frontend-${TENANT_ID:-default}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8000}
       - NODE_ENV=production
+      - TENANT_ID=${TENANT_ID:-default}
     depends_on:
       - api
     restart: unless-stopped
@@ -45,7 +47,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: legal-search-nginx
+    container_name: legal-search-nginx-${TENANT_ID:-default}
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -65,4 +67,5 @@ services:
 
 volumes:
   legal_search_data:
+    name: legal_search_data_${TENANT_ID:-default}
     driver: local

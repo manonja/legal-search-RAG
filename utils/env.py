@@ -82,36 +82,94 @@ def get_google_api_key() -> str:
     return api_key
 
 
-def get_input_dir() -> str:
-    """Get the input directory from environment variables or default.
+def get_tenant_id():
+    """Get the tenant ID from environment variables.
 
     Returns:
-        str: The input directory path.
+        str: Tenant ID, defaulting to 'default' if not specified
     """
-    return os.getenv("INPUT_DIR", os.path.expanduser("~/Downloads/legaldocs"))
+    return os.getenv("TENANT_ID", "default")
 
 
-def get_output_dir() -> str:
-    """Get the output directory from environment variables or default.
+def get_docs_root():
+    """Get the root directory for document storage.
+
+    Uses tenant-specific subdirectory if TENANT_ID is set.
 
     Returns:
-        str: The output directory path.
+        Path: Expanded absolute path to the docs root directory
     """
-    return os.getenv("OUTPUT_DIR", os.path.expanduser("~/Downloads/processedLegalDocs"))
+    tenant_id = get_tenant_id()
+    docs_root = os.getenv("DOCS_ROOT")
+
+    if not docs_root:
+        # Default to a documents directory in the user's home
+        docs_root = os.path.expanduser("~/Documents/legal_search_docs")
+    else:
+        # Expand user and environment variables
+        docs_root = os.path.expanduser(docs_root)
+
+    # Create tenant-specific subdirectory
+    tenant_docs_root = os.path.join(docs_root, tenant_id)
+
+    # Create the directory if it doesn't exist
+    os.makedirs(tenant_docs_root, exist_ok=True)
+
+    return Path(tenant_docs_root)
 
 
-def get_docs_root() -> str:
-    """Get the documents root directory.
+def get_input_dir():
+    """Get the input directory for raw document files.
+
+    Uses tenant-specific subdirectory.
 
     Returns:
-        Document directory path
+        Path: Expanded absolute path to the input directory
     """
-    docs_root = os.getenv(
-        "DOCS_ROOT", os.path.expanduser("~/Downloads/processedLegalDocs")
-    )
-    # Ensure directory exists
-    Path(docs_root).mkdir(parents=True, exist_ok=True)
-    return docs_root
+    tenant_id = get_tenant_id()
+    input_dir = os.getenv("INPUT_DIR")
+
+    if not input_dir:
+        # Default to a subdirectory within the docs root
+        input_dir = os.path.expanduser("~/Downloads/legaldocs")
+    else:
+        # Expand user and environment variables
+        input_dir = os.path.expanduser(input_dir)
+
+    # Create tenant-specific subdirectory
+    tenant_input_dir = os.path.join(input_dir, tenant_id)
+
+    # Create the directory if it doesn't exist
+    os.makedirs(tenant_input_dir, exist_ok=True)
+
+    return Path(tenant_input_dir)
+
+
+def get_output_dir():
+    """Get the output directory for processed documents.
+
+    Uses tenant-specific subdirectory.
+
+    Returns:
+        Path: Expanded absolute path to the output directory
+    """
+    tenant_id = get_tenant_id()
+    output_dir = os.getenv("OUTPUT_DIR")
+
+    if not output_dir:
+        # Default to a subdirectory within the docs root
+        output_dir = os.path.expanduser("~/Downloads/processedLegalDocs")
+    else:
+        # Expand user and environment variables
+        output_dir = os.path.expanduser(output_dir)
+
+    # Create tenant-specific subdirectory
+    tenant_output_dir = os.path.join(output_dir, tenant_id)
+
+    # Create the directory if it doesn't exist
+    os.makedirs(tenant_output_dir, exist_ok=True)
+
+    return Path(tenant_output_dir)
 
 
 def get_chunks_dir() -> str:
