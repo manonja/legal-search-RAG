@@ -16,12 +16,7 @@ import google.generativeai as genai  # type: ignore
 from tqdm import tqdm  # type: ignore
 
 from utils.env import is_gcp_configured
-from utils.gcp_storage import (
-    download_file,
-    file_exists,
-    list_files,
-    upload_file,
-)
+from utils.gcp_storage import download_file, file_exists, list_files, upload_file
 
 # Configure logging
 logging.basicConfig(
@@ -116,7 +111,9 @@ def process_gcs_document(gcs_path: str, output_dir: str, model) -> Tuple[bool, s
             # Check if output already exists in GCS
             output_gcs_path = f"output/{output_filename}"
             if file_exists(output_gcs_path):
-                logger.info(f"Output already exists for {filename}, skipping processing")
+                logger.info(
+                    f"Output already exists for {filename}, skipping processing"
+                )
                 return True, f"Skipped {filename} (already processed)"
 
             # Extract text based on file type
@@ -179,7 +176,9 @@ def process_documents(input_dir: str, output_dir: str) -> None:
         gcs_files = get_files_from_gcs("input/")
 
         if not gcs_files:
-            logger.warning("No files found in GCS bucket. Make sure you've uploaded files to the 'input/' prefix.")
+            logger.warning(
+                "No files found in GCS bucket. Make sure you've uploaded files to the 'input/' prefix."
+            )
 
         # Process files from GCS
         for gcs_file in tqdm(gcs_files, desc="Processing GCS documents"):
@@ -261,7 +260,9 @@ def main():
         output_directory = os.getenv("OUTPUT_DIR")
 
         if not input_directory or not output_directory:
-            raise ValueError("INPUT_DIR and OUTPUT_DIR environment variables must be set")
+            raise ValueError(
+                "INPUT_DIR and OUTPUT_DIR environment variables must be set"
+            )
 
         # Process the documents
         process_documents(input_directory, output_directory)

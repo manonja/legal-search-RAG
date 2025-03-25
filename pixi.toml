@@ -9,6 +9,8 @@ platforms = ["osx-64"]
 python = ">=3.9,<3.13"     # Pin Python version below 3.13 for better compatibility
 pip = "*"                  # Required for pip installations
 tiktoken = ">=0.9.0,<0.10"
+google-cloud-storage = ">=3.1.0,<4"
+google-api-core = ">=2.24.2,<3"
 
 [tasks]
 lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
