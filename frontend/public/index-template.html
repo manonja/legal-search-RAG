@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Document Search RAG System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1a1a1a;
+            --secondary-color: #333;
+            --accent-color: #000;
+            --light-gray: #f5f5f5;
+            --medium-gray: #e0e0e0;
+            --dark-gray: #666;
+            --white: #fff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background-color: var(--white);
+            color: var(--primary-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Navigation */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--medium-gray);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-icon {
+            margin-right: 10px;
+            font-size: 1.8rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+
+        .nav-link {
+            color: var(--secondary-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-link:hover {
+            color: var(--accent-color);
+        }
+
+        .login-btn {
+            background-color: var(--accent-color);
+            color: var(--white);
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .login-btn:hover {
+            background-color: #333;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 80px 0 60px;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: var(--dark-gray);
+            max-width: 700px;
+            margin: 0 auto 30px;
+        }
+
+        .cta-button {
+            background-color: var(--accent-color);
+            color: var(--white);
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 15px;
+            transition: background-color 0.3s;
+        }
+
+        .cta-button:hover {
+            background-color: #333;
+        }
+
+        .trial-text {
+            display: inline-block;
+            color: var(--dark-gray);
+        }
+
+        /* Features Section */
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 50px 0;
+        }
+
+        .feature-card {
+            background-color: var(--white);
+            border: 1px solid var(--medium-gray);
+            border-radius: 8px;
+            padding: 15px 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 1.2rem;
+        }
+
+        .feature-text {
+            font-weight: 500;
+        }
+
+        /* Search Section */
+        .search-section {
+            margin: 40px 0;
+            border: 1px solid var(--medium-gray);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--medium-gray);
+        }
+
+        .search-icon {
+            margin-right: 10px;
+            color: var(--dark-gray);
+        }
+
+        .search-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            padding: 5px;
+        }
+
+        .search-results {
+            padding: 20px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            color: var(--dark-gray);
+            font-size: 0.9rem;
+        }
+
+        .sort-dropdown {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .result-item {
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--medium-gray);
+            padding-bottom: 20px;
+        }
+
+        .result-meta {
+            display: flex;
+            gap: 10px;
+            color: var(--dark-gray);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .result-tags {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tag {
+            background-color: var(--light-gray);
+            padding: 5px 10px;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            color: var(--dark-gray);
+        }
+
+        .result-content {
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .time-ago {
+            color: var(--dark-gray);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <a href="#" class="logo">
+                <span class="logo-icon">☰</span>
+                Legal Search RAG
+            </a>
+            <div class="nav-links">
+                <a href="#" class="nav-link">For Students</a>
+                <a href="#" class="nav-link">Contact</a>
+                <a href="#" class="nav-link">Pricing</a>
+                <a href="#" class="nav-link">About</a>
+            </div>
+            <a href="#" class="login-btn">Log in</a>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1 class="hero-title">Legal Research<br>With Generative AI</h1>
+            <p class="hero-subtitle">Everything you'd expect in a legal research platform—and more.<br>Trusted by thousands of legal professionals to do better legal research faster.</p>
+            <div>
+                <a href="#" class="cta-button">Start Free</a>
+                <span class="trial-text">2-week free trial.</span>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features">
+            <div class="feature-card">
+                <span class="feature-icon">🔍</span>
+                <span class="feature-text">Search</span>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">💬</span>
+                <span class="feature-text">Legal Research Agent</span>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">📝</span>
+                <span class="feature-text">Citator</span>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">📊</span>
+                <span class="feature-text">Full Coverage</span>
+            </div>
+        </section>
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" placeholder="Search legal documents..." value="non-compete AND enforc*">
+            </div>
+
+            <div class="search-results">
+                <div class="results-header">
+                    <span>5651 Results</span>
+                    <div class="sort-dropdown">
+                        Sort by: Relevance ▼
+                    </div>
+                </div>
+
+                <div class="result-item">
+                    <div class="result-meta">
+                        <span>14 F.3d 941</span>
+                        <span>|</span>
+                        <span>4th Cir.</span>
+                        <span>|</span>
+                        <span>1993</span>
+                    </div>
+                    <h3 class="result-title">Php Healthcare Corporation v. Emsa Limited Partnership</h3>
+                    <div class="result-tags">
+                        <span class="tag">Overview</span>
+                        <span class="tag">Non-Compete</span>
+                        <span class="tag">Enforceability</span>
+                    </div>
+                    <p class="result-content">"The only issue before us, as the parties agree, Appellant's Br. 2; Appellee's Br. 1, is whether the district court erred in ruling that the 'limitation on practice' provision in EMSA's contracts with its Millington physician-employees was invalid and unenforceable under Florida law."</p>
+                    <div class="time-ago">
+                        <span>17m ago</span>
+                    </div>
+                </div>
+
+                <div class="result-item">
+                    <div class="result-meta">
+                        <span>203 F. App'x 450</span>
+                        <span>|</span>
+                        <span>4th Cir.</span>
+                        <span>|</span>
+                        <span>2006</span>
+                    </div>
+                    <h3 class="result-title">McGough v. Nalco Company</h3>
+                    <div class="result-tags">
+                        <span class="tag">Overview</span>
+                        <span class="tag">Non-Compete</span>
+                        <span class="tag">Injunction</span>
+                        <span class="tag">Trade Secrets</span>
+                    </div>
+                    <p class="result-content">"A preliminary injunction is an 'extraordinary remedy' involving the exercise of very far-reaching power to be granted only sparingly and in limited circumstances."</p>
+                    <div class="time-ago">
+                        <span>16m ago</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
