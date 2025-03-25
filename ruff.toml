@@ -1,0 +1,10 @@
+[lint]
+select = [
+    "S",    # Security-related rules
+    "B",    # flake8-bugbear
+    "F403", # Star imports
+]
+
+[lint.per-file-ignores]
+"api/tests/*" = ["S101"]
+"api/api.py" = ["S104"]  # Allow binding to all interfaces in development

@@ -1,0 +1,26 @@
+{
+    "name": "legal-search-rag",
+    "version": "0.1.0",
+    "private": true,
+    "workspaces": [
+        "frontend"
+    ],
+    "scripts": {
+        "start": "docker-compose up",
+        "start:prod": "docker-compose -f docker-compose.production.yml up",
+        "build": "docker-compose build",
+        "build:prod": "docker-compose -f docker-compose.production.yml build",
+        "frontend:dev": "cd frontend && npm run dev",
+        "frontend:build": "cd frontend && npm run build",
+        "api:dev": "cd api && python -m uvicorn api:app --reload --host 0.0.0.0 --port 8000",
+        "process-docs": "cd api && python process_docs.py",
+        "chunk-docs": "cd api && python chunk.py",
+        "embed-docs": "cd api && python embeddings.py",
+        "lint": "npm run frontend:lint",
+        "frontend:lint": "cd frontend && npm run lint"
+    },
+    "engines": {
+        "node": ">=18.0.0",
+        "npm": ">=9.0.0"
+    }
+}
