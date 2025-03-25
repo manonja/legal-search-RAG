@@ -224,3 +224,62 @@ def is_s3_configured():
         and config["access_key"] is not None
         and config["secret_key"] is not None
     )
+
+
+def get_gcp_credentials_path() -> str:
+    """Get the path to the GCP credentials JSON file.
+
+    Returns:
+        str: Path to the GCP credentials file
+    """
+    # First check if explicitly set in environment variables
+    creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
+    if not creds_path:
+        # Use the default path if not set in environment
+        creds_path = (
+            "/Users/manonjacquin/Downloads/legal-search-454723-9c632bace529.json"
+        )
+
+    # Verify file exists
+    if not os.path.exists(creds_path):
+        logger.warning(f"GCP credentials file not found at: {creds_path}")
+    else:
+        logger.info(f"Using GCP credentials from: {creds_path}")
+
+    return creds_path
+
+
+def get_gcp_config():
+    """Get GCP configuration from environment variables.
+
+    Returns:
+        Dictionary with GCP configuration or None if not configured
+    """
+    use_gcp = os.getenv("USE_GCP_STORAGE", "false").lower() == "true"
+    if not use_gcp:
+        return None
+
+    bucket_name = os.getenv("GCS_BUCKET_NAME")
+    if not bucket_name:
+        return None
+
+    return {
+        "use_gcp": use_gcp,
+        "project_id": os.getenv("GCP_PROJECT_ID", "legal-search"),
+        "bucket_name": bucket_name,
+        "credentials_path": get_gcp_credentials_path(),
+    }
+
+
+def is_gcp_configured():
+    """Check if GCP is configured in the environment."""
+    # Simplify by checking presence of env vars
+    return all(
+        [
+            os.environ.get("USE_GCP_STORAGE"),
+            os.environ.get("GCP_PROJECT_ID"),
+            os.environ.get("GCS_BUCKET_NAME"),
+            os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"),
+        ]
+    )

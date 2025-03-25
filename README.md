@@ -18,6 +18,7 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 - **RAG-Powered Q&A**: Ask legal questions and get AI-generated answers based on your document corpus
 - **Privacy-First**: Local ChromaDB storage ensuring data privacy and compliance
 - **Multi-Tenant Support**: Deploy isolated instances for different users or document sets
+- **Cloud Storage Integration**: Support for both AWS S3 and Google Cloud Storage
 - **OpenAI API Cost Controls**:
   - Token counting and cost estimation
   - Per-query, daily, and monthly cost thresholds
@@ -178,7 +179,8 @@ answer = response.json()
 - **Backend**: Python, FastAPI, LangChain, ChromaDB
 - **Frontend**: Next.js, TypeScript, Tailwind CSS
 - **Document Processing**: PyMuPDF, python-docx
-- **AI**: OpenAI API for embeddings and completions
+- **AI**: OpenAI API and Google Gemini for embeddings and completions
+- **Cloud Storage**: AWS S3 and Google Cloud Storage integration
 
 ## Project Status
 Active development - core features implemented, optimizations ongoing
@@ -311,18 +313,25 @@ docker-compose up -d
 ```
 
 ### Cloud Deployment
-For production deployment, we support several cloud providers:
 
-1. **Render**: Easy deployment with automatic SSL and Docker support
-2. **Railway**: Developer-friendly platform with flexible scaling options
+#### Render.com Deployment
+We provide a comprehensive guide for deploying to Render.com:
+- [Render.com Deployment Guide](docs/render_deployment.md)
 
-We provide a deployment script to automate most of the process:
+#### AWS and Google Cloud Storage Integration
+The system supports both AWS S3 and Google Cloud Storage for document storage:
 
-```bash
-./scripts/deploy_to_cloud.sh [provider]
-```
+1. Set up GCP storage:
+   ```bash
+   ./scripts/setup_local_gcp.sh /path/to/gcp-credentials.json
+   ```
 
-See [Cloud Deployment Guide](docs/cloud_deployment.md) for detailed instructions.
+2. Upload documents to GCP:
+   ```bash
+   python scripts/upload_to_gcs.py /path/to/document.pdf
+   ```
+
+For more details on cloud deployment, see the [Cloud Deployment Guide](docs/cloud_deployment.md).
 
 #### Key Cloud Deployment Features
 - **S3 Document Storage**: Persistent storage for documents

@@ -1,224 +1,184 @@
 # Cloud Deployment Guide for Legal Search RAG
 
-This guide provides detailed instructions for deploying the Legal Search RAG system to cloud providers for production use.
+This guide provides detailed instructions for deploying the Legal Search RAG system to cloud providers with both AWS S3 and Google Cloud Storage (GCS) integration.
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Overview](#overview)
+- [Storage Options](#storage-options)
+- [AWS S3 Integration](#aws-s3-integration)
+- [Google Cloud Storage Integration](#google-cloud-storage-integration)
 - [Deployment Options](#deployment-options)
-- [Option 1: Render Deployment](#option-1-render-deployment)
-- [Option 2: Railway Deployment](#option-2-railway-deployment)
-- [S3 Document Storage](#s3-document-storage)
-- [Environment Variables](#environment-variables)
-- [Deployment Script](#deployment-script)
-- [Manual Deployment Steps](#manual-deployment-steps)
-- [Troubleshooting](#troubleshooting)
-- [Monitoring](#monitoring)
+- [Custom Docker Deployment](#custom-docker-deployment)
+- [Monitoring and Maintenance](#monitoring-and-maintenance)
 
 ## Prerequisites
 
 Before deploying to the cloud, ensure you have:
 
-- Git repository set up with your project
-- AWS account (for S3 document storage)
-- OpenAI API key
-- Docker and Docker Compose installed locally
-- Basic understanding of cloud services
+- A complete and tested local setup
+- Access to cloud provider accounts (AWS, GCP, Render.com, or Railway)
+- API keys and credentials for all services
+- Your legal document corpus
 
-## Overview
+## Storage Options
 
-The Legal Search RAG system consists of three main components:
+The Legal Search RAG system supports three storage options:
 
-1. **Backend API**: FastAPI application that handles document search, RAG processing, and admin functionality
-2. **Frontend**: Next.js application providing the user interface
-3. **Document Storage**: Either local storage or cloud S3 storage
+1. **Local Storage**: Documents and embeddings stored locally (default)
+2. **AWS S3**: Documents stored in S3 buckets
+3. **Google Cloud Storage**: Documents stored in GCS buckets
 
-For cloud deployment, we recommend using S3 for document storage to ensure data persistence and accessibility.
+You can use one or both cloud storage options simultaneously.
 
-## Deployment Options
+## AWS S3 Integration
 
-We provide two recommended options for cloud deployment:
+### Setting Up AWS S3
 
-1. **Render**: Simple deployment with minimal configuration
-2. **Railway**: More flexible deployment with better scaling options
+1. Create an AWS account if you don't have one
+2. Create an S3 bucket for your documents
+3. Create an IAM user with programmatic access and S3 permissions
+4. Note your AWS access key ID and secret access key
 
-Both options provide similar functionality, but the choice depends on your specific needs and preferences.
+### Configure AWS S3 for Local Development
 
-## Option 1: Render Deployment
-
-[Render](https://render.com) provides a straightforward deployment process with automatic SSL certificates and containerized applications.
-
-### Steps for Render Deployment
-
-#### Backend API Deployment
-
-1. Create a new account on Render if you don't have one
-2. Click "New Web Service"
-3. Connect your GitHub repository
-4. Configure the service:
-   - Name: `legal-search-api`
-   - Environment: Docker
-   - Branch: `main` (or your deployment branch)
-   - Build Command: (leave as default)
-   - Start Command: (leave as default)
-5. Add environment variables from your `.env.deploy` file
-6. Click "Create Web Service"
-
-#### Frontend Deployment
-
-1. Click "New Web Service"
-2. Connect the same GitHub repository
-3. Configure the service:
-   - Name: `legal-search-frontend`
-   - Root Directory: `nextjs-legal-search`
-   - Environment: Node
-   - Branch: `main` (or your deployment branch)
-   - Build Command: `npm install && npm run build`
-   - Start Command: `npm start`
-4. Add environment variables:
-   - `NEXT_PUBLIC_API_URL=https://your-api-service-url.onrender.com`
-5. Click "Create Web Service"
-
-## Option 2: Railway Deployment
-
-[Railway](https://railway.app) offers a developer-friendly platform with better pricing for higher usage volumes.
-
-### Steps for Railway Deployment
-
-#### Using Railway CLI
-
-1. Install Railway CLI:
+1. Configure your environment with AWS credentials:
    ```bash
-   npm i -g @railway/cli
+   ./scripts/setup_local_s3.sh
    ```
 
-2. Login to Railway:
-   ```bash
-   railway login
-   ```
+2. Follow the prompts to add your:
+   - AWS access key ID
+   - AWS secret access key
+   - S3 bucket name
+   - AWS region
 
-3. Create a new project in Railway:
-   ```bash
-   railway init
-   ```
-
-4. Deploy the API:
-   ```bash
-   cd /path/to/legal-search-rag
-   railway up
-   ```
-
-5. Deploy the frontend:
-   ```bash
-   cd /path/to/legal-search-rag/nextjs-legal-search
-   railway up
-   ```
-
-6. Set environment variables in the Railway dashboard
-
-#### Using Railway Dashboard
-
-1. Create a new project in Railway
-2. Connect your GitHub repository
-3. Deploy both the API and frontend separately
-4. Configure environment variables for each service
-5. Link the services together
-
-## S3 Document Storage
-
-For production deployment, we strongly recommend using S3 for document storage:
-
-1. Create an S3 bucket in your AWS account
-2. Create an IAM user with S3 access permissions
-3. Configure environment variables in your deployment:
-   ```
-   USE_S3_STORAGE=true
-   S3_BUCKET_NAME=your-legal-docs-bucket
-   S3_PREFIX=legal-search-data
-   AWS_REGION=us-west-2
-   AWS_ACCESS_KEY_ID=your_aws_access_key
-   AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-   ```
-4. Use the included script to sync documents to S3:
+3. Sync your documents to S3:
    ```bash
    python scripts/sync_to_s3.py
    ```
 
-## Environment Variables
+## Google Cloud Storage Integration
 
-The following environment variables are required for cloud deployment:
+### Setting Up Google Cloud Storage
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `OPENAI_API_KEY` | API key for OpenAI | Yes |
-| `USE_S3_STORAGE` | Enable S3 storage (true/false) | Yes for cloud |
-| `S3_BUCKET_NAME` | AWS S3 bucket name | Yes for S3 |
-| `AWS_REGION` | AWS region | Yes for S3 |
-| `AWS_ACCESS_KEY_ID` | AWS access key | Yes for S3 |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | Yes for S3 |
-| `NEXT_PUBLIC_API_URL` | URL for the API service | Yes for frontend |
-| `ADMIN_API_KEY` | Key for admin dashboard access | Yes |
-| `OPENAI_MONTHLY_BUDGET` | Budget limit for OpenAI API | Recommended |
+1. Create a GCP account if you don't have one
+2. Create a new GCP project or select an existing one
+3. Enable the Cloud Storage API
+4. Create a GCS bucket for your documents
+5. Create a service account with Storage Admin permissions
+6. Download the service account credentials JSON file
 
-## Deployment Script
+### Configure GCP for Local Development
 
-We provide an automated deployment script that handles most of the setup process:
+1. Configure your environment with GCP credentials:
+   ```bash
+   ./scripts/setup_local_gcp.sh /path/to/gcp-credentials.json
+   ```
 
-```bash
-./scripts/deploy_to_cloud.sh [provider]
-```
+2. Follow the prompts to confirm:
+   - GCP project ID (extracted from credentials)
+   - GCS bucket name
 
-Where `provider` is either `render` or `railway` (defaults to `render`).
+3. Upload test documents to GCS:
+   ```bash
+   python scripts/upload_to_gcs.py /path/to/document.pdf
+   ```
 
-The script will:
-1. Check prerequisites
-2. Create a deployment environment file
-3. Sync documents to S3 if enabled
-4. Build Docker containers
-5. Provide instructions for the final manual steps
+4. List uploaded documents:
+   ```bash
+   python scripts/upload_to_gcs.py --list
+   ```
 
-## Manual Deployment Steps
+## Deployment Options
 
-After running the deployment script, some manual steps are still required:
+### Render.com
 
-1. Create services in your chosen cloud provider
-2. Set environment variables from your `.env.deploy` file
-3. Connect your GitHub repository
-4. Configure build and start commands
-5. Update the frontend's `NEXT_PUBLIC_API_URL` to point to your deployed API
+Render.com provides an easy-to-use platform for deploying containerized applications.
+
+Follow our dedicated guide:
+- [Render.com Deployment Guide](render_deployment.md)
+
+### Railway
+
+Railway is a developer-friendly platform with flexible scaling options.
+
+1. Install the Railway CLI:
+   ```bash
+   npm i -g @railway/cli
+   ```
+
+2. Run our deployment script:
+   ```bash
+   ./scripts/deploy_to_cloud.sh railway
+   ```
+
+3. Follow the interactive prompts to:
+   - Log in to Railway
+   - Select your project
+   - Configure environment variables
+   - Deploy the application
+
+## Custom Docker Deployment
+
+For custom cloud deployments, use our Docker Compose production configuration:
+
+1. Configure your `.env.production` file with cloud credentials
+2. Deploy using:
+   ```bash
+   docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+   ```
+
+## Monitoring and Maintenance
+
+### Monitoring Document Processing
+
+Monitor document processing in the cloud:
+
+1. Check processing logs:
+   ```bash
+   docker-compose logs -f api
+   ```
+
+2. View uploaded documents:
+   - For S3: `python scripts/list_s3_docs.py`
+   - For GCS: `python scripts/upload_to_gcs.py --list`
+
+### Cost Management
+
+1. Monitor your usage of:
+   - Cloud storage (S3/GCS)
+   - OpenAI API
+   - Google Gemini API
+   - Cloud hosting provider
+
+2. Set up alerts for unexpected cost increases
+
+3. Consider implementing database backups for your embeddings
+
+### Security Considerations
+
+1. Ensure your API keys and credentials are stored securely
+2. Use environment variables for sensitive information
+3. Consider implementing API rate limiting and authentication
+4. Regularly rotate credentials and API keys
 
 ## Troubleshooting
 
-Common issues and solutions:
+### Common Issues
 
-### API Connection Issues
+1. **Storage Access Errors**
+   - Check permissions on your S3 bucket or GCS bucket
+   - Verify your credentials are correctly set in environment variables
 
-- Ensure CORS settings are correctly configured
-- Verify `NEXT_PUBLIC_API_URL` is set correctly in the frontend service
-- Check that the API is running and accessible
+2. **Document Processing Failures**
+   - Check logs for specific error messages
+   - Ensure document format is supported (PDF or DOCX)
+   - Verify API keys for Gemini are valid
 
-### Document Storage Issues
+3. **Deployment Failures**
+   - Check Docker build logs
+   - Verify all environment variables are correctly set
+   - Ensure all dependencies are properly installed
 
-- Verify S3 bucket permissions
-- Check AWS credentials are correct
-- Ensure documents were synced correctly using the sync script
-
-### Build Failures
-
-- Check Docker build logs for errors
-- Ensure all dependencies are included in requirements.txt
-- Verify environment variables are set correctly
-
-## Monitoring
-
-Once deployed, monitor your application using:
-
-1. The admin dashboard at `/admin`
-2. Cloud provider monitoring tools
-3. AWS CloudWatch for S3 monitoring
-
-We recommend setting up alerts for:
-- API errors
-- High usage spikes
-- Cost thresholds exceeded
+For additional help, please consult our troubleshooting documentation or open an issue on GitHub.

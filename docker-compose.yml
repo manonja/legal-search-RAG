@@ -12,9 +12,11 @@ services:
     environment:
       - PORT=8000
       - TENANT_ID=${TENANT_ID:-default}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-key.json
     volumes:
       - legal_search_data:/app/cache
       - ./:/app
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/Users/manonjacquin/Downloads/legal-search-454723-9c632bace529.json}:/app/credentials/gcp-key.json
     develop:
       watch:
         - action: sync+restart

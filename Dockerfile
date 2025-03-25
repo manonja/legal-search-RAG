@@ -33,6 +33,10 @@ COPY --chown=appuser:appuser . .
 RUN mkdir -p /app/cache/chroma /app/cache/usage && \
     chown -R appuser:appuser /app/cache
 
+# Create credentials directory for GCP
+RUN mkdir -p /app/credentials && \
+    chown -R appuser:appuser /app/credentials
+
 # Switch to non-root user
 USER appuser
 WORKDIR /app
@@ -54,7 +58,9 @@ RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
     pydantic \
-    "tiktoken>=0.9.0,<0.10"
+    "tiktoken>=0.9.0,<0.10" \
+    "google-cloud-storage>=2.9.0" \
+    "google-api-core>=2.11.0"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
