@@ -16,6 +16,9 @@ from typing import Any, Dict, List, Optional, TypeVar, cast
 
 import chromadb
 import uvicorn
+
+# Import from local modules
+from api_modules.admin import router as admin_router
 from chromadb.config import Settings
 from chromadb.errors import InvalidCollectionException
 from chromadb.utils import embedding_functions
@@ -23,12 +26,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from middleware.cost_control import CostControlMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-
-# Import from local modules
-from api_modules.admin import router as admin_router
-from middleware.cost_control import CostControlMiddleware
 from utils.env import get_docs_root
 from utils.usage_db import init_usage_db
 
@@ -473,7 +473,7 @@ async def search_documents(request: QueryRequest = None) -> QueryResponse:
 
     except Exception as e:
         logger.error(f"Search failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}") from e
 
 
 @app.get("/api/health", tags=["System"])
@@ -518,7 +518,7 @@ def get_query_hash(request: RagRequest) -> str:
     }
     # Convert to string and hash
     param_str = json.dumps(query_params, sort_keys=True)
-    return hashlib.md5(param_str.encode()).hexdigest()
+    return hashlib.sha256(param_str.encode()).hexdigest()
 
 
 def is_cache_valid(cached_result: Dict) -> bool:
@@ -747,11 +747,11 @@ async def rag_search(request: RagRequest) -> RagResponse:
 
         except Exception as e:
             logger.error(f"Error in GPT-4 API call: {e}")
-            raise HTTPException(status_code=500, detail="Error generating response")
+            raise HTTPException(status_code=500, detail="Error generating response") from e
 
     except Exception as e:
         logger.error(f"Error in rag_search: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 def get_document_path(document_id: str) -> Path:
@@ -917,11 +917,11 @@ async def get_document(document_id: str) -> DocumentResponse:
         try:
             content, metadata = await get_document_content(document_id)
         except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from e
         except IOError as e:
             raise HTTPException(
                 status_code=500, detail=f"Failed to read document: {str(e)}"
-            )
+            ) from e
 
         # Return document response
         return DocumentResponse(
@@ -936,7 +936,7 @@ async def get_document(document_id: str) -> DocumentResponse:
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to retrieve document: {str(e)}"
-        )
+        ) from e
 
 
 def upload_document(file_path: str) -> dict:
@@ -982,4 +982,6 @@ def upload_document(file_path: str) -> dict:
 
 
 if __name__ == "__main__":
+    # Using 0.0.0.0 for development only; in production, the application
+    # should be behind a reverse proxy or restricted by firewall rules
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

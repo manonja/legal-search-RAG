@@ -12,11 +12,12 @@ tiktoken = ">=0.9.0,<0.10"
 google-cloud-storage = ">=3.1.0,<4"
 google-api-core = ">=2.24.2,<3"
 grpcio = "*"                        # Required for ChromaDB
+ruff = ">=0.11.2,<0.12"
 
 [tasks]
-lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
-format = { cmd = "black . --exclude=.pixi && isort . --skip=.pixi --profile black" }
-check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --skip=.pixi --profile black" }
+lint = { cmd = "ruff check . --exclude=.pixi" }
+format = { cmd = "ruff format . --exclude=.pixi" }
+check-format = { cmd = "ruff format . --check --exclude=.pixi" }
 process-docs = { cmd = "python process_docs.py" }
 chunk-docs = { cmd = "python chunk.py" }
 embed-docs = { cmd = "python embeddings.py" }
@@ -44,6 +45,4 @@ pydantic = "*" # Data validation
 
 # Development dependencies
 pre-commit = "*"
-black = "*"
-flake8 = "*"
-isort = "*"
+ruff = ">=0.3.0" # Modern Python linter (replaces black, flake8, isort)
