@@ -1,0 +1,51 @@
+services:
+  # API Service
+  - type: web
+    name: legal-search-api
+    env: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    branch: main
+    buildCommand: docker build -t legal-search-rag-api:latest .
+    startCommand: python -m uvicorn api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GCP_PROJECT_ID
+        sync: false
+      - key: GCS_BUCKET_NAME
+        sync: false
+      - key: PORT
+        value: 8000
+    healthCheckPath: /api/health
+    disk:
+      name: data
+      mountPath: /app/cache
+      sizeGB: 10
+
+  # Frontend Service
+  - type: web
+    name: legal-search-frontend
+    env: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    branch: main
+    buildCommand: docker build -t legal-search-rag-frontend:latest .
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: legal-search-api
+          type: web
+          property: url
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true
+
+# Persistent disk for vector database
+disks:
+  - name: data
+    mountPath: /app/cache
+    sizeGB: 10

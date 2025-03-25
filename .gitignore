@@ -165,3 +165,59 @@ next-env.d.ts
 !.gitkeep
 !.env.example
 !stubs/**/*
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environments
+.env
+.env.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Cache
+api/cache/
+.cache/
+
+# Credentials
+credentials/
+*.pem
+*.key
+*.crt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Next.js
+.next/
+out/
+
+# Testing
+coverage/
+
+# ChromaDB
+api/chroma/
+
+# macOS
+.DS_Store
+
+# Docker
+docker-volumes/
+
+# Pixi
+.pixi/

@@ -1,6 +1,6 @@
 # Legal Document Search RAG System
 
-![Legal Search Banner](assets/images/app-screenshot.png)
+![Legal Search Banner](shared/assets/images/app-screenshot.png)
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yourusername/legal-search-rag)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -27,8 +27,8 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
   - Cost warnings for expensive requests
 
 ## Screenshots
-![Search Interface](assets/images/search-interface.png)
-![RAG Results](assets/images/rag-results.png)
+![Search Interface](shared/assets/images/search-interface.png)
+![RAG Results](shared/assets/images/rag-results.png)
 
 ## Quick Start
 
@@ -46,13 +46,24 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
    cd legal-search-rag
    ```
 
-2. Install dependencies using Pixi:
+2. Install dependencies:
    ```bash
+   # For API
+   cd api
    pixi install
+
+   # For Frontend
+   cd ../frontend
+   npm install
+
+   # For monorepo (optional)
+   cd ..
+   npm install
    ```
 
 3. Set up environment variables:
    ```bash
+   cd api
    cp .env.example .env
    # Edit .env to add your OPENAI_API_KEY and GOOGLE_API_KEY
    ```
@@ -65,24 +76,40 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 
 5. Process documents (extract, chunk, and embed):
    ```bash
-   pixi run process-docs    # Convert documents to text
-   pixi run chunk-docs      # Split into chunks
-   pixi run embed-docs      # Generate embeddings
+   # From root directory
+   npm run process-docs    # Convert documents to text
+   npm run chunk-docs      # Split into chunks
+   npm run embed-docs      # Generate embeddings
+
+   # Alternatively, from api directory
+   cd api
+   python process_docs.py
+   python chunk.py
+   python embeddings.py
    ```
 
-6. Start the API server:
+6. Start the services:
    ```bash
-   pixi run serve-api
-   ```
+   # Start everything with Docker Compose
+   npm run start
 
-7. In a new terminal, start the Next.js frontend:
-   ```bash
-   cd nextjs-legal-search
-   npm install
+   # Or run services individually:
+
+   # API (from root)
+   npm run api:dev
+
+   # Frontend (from root)
+   npm run frontend:dev
+
+   # Or manually:
+   cd api
+   python -m uvicorn api:app --reload --host 0.0.0.0 --port 8000
+
+   cd ../frontend
    npm run dev
    ```
 
-8. Open your browser to http://localhost:3000
+7. Open your browser to http://localhost:3000
 
 ### Option 2: Multi-Tenant Deployment with Docker
 
@@ -119,15 +146,40 @@ For deployments with multiple users or isolated document sets:
 
 For full details, see our [Multi-Tenant Deployment Guide](MULTI_TENANT_DEPLOYMENT.md).
 
+## Cloud Deployment
+
+### Render.com Deployment
+1. Make sure you have the Render CLI installed:
+   ```bash
+   npm install -g @render/cli
+   ```
+
+2. Set up your GCP integration (if needed):
+   ```bash
+   ./scripts/setup_gcp.sh
+   ```
+
+3. Deploy to Render:
+   ```bash
+   ./scripts/deploy_to_render.sh
+   ```
+
+4. Configure your environment variables in the Render dashboard:
+   - `OPENAI_API_KEY`
+   - `GOOGLE_API_KEY` (if using Google Gemini)
+   - GCP-related variables (if using GCP storage)
+
+For more details, see our [Cloud Deployment Guide](CLOUD_DEPLOYMENT.md).
+
 ## Usage
 
 ### Document Processing
 ```bash
 # Process documents
-pixi run process-docs
+npm run process-docs
 
 # Chunk documents
-pixi run chunk-docs
+npm run chunk-docs
 ```
 
 ### Accessing the Application
@@ -184,6 +236,30 @@ answer = response.json()
 
 ## Project Status
 Active development - core features implemented, optimizations ongoing
+
+## Monorepo Structure
+This project follows a monorepo structure with two main components:
+
+- **`api/`**: Python FastAPI backend service
+  - Document processing
+  - Vector database management
+  - RAG search implementation
+  - Cost control middleware
+
+- **`frontend/`**: Next.js frontend application
+  - Modern React-based interface
+  - Search and RAG features
+  - TypeScript and Tailwind CSS
+
+- **`shared/`**: Shared configuration and assets
+  - Docker Compose files
+  - Nginx configuration
+  - Shared assets and images
+
+- **`scripts/`**: Utility scripts for deployment and setup
+  - GCP integration
+  - Render.com deployment
+  - Tenant management
 
 ## License
 Apache 2.0
