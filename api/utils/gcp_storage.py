@@ -73,8 +73,8 @@ def upload_file(local_path: str, gcs_path: Optional[str] = None) -> Tuple[bool, 
         return False, "GCP not configured"
 
     try:
-        storage_client = storage.Client(project=config['project_id'])
-        bucket = storage_client.bucket(config['bucket_name'])
+        storage_client = storage.Client(project=config["project_id"])
+        bucket = storage_client.bucket(config["bucket_name"])
         blob = bucket.blob(gcs_path)
         blob.upload_from_filename(local_path)
 

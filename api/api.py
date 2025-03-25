@@ -885,8 +885,10 @@ async def get_document_content(document_id: str) -> tuple[str, dict]:
         metadata = {
             "filename": doc_file.name,
             "size": doc_file.stat().st_size,
-            "last_modified": datetime.fromtimestamp(doc_file.stat().st_mtime).isoformat(),
-            "source": f"local:{doc_file}"
+            "last_modified": datetime.fromtimestamp(
+                doc_file.stat().st_mtime
+            ).isoformat(),
+            "source": f"local:{doc_file}",
         }
 
         return content, metadata
