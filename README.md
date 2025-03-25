@@ -32,7 +32,67 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 
 ## Quick Start
 
-### Option 1: Single-User Development Setup
+### Option 1: Docker-based Local Development (Recommended)
+
+#### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- Git
+
+#### Setup
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd legal-search-rag
+   ```
+
+2. Environment setup:
+   ```bash
+   # Copy the example environment file
+   cp api/.env.example api/.env
+
+   # Edit the .env file to add your API keys
+   # OPENAI_API_KEY=your_openai_key
+   # GOOGLE_API_KEY=your_google_key (if using Gemini)
+   ```
+
+3. Start the containers:
+   ```bash
+   # Start all services with Docker Compose
+   docker-compose -f shared/docker-compose.yml up -d
+   ```
+
+4. Add your legal documents:
+   ```bash
+   # Create a directory for your documents
+   mkdir -p ~/Downloads/legaldocs
+
+   # Copy your documents to the input directory
+   cp /path/to/your/legal/documents/*.pdf ~/Downloads/legaldocs/
+   ```
+
+5. Process your documents:
+   ```bash
+   # Process, chunk, and embed documents using Docker
+   docker exec legal-search-api-default python process_docs.py
+   docker exec legal-search-api-default python chunk.py
+   docker exec legal-search-api-default python embeddings.py
+   ```
+
+6. Access the application:
+   - Frontend: http://localhost:3000
+   - API Swagger UI: http://localhost:8000/docs
+
+7. Development with live reload (optional):
+   ```bash
+   # Stop the running containers
+   docker-compose -f shared/docker-compose.yml down
+
+   # Start with the development configuration
+   # This enables file watching and hot reloading
+   docker-compose -f shared/docker-compose.yml up -d --build
+   ```
+
+### Option 2: Manual Development Setup
 
 #### Prerequisites
 - [Pixi](https://pixi.sh) - A fast, modern package manager built on top of Conda
@@ -111,7 +171,7 @@ A Retrieval-Augmented Generation (RAG) system specifically designed for legal do
 
 7. Open your browser to http://localhost:3000
 
-### Option 2: Multi-Tenant Deployment with Docker
+### Option 3: Multi-Tenant Deployment with Docker
 
 For deployments with multiple users or isolated document sets:
 
@@ -149,25 +209,55 @@ For full details, see our [Multi-Tenant Deployment Guide](MULTI_TENANT_DEPLOYMEN
 ## Cloud Deployment
 
 ### Render.com Deployment
-1. Make sure you have the Render CLI installed:
+
+Render.com offers a seamless deployment experience for your Legal Search RAG system, managing containers, persistent storage, and environment variables.
+
+#### One-click Deployment
+1. Install Render CLI:
    ```bash
    npm install -g @render/cli
    ```
 
-2. Set up your GCP integration (if needed):
+2. Login to Render:
    ```bash
-   ./scripts/setup_gcp.sh
+   render login
    ```
 
-3. Deploy to Render:
+3. Deploy using our script:
    ```bash
    ./scripts/deploy_to_render.sh
    ```
+   This uses the `render.yaml` blueprint to create:
+   - API service with FastAPI backend
+   - Frontend service with Next.js
+   - Persistent disk for vector database
 
-4. Configure your environment variables in the Render dashboard:
-   - `OPENAI_API_KEY`
-   - `GOOGLE_API_KEY` (if using Google Gemini)
-   - GCP-related variables (if using GCP storage)
+#### Post-Deployment Configuration
+1. Set required environment variables in Render dashboard:
+   - `OPENAI_API_KEY` - Your OpenAI API key
+   - `GOOGLE_API_KEY` - (Optional) Your Google Gemini API key
+   - `GCP_PROJECT_ID` - (Optional) For Google Cloud Storage
+   - `GCS_BUCKET_NAME` - (Optional) For Google Cloud Storage
+
+2. For GCP integration (optional):
+   ```bash
+   # Run the GCP setup script
+   ./scripts/setup_gcp_credentials.sh
+
+   # Then upload the generated key file to Render's Secret Files
+   # Path: /app/credentials/gcp-key.json
+   ```
+
+3. Process documents after deployment:
+   - Upload via the admin interface, or
+   - Use GCP Storage if configured
+
+#### CI/CD Setup
+Connect your GitHub repository to Render for automatic deployments:
+1. Go to your Render Dashboard → Services
+2. Select "Blueprint"
+3. Connect to your GitHub repository
+4. Configure auto-deploy settings for your main branch
 
 For more details, see our [Cloud Deployment Guide](CLOUD_DEPLOYMENT.md).
 
