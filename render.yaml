@@ -7,7 +7,6 @@ services:
     dockerContext: ./api
     branch: main
     buildCommand: docker build -t legal-search-rag-api:latest .
-    startCommand: python -m uvicorn api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
         sync: false
@@ -33,13 +32,12 @@ services:
     dockerContext: ./frontend
     branch: main
     buildCommand: docker build -t legal-search-rag-frontend:latest .
-    startCommand: npm start
     envVars:
       - key: NEXT_PUBLIC_API_URL
         fromService:
           name: legal-search-api
           type: web
-          property: url
+          property: host
       - key: NODE_ENV
         value: production
     autoDeploy: true
