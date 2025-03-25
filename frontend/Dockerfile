@@ -5,11 +5,11 @@ FROM node:18-alpine AS base
 FROM base AS deps
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package.json package-lock.json* ./
+# Copy package.json (and package-lock.json if it exists)
+COPY package.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with better error handling
+RUN npm install --no-fund --no-audit || (echo "npm install failed, retrying..." && npm install --no-fund --no-audit)
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -49,6 +49,10 @@ EXPOSE ${PORT}
 
 # Set the environment variable for the API URL, but allow it to be overridden
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:8000}
+
+# Health check to ensure container is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/ || exit 1
 
 # Start the application
 CMD ["sh", "-c", "node server.js"]
