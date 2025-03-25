@@ -59,7 +59,7 @@ def process_file(
 
     with open(output_path, "w", encoding="utf-8") as out:
         for i, chunk in enumerate(chunks):
-            out.write(f"### CHUNK {i+1}\n")
+            out.write(f"### CHUNK {i + 1}\n")
             out.write(chunk)
             out.write("\n\n")
 

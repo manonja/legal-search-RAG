@@ -100,7 +100,7 @@ def process_chunks(chunks_dir: Path) -> None:
             batch = chunks[i : i + batch_size]
 
             # Generate IDs for batch
-            ids = [f"{doc_id}_chunk_{j+i+1}" for j in range(len(batch))]
+            ids = [f"{doc_id}_chunk_{j + i + 1}" for j in range(len(batch))]
 
             # Add to Chroma (it will handle embeddings through OpenAI)
             try:
