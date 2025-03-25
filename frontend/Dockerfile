@@ -43,11 +43,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Set the correct permissions
 USER nextjs
 
-# Expose port 3000
-EXPOSE 3000
+# Expose port based on PORT env var with fallback to 3000
+ENV PORT=${PORT:-3000}
+EXPOSE ${PORT}
 
-# Set the environment variable for the API URL
-ENV NEXT_PUBLIC_API_URL=http://api:8000
+# Set the environment variable for the API URL, but allow it to be overridden
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:8000}
 
 # Start the application
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node server.js"]

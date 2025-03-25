@@ -12,8 +12,9 @@ const nextConfig = {
     // The client-side code will handle the proper formatting
     NEXT_PUBLIC_API_URL:
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
+    PORT: process.env.PORT || 3000,
   },
-  // This ensures Next.js allows the NEXT_PUBLIC_API_URL to be used in the client-side code
+  // This ensures Next.js allows the environment variables to be used in the client-side code
   publicRuntimeConfig: {
     apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
   },
