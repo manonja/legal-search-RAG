@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { constructApiUrl } from "../../lib/utils";
 
 // Admin API endpoints
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = constructApiUrl();
 const REFRESH_INTERVAL = 30000; // Refresh every 30 seconds
 
 interface UsageData {
