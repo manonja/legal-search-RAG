@@ -1,0 +1,49 @@
+[project]
+name = "legal-search-rag"
+version = "0.1.0"
+description = "Legal search RAG project"
+channels = ["conda-forge"]
+platforms = ["osx-64"]
+
+[dependencies]
+python = ">=3.9,<3.13"              # Pin Python version below 3.13 for better compatibility
+pip = "*"                           # Required for pip installations
+tiktoken = ">=0.9.0,<0.10"
+google-cloud-storage = ">=3.1.0,<4"
+google-api-core = ">=2.24.2,<3"
+grpcio = "*"                        # Required for ChromaDB
+
+[tasks]
+lint = { cmd = "isort --check . --skip=.pixi --profile black && flake8 . --exclude=.pixi --max-line-length=88 --extend-ignore=E203" }
+format = { cmd = "black . --exclude=.pixi && isort . --skip=.pixi --profile black" }
+check-format = { cmd = "black --check . --exclude=.pixi && isort --check . --skip=.pixi --profile black" }
+process-docs = { cmd = "python process_docs.py" }
+chunk-docs = { cmd = "python chunk.py" }
+embed-docs = { cmd = "python embeddings.py" }
+serve-api = { cmd = "uvicorn api:app --reload --host 0.0.0.0 --port 8000" }
+
+[pypi-dependencies]
+# Core dependencies
+PyMuPDF = "*"             # PDF processing
+python-docx = "*"         # Word document processing
+tqdm = "*"                # Progress bars
+google-generativeai = "*" # Google's Generative AI API
+Pillow = "*"              # Python Imaging Library
+chromadb = ">=0.4.22"     # Vector database with client extras
+python-dotenv = "*"       # Environment variable management
+langchain = "*"           # LangChain framework for RAG pipeline
+openai = "*"              # OpenAI API for embeddings
+tokenizers = "*"          # Required for Chroma's embedding functions
+grpcio = "*"              # Required for ChromaDB
+protobuf = "*"            # Required for gRPC
+
+# API dependencies
+fastapi = "*"  # FastAPI framework
+uvicorn = "*"  # ASGI server
+pydantic = "*" # Data validation
+
+# Development dependencies
+pre-commit = "*"
+black = "*"
+flake8 = "*"
+isort = "*"
