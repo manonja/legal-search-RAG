@@ -43,9 +43,3 @@ services:
       - key: NODE_ENV
         value: production
     autoDeploy: true
-
-# Persistent disk for vector database
-disks:
-  - name: data
-    mountPath: /app/cache
-    sizeGB: 10
