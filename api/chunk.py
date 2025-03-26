@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from tqdm import tqdm
+from utils.env import get_chunks_dir, get_output_dir
 
 
 def create_text_splitter(
@@ -69,26 +70,16 @@ def process_file(
 def main():
     """Process all text files in the input directory.
 
-    Uses environment variables:
-        - INPUT_DIR: Directory containing processed legal text files
-        - OUTPUT_DIR: Directory to save chunked output files
+    Uses environment variables for input/output directories from env utils.
     """
-    # Get input/output directories from environment variables with defaults
-    input_dir = os.getenv(
-        "INPUT_DIR", os.path.expanduser("~/Downloads/processedLegalDocs")
-    )
-    output_dir = os.getenv(
-        "OUTPUT_DIR", os.path.expanduser("~/Downloads/chunkedLegalDocs")
-    )
-
-    input_path = Path(input_dir)
-    output_path = Path(output_dir)
+    # Get input/output directories from environment utilities
+    input_path = get_output_dir()  # Processed docs from previous step
+    output_path = get_chunks_dir()  # Where to save chunked docs
 
     if not input_path.exists():
         print(f"Error: Input directory not found: {input_path}")
         return
 
-    output_path.mkdir(exist_ok=True, parents=True)
     print(f"\nInput directory: {input_path}")
     print(f"Output directory: {output_path}\n")
 
@@ -98,7 +89,7 @@ def main():
     txt_files = list(input_path.glob("*.txt"))
 
     if not txt_files:
-        print(f"No .txt files found in {input_dir}")
+        print(f"No .txt files found in {input_path}")
         return
 
     print(f"Found {len(txt_files)} text files to process")

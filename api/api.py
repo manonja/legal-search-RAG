@@ -4,21 +4,49 @@ This module provides REST API endpoints to interact with the
 Chroma vector database.
 """
 
+# Disable ChromaDB telemetry before any imports
+import os
+
+# Set environment variables to disable telemetry
+os.environ["ANONYMIZED_TELEMETRY"] = "FALSE"
+os.environ["CHROMADB_TELEMETRY_ENABLED"] = "FALSE"
+os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
+
+# Patch sys.modules to prevent OpenTelemetry imports from failing
+import sys
+
+
+class DisabledModule:
+    """A module that returns None for any attribute access."""
+
+    def __getattr__(self, name):
+        return None
+
+
+# Create fake modules for problematic imports
+for module_name in [
+    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.exporter",
+    "opentelemetry.sdk.resources",
+    "opentelemetry.sdk.trace",
+    "opentelemetry.sdk.trace.export",
+    "opentelemetry.trace",
+    "grpc",
+]:
+    if module_name not in sys.modules:
+        sys.modules[module_name] = DisabledModule()
+
 import hashlib
 import json
 import logging
-import os
 import shutil
-import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TypeVar, cast
 
+# Import other dependencies after setting environment variables
 import chromadb
 import uvicorn
-
-# Import from local modules
-from api_modules.admin import router as admin_router
 from chromadb.config import Settings
 from chromadb.errors import InvalidCollectionException
 from chromadb.utils import embedding_functions
@@ -29,8 +57,8 @@ from fastapi.responses import JSONResponse
 from middleware.cost_control import CostControlMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-from utils.env import get_docs_root
-from utils.usage_db import init_usage_db
+from utils.env import get_chroma_dir, get_chunks_dir, get_docs_root
+from utils.usage_db import init_usage_db, record_usage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -65,17 +93,12 @@ chroma_logger.addFilter(ChromaWarningFilter())
 load_dotenv()
 
 # Constants
-EMBEDDING_MODEL = "text-embedding-ada-002"  # Updated to latest model
-CHROMA_PERSIST_DIR = os.path.join(os.path.dirname(__file__), "cache", "chroma")
+EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
 DOCUMENTS_DIR = os.getenv(
     "DOCUMENTS_DIR", os.path.join(os.path.dirname(__file__), "..", "data")
 )
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "cache", "query_cache.json")
-TENANT_ID = os.getenv("TENANT_ID", "default")
-DOCS_ROOT = os.getenv("DOCS_ROOT", "./docs")
-
-# Define the collection name for ChromaDB
-COLLECTION_NAME = f"legal_docs_{TENANT_ID}"
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "legal_docs")
 API_VERSION = "1.0.0"
 
 # Type variables
@@ -90,78 +113,20 @@ def initialize_chroma_client():
     """
     logger.info("Initializing Chroma client")
 
-    # Create path - use the main Chroma directory, not a tenant-specific subdirectory
-    chroma_dir = Path(CHROMA_PERSIST_DIR)
-    chroma_dir.mkdir(parents=True, exist_ok=True)
+    # Get ChromaDB directory
+    chroma_dir = get_chroma_dir()
 
-    logger.info(f"Using local storage: {chroma_dir}")
+    logger.info(f"Using local ChromaDB storage: {chroma_dir}")
 
+    # Create client with telemetry disabled
     return chromadb.PersistentClient(
         path=str(chroma_dir),
-        settings=Settings(anonymized_telemetry=False, allow_reset=True),
+        settings=Settings(
+            anonymized_telemetry=False,  # Disable telemetry
+            allow_reset=True,
+            is_persistent=True,
+        ),
     )
-
-
-# Process a document and add its chunks to the collection
-def process_document(doc_path: Path) -> None:
-    """Process a document and add its chunks to Chroma.
-
-    Args:
-        doc_path: Path to the document file
-    """
-    try:
-        # Get document name from path
-        doc_name = doc_path.stem.replace("chunked_", "")
-        logger.info(f"Processing document: {doc_name}")
-
-        # Read document content
-        with open(doc_path, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        # Split into chunks (assuming document is pre-chunked and separated by markers)
-        chunks = content.split("\n\n--- CHUNK ---\n\n")
-        if len(chunks) == 1:  # No markers, treat as a single chunk
-            chunks = [content]
-
-        # Prepare data for Chroma
-        chunk_ids = []
-        chunk_texts = []
-        chunk_metadatas = []
-
-        # Process each chunk
-        for i, chunk in enumerate(chunks):
-            if not chunk.strip():
-                continue
-
-            # Generate a unique ID for this chunk
-            chunk_id = (
-                f"{doc_name}_chunk_{i + 1}"  # Start from 1 instead of 0 for consistency
-            )
-
-            # Add to batch
-            chunk_ids.append(chunk_id)
-            chunk_texts.append(chunk)
-            chunk_metadatas.append(
-                {
-                    "filename": str(
-                        doc_path
-                    ),  # Changed from 'source' to 'filename' to match existing format
-                    "chunk_index": i,
-                }
-            )
-
-        # Use upsert instead of add to avoid duplicate ID warnings
-        if chunk_ids:
-            collection.upsert(
-                ids=chunk_ids,
-                documents=chunk_texts,
-                metadatas=chunk_metadatas,
-            )
-            logger.info(f"Upserted {len(chunk_ids)} chunks from {doc_name}")
-
-    except Exception as e:
-        logger.error(f"Error processing document {doc_path}: {e}")
-        logger.exception(e)  # Log full traceback for debugging
 
 
 # Initialize FastAPI app with metadata
@@ -175,26 +140,14 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8000",  # Local development
-        "http://localhost:3000",  # Next.js local development
-        "http://localhost:8001",  # Next.js local development (tenant port)
-        "https://*.ngrok.io",  # ngrok tunnels
-        "https://*.ngrok-free.app",  # ngrok free tier domains
-        "https://your-nextjs-domain.com",  # Production Next.js domain
-    ],
+    allow_origins=["*"],  # Allow all origins for local development
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=86400,  # Cache preflight requests for 24 hours
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Add cost control middleware
 app.add_middleware(CostControlMiddleware)
-
-# Include admin router
-app.include_router(admin_router)
 
 
 # Initialize usage database
@@ -205,9 +158,23 @@ async def startup_event():
         # Initialize usage database
         init_usage_db()
         logger.info("Usage database initialized")
-    except Exception as e:
-        logger.error(f"Error initializing usage database: {e}")
 
+        # Initialize cache directories
+        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+        logger.info(f"Cache directory created at {os.path.dirname(CACHE_PATH)}")
+    except Exception as e:
+        logger.error(f"Error during initialization: {e}")
+
+
+# Initialize OpenAI client
+client = AsyncOpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    timeout=60.0,  # Increase timeout for longer responses
+)
+
+# Cache for storing query results
+query_cache: Dict[str, Dict] = {}
+CACHE_DURATION = timedelta(hours=24)  # Cache duration for query results
 
 try:
     # Initialize OpenAI embedding function
@@ -216,9 +183,27 @@ try:
         model_name=EMBEDDING_MODEL,
     )
 
-    # Initialize Chroma client and collection
+    # Initialize Chroma client and collection with a retry mechanism
     logger.info("Initializing Chroma client and collection")
-    client = initialize_chroma_client()
+    max_attempts = 3
+    attempt = 0
+    client = None
+
+    while attempt < max_attempts:
+        try:
+            attempt += 1
+            logger.info(f"ChromaDB initialization attempt {attempt}/{max_attempts}")
+            client = initialize_chroma_client()
+            # Test connection with a simple operation
+            client.list_collections()
+            break
+        except Exception as e:
+            logger.warning(f"ChromaDB initialization attempt {attempt} failed: {e}")
+            if attempt >= max_attempts:
+                raise
+            import time
+
+            time.sleep(1)  # Wait before retrying
 
     # Check if collection exists before creating it
     try:
@@ -239,36 +224,48 @@ try:
             metadata={"hnsw:space": "cosine"},
         )
 
-        # Load documents and create embeddings only for new collection
-        documents_dir = Path(DOCUMENTS_DIR)
-        if documents_dir.exists():
-            for doc_file in documents_dir.glob("chunked_*.txt"):
-                # Process each document file
-                process_document(doc_file)
-
     logger.info("Successfully initialized Chroma client and collection")
 
 except Exception as e:
-    logger.error(f"Failed to initialize Chroma: {str(e)}")
-    raise
-
-# Initialize OpenAI client
-client = AsyncOpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    timeout=60.0,  # Increase timeout for longer responses
-)
-
-# Cache for storing query results
-query_cache: Dict[str, Dict] = {}
-CACHE_DURATION = timedelta(hours=24)  # Cache duration for query results
-
-# Initialize cache directories
-os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+    logger.error(f"Error initializing Chroma: {e}")
+    logger.exception(e)  # Log full traceback for debugging
 
 
-# Request/Response Models
+# Define API Models
+class SearchQuery(BaseModel):
+    """Search query parameters for basic vector search."""
+
+    query: str = Field(..., description="Search query text")
+    limit: int = Field(5, description="Maximum number of results to return")
+
+
+class SearchResult(BaseModel):
+    """Search result model."""
+
+    text: str = Field(..., description="Document chunk text")
+    metadata: Dict[str, Any] = Field(..., description="Document metadata")
+    distance: float = Field(..., description="Similarity distance")
+
+
+class RAGQuery(BaseModel):
+    """RAG query parameters for generating answers from documents."""
+
+    query: str = Field(..., description="Question to answer")
+    limit: int = Field(5, description="Maximum number of documents to retrieve")
+    max_tokens: Optional[int] = Field(1000, description="Maximum tokens to generate")
+    temperature: float = Field(0.7, description="Sampling temperature")
+
+
+class RAGResponse(BaseModel):
+    """RAG response model with answer and sources."""
+
+    answer: str = Field(..., description="Generated answer to the question")
+    sources: List[Dict[str, Any]] = Field(..., description="Source documents used")
+    total_tokens: int = Field(..., description="Total tokens used")
+
+
 class QueryRequest(BaseModel):
-    """Request model for document search queries."""
+    """Request model for document search queries (backward compatibility)."""
 
     query_text: str = Field(..., min_length=1, description="The text to search for")
     n_results: int = Field(
@@ -286,82 +283,11 @@ class QueryRequest(BaseModel):
     )
 
 
-class SearchResult(BaseModel):
-    """Model representing a single search result."""
-
-    chunk: str = Field(..., description="The matched text chunk")
-    metadata: Dict[str, Any] = Field(..., description="Document metadata")
-    similarity: float = Field(..., description="Similarity score (0 to 1)")
-    rank: int = Field(..., description="Result rank")
-
-
 class QueryResponse(BaseModel):
-    """Response model for search queries."""
+    """Response model for search queries (backward compatibility)."""
 
     results: List[SearchResult] = Field(..., description="List of search results")
     total_found: int = Field(..., description="Total number of results")
-
-
-class DocumentSource(BaseModel):
-    """Model representing a document source with metadata."""
-
-    source: str = Field(..., description="Document source path")
-    title: str = Field(..., description="Document title")
-    similarity: float = Field(..., description="Similarity score (0 to 1)")
-
-
-class SourceDocument(BaseModel):
-    """Source document model with metadata."""
-
-    content: str = Field(..., description="Document content or title")
-    metadata: Dict[str, Any] = Field(..., description="Document metadata")
-    similarity: float = Field(..., description="Similarity score (0-1)")
-
-
-class UsageInfo(BaseModel):
-    """Usage information for an API call."""
-
-    input_tokens: int = Field(..., description="Number of input tokens used")
-    output_tokens: int = Field(..., description="Number of output tokens generated")
-    total_tokens: int = Field(..., description="Total tokens used")
-    cost: float = Field(..., description="Estimated cost of the API call")
-
-
-class RagRequest(BaseModel):
-    """Request model for RAG search and answer generation."""
-
-    query: str = Field(..., description="The query text to search for")
-    model: Optional[str] = Field("gpt-4", description="The OpenAI model to use")
-    temperature: Optional[float] = Field(0.0, description="Temperature for generation")
-    max_tokens: Optional[int] = Field(1000, description="Maximum tokens to generate")
-    n_results: Optional[int] = Field(5, description="Number of results to return")
-    min_similarity: Optional[float] = Field(
-        0.7, description="Minimum similarity threshold (0-1)"
-    )
-    conversation_id: Optional[str] = Field(
-        None, description="Conversation ID for follow-up questions"
-    )
-    messages: Optional[List[Dict[str, str]]] = Field(
-        None, description="Message history for the conversation"
-    )
-    metadata_filter: Optional[Dict[str, Any]] = Field(
-        None, description="Metadata filter for document search"
-    )
-
-
-class RagResponse(BaseModel):
-    """Response model for RAG search and answer generation."""
-
-    answer: str = Field(..., description="The generated answer")
-    source_documents: List[SourceDocument] = Field(
-        ..., description="Source documents used for context"
-    )
-    conversation_id: str = Field(
-        ..., description="Conversation ID for follow-up questions"
-    )
-    usage: Optional[UsageInfo] = Field(
-        None, description="Usage information for the API call"
-    )
 
 
 class DocumentResponse(BaseModel):
@@ -373,48 +299,103 @@ class DocumentResponse(BaseModel):
     chunks: List[str] = Field(..., description="List of chunks from this document")
 
 
-def get_request() -> Request:
-    """Get FastAPI request object.
-
-    Returns:
-        Request: The FastAPI request object
-    """
-    return Request(scope={"type": "http"})
+@app.get("/health")
+async def health_check():
+    """Check if the API is healthy."""
+    return {"status": "ok", "version": API_VERSION}
 
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handle all unhandled exceptions globally.
+def get_query_hash(query: str, **params) -> str:
+    """Generate a hash for the query to use as a cache key.
 
     Args:
-        request: The incoming request
-        exc: The exception that was raised
+        query: The query text
+        params: Additional parameters that affect the result
 
     Returns:
-        JSONResponse with error details
+        A hash string representing the query
     """
-    logger.error(f"Global error handler caught: {str(exc)}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)},
-    )
+    # Include relevant parameters that affect the result
+    query_params = {"query": query, **params}
+    # Convert to string and hash
+    param_str = json.dumps(query_params, sort_keys=True)
+    return hashlib.sha256(param_str.encode()).hexdigest()
+
+
+def is_cache_valid(cached_result: Dict) -> bool:
+    """Check if a cached result is still valid.
+
+    Args:
+        cached_result: The cached result to check
+
+    Returns:
+        True if the result is still valid, False otherwise
+    """
+    # Get cache timestamp
+    timestamp = cached_result.get("timestamp")
+    if not timestamp:
+        return False
+
+    # Parse timestamp
+    try:
+        cache_time = datetime.fromisoformat(timestamp)
+    except ValueError:
+        return False
+
+    # Check if cache is expired (more than 24 hours old)
+    return (datetime.now() - cache_time) < CACHE_DURATION
+
+
+@app.post("/search", response_model=List[SearchResult])
+async def search_documents(request: SearchQuery):
+    """Search for documents using vector similarity.
+
+    Args:
+        request: Search query parameters
+
+    Returns:
+        List of document chunks and metadata
+    """
+    try:
+        # Log the request
+        logger.info(f"Search query: {request.query}")
+
+        # Query the collection
+        results = collection.query(
+            query_texts=[request.query],
+            n_results=request.limit,
+            include=["documents", "metadatas", "distances"],
+        )
+
+        # Format results
+        search_results = []
+        for i in range(len(results["documents"][0])):
+            search_results.append(
+                SearchResult(
+                    text=results["documents"][0][i],
+                    metadata=results["metadatas"][0][i],
+                    distance=float(results["distances"][0][i]),
+                )
+            )
+
+        return search_results
+
+    except Exception as e:
+        logger.error(f"Error during search: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/search", response_model=QueryResponse, tags=["Search"])
-async def search_documents(request: QueryRequest = None) -> QueryResponse:
-    """Search for relevant document chunks.
+async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
+    """Search for relevant document chunks using the old API format.
 
-    This endpoint searches the document collection using semantic similarity and returns
-    the most relevant chunks based on the query.
+    This endpoint is preserved for backward compatibility.
 
     Args:
         request: Search parameters including query text and filters
 
     Returns:
         QueryResponse containing matched chunks and their metadata
-
-    Raises:
-        HTTPException: If the search fails or no results are found
     """
     try:
         if not request:
@@ -456,10 +437,9 @@ async def search_documents(request: QueryRequest = None) -> QueryResponse:
 
             formatted_results.append(
                 SearchResult(
-                    chunk=doc,
+                    text=doc,
                     metadata=cast(Dict[str, Any], metadata),
-                    similarity=similarity,
-                    rank=idx + 1,
+                    distance=distance,
                 )
             )
 
@@ -476,333 +456,119 @@ async def search_documents(request: QueryRequest = None) -> QueryResponse:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}") from e
 
 
-@app.get("/api/health", tags=["System"])
-async def health_check() -> Dict[str, Any]:
-    """Check the health status of the API and its dependencies.
-
-    Returns:
-        Dict containing API status and version information
-    """
-    try:
-        # Test Chroma connection
-        collection.count()
-        return {
-            "status": "healthy",
-            "version": API_VERSION,
-            "chroma_status": "connected",
-            "document_count": collection.count(),
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return {"status": "unhealthy", "version": API_VERSION, "error": str(e)}
-
-
-def get_query_hash(request: RagRequest) -> str:
-    """Generate a hash for the query to use as a cache key.
+@app.post("/rag-search", response_model=RAGResponse)
+async def rag_search(request: RAGQuery):
+    """Generate an answer to a question using RAG.
 
     Args:
-        request: The RAG request object
+        request: RAG query parameters
 
     Returns:
-        A hash string representing the query
-    """
-    # Include relevant parameters that affect the result
-    query_params = {
-        "query": request.query,
-        "model": request.model,
-        "temperature": request.temperature,
-        "max_tokens": request.max_tokens,
-        "n_results": request.n_results,
-        "min_similarity": request.min_similarity,
-        "metadata_filter": request.metadata_filter,
-    }
-    # Convert to string and hash
-    param_str = json.dumps(query_params, sort_keys=True)
-    return hashlib.sha256(param_str.encode()).hexdigest()
-
-
-def is_cache_valid(cached_result: Dict) -> bool:
-    """Check if a cached result is still valid.
-
-    Args:
-        cached_result: The cached result to check
-
-    Returns:
-        True if the result is still valid, False otherwise
-    """
-    # Get cache timestamp
-    timestamp = cached_result.get("timestamp")
-    if not timestamp:
-        return False
-
-    # Parse timestamp
-    try:
-        cache_time = datetime.fromisoformat(timestamp)
-    except ValueError:
-        return False
-
-    # Check if cache is expired (more than 24 hours old)
-    return (datetime.now() - cache_time).total_seconds() < 86400  # 24 hours
-
-
-async def process_document_chunk(
-    chunk: Dict, collection: chromadb.Collection
-) -> Optional[Dict]:
-    """Process a single document chunk asynchronously."""
-    try:
-        # Extract metadata
-        metadata = chunk.get("metadata", {})
-        source = metadata.get("source", "")
-        title = metadata.get("title", "")
-        similarity = chunk.get("distance", 0.0)
-
-        # Get the document content
-        content = chunk.get("document", "")
-
-        return {
-            "source": source,
-            "title": title,
-            "similarity": similarity,
-            "content": content,
-        }
-    except Exception as e:
-        logger.error(f"Error processing document chunk: {e}")
-        return None
-
-
-@app.post("/api/rag-search", response_model=RagResponse, tags=["Search"])
-async def rag_search(request: RagRequest) -> RagResponse:
-    """Search documents and generate answer using GPT-4.
-
-    This endpoint combines vector search with GPT-4 processing to provide
-    context-aware answers to legal questions.
-
-    Args:
-        request: Search parameters including query text and filters
-
-    Returns:
-        RagResponse containing context documents and GPT-4 generated answer
-
-    Raises:
-        HTTPException: If the search or GPT-4 processing fails
+        Generated answer with sources
     """
     try:
-        if not request:
-            raise HTTPException(status_code=400, detail="Missing request body")
+        # Check cache
+        cache_key = get_query_hash(
+            request.query,
+            limit=request.limit,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+        )
 
-        # Generate a conversation ID if not provided
-        if not request.conversation_id:
-            request.conversation_id = str(uuid.uuid4())
+        if cache_key in query_cache and is_cache_valid(query_cache[cache_key]):
+            logger.info("Returning cached RAG result")
+            cached_data = query_cache[cache_key]["data"]
+            return RAGResponse(**cached_data)
 
-        logger.info(f"Processing RAG search request: {request.query}")
+        # Log the request
+        logger.info(f"RAG query: {request.query}")
 
-        # Check cache first
-        query_hash = get_query_hash(request)
-        cached_result = query_cache.get(query_hash)
-        if cached_result and is_cache_valid(cached_result):
-            logger.info("Returning cached result")
-            return RagResponse(**cached_result["data"])
-
-        # Query Chroma with optimized parameters
+        # Query the collection to retrieve relevant documents
         results = collection.query(
             query_texts=[request.query],
-            n_results=request.n_results,
-            where=request.metadata_filter,
+            n_results=request.limit,
             include=["documents", "metadatas", "distances"],
         )
 
-        if not results or not results.get("documents"):
-            logger.warning("No results found for query")
-            return RagResponse(
-                answer="No relevant documents found.",
-                source_documents=[],
-                conversation_id=request.conversation_id,
-                usage=None,
-            )
-
-        # Process results
-        formatted_results = []
-        document_sources = {}  # Use dict to track unique sources
-        for idx, (doc, metadata, distance) in enumerate(
+        # Prepare context from retrieved documents
+        context = ""
+        sources = []
+        for i, (doc, meta, distance) in enumerate(
             zip(
                 results["documents"][0],
                 results["metadatas"][0],
                 results["distances"][0],
             )
         ):
-            # Convert distance to similarity score (0 to 1)
-            similarity = 1 - (distance / 2)
+            # Add to context with a separator
+            context += f"\n\nDocument {i + 1} (Distance: {distance:.4f}):\n{doc}"
 
-            # Skip results below similarity threshold
-            if similarity < request.min_similarity:
-                continue
-
-            # Create search result
-            result = SearchResult(
-                chunk=doc,
-                metadata=cast(Dict[str, Any], metadata),
-                similarity=similarity,
-                rank=idx + 1,
-            )
-            formatted_results.append(result)
-
-            # Track document sources
-            source = metadata.get("source", "Unknown Document")
-            if source not in document_sources or (
-                similarity > document_sources[source].similarity
-            ):
-                document_sources[source] = DocumentSource(
-                    source=source,
-                    title=metadata.get("title", source),
-                    similarity=similarity,
-                )
-
-        # Prepare context for GPT-4
-        context = "\n\n".join(
-            [
-                (
-                    f"Document {r.rank} (Similarity: {r.similarity:.2%}):\n"
-                    f"Source: {r.metadata.get('source', 'Unknown Document')}\n"
-                    f"{r.chunk}"
-                )
-                for r in formatted_results
-            ]
-        )
-
-        logger.debug(f"""Context for GPT-4:\n{context}""")
-
-        # Query GPT-4 with optimized prompt
-        system_message = (
-            "You are a legal research assistant providing answers based on the "
-            "provided legal documents.\nYour responses should be comprehensive but "
-            "concise, including:\n1. A brief summary (2-3 sentences)\n2. Key legal "
-            "concepts (bullet points)\n3. Relevant case law (if mentioned)\n4. "
-            "Practical considerations (if applicable)\n5. Source attribution with "
-            "clickable links\n\n"
-            "Format your response in markdown with appropriate headers. For each "
-            "source you reference, include a clickable link using the format:\n"
-            "[Source Name](source:filename.txt)\n\n"
-            'For example, if you reference information from "Medical Malpractice '
-            'Guide.txt", include a link like:\n'
-            "[Medical Malpractice Guide](source:Medical Malpractice Guide.txt)\n\n"
-            "This will allow users to click directly on the source to view the "
-            "full document."
-        )
-
-        user_prompt = (
-            "Based on the following legal document excerpts, please provide a "
-            "concise answer to this legal question:\n\n"
-            f"{request.query}\n\n"
-            "Document excerpts:\n"
-            "------\n"
-            f"{context}\n"
-            "------\n\n"
-            "Please structure your response to be clear and concise, focusing on "
-            "the most relevant information. Include clickable links to the source "
-            "documents where you reference them."
-        )
-
-        try:
-            # Make async API call with optimized parameters
-            chat_completion = await client.chat.completions.create(
-                model=request.model,
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
+            # Add to sources list
+            sources.append(
+                {
+                    "text": doc[:200] + "..." if len(doc) > 200 else doc,
+                    "metadata": meta,
+                    "distance": float(distance),
+                }
             )
 
-            answer = chat_completion.choices[0].message.content
+        # Initialize OpenAI client
+        openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-            # Cache the result
-            response_data = {
-                "answer": answer,
-                "source_documents": [
-                    SourceDocument(
-                        content=source.title,
-                        metadata={"filename": source.source},
-                        similarity=source.similarity,
-                    )
-                    for source in document_sources.values()
-                ],
-                "conversation_id": request.conversation_id,
-                "usage": {
-                    "input_tokens": chat_completion.usage.prompt_tokens,
-                    "output_tokens": chat_completion.usage.completion_tokens,
-                    "total_tokens": chat_completion.usage.total_tokens,
-                    "cost": (
-                        chat_completion.usage.total_tokens
-                        * 0.000002  # Assuming $0.000002 per token
-                    ),
-                },
-            }
-            query_cache[query_hash] = {
-                "data": response_data,
-                "timestamp": datetime.now().isoformat(),
-            }
+        # Prepare the prompt for the language model
+        system_prompt = """You are a legal assistant that helps answer questions about legal documents.
+        Use ONLY information from the provided document excerpts to answer the question.
+        If the answer cannot be found in the documents, say so clearly.
+        DO NOT make up information or use external knowledge.
+        Cite specific sections of documents when possible."""
 
-            return RagResponse(**response_data)
+        user_prompt = f"""Question: {request.query}
 
-        except Exception as e:
-            logger.error(f"Error in GPT-4 API call: {e}")
-            raise HTTPException(status_code=500, detail="Error generating response") from e
+        Context from relevant legal documents:
+        {context}
+
+        Based ONLY on the above documents, please provide a comprehensive answer to the question."""
+
+        # Call the OpenAI API
+        model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+        logger.info(f"Using model: {model}")
+
+        chat_completion = await openai_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+        )
+
+        # Get the answer from the response
+        answer = chat_completion.choices[0].message.content.strip()
+        total_tokens = chat_completion.usage.total_tokens
+
+        # Record usage
+        record_usage("rag-search", total_tokens, model, total_tokens * 0.000002)
+
+        # Cache the result
+        response_data = {
+            "answer": answer,
+            "sources": sources,
+            "total_tokens": total_tokens,
+        }
+
+        query_cache[cache_key] = {
+            "data": response_data,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        # Return the RAG response
+        return RAGResponse(**response_data)
 
     except Exception as e:
-        logger.error(f"Error in rag_search: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-def get_document_path(document_id: str) -> Path:
-    """Get the full path to a document from its ID.
-
-    Args:
-        document_id: Document identifier (filename)
-
-    Returns:
-        Path to the processed document
-    """
-    # Remove any URL encoding
-    document_id = document_id.replace("%20", " ")
-
-    logger.info(f"Looking for document: {document_id}")
-
-    # Look in processed docs directory first
-    docs_root = Path(get_docs_root())
-    logger.info(f"Searching in processed docs directory: {docs_root}")
-
-    # First try the exact path if it exists
-    if (docs_root / document_id).exists():
-        logger.info(f"Found document at exact path: {docs_root / document_id}")
-        return docs_root / document_id
-
-    # Then try finding it by name only, including in subdirectories
-    for file in docs_root.rglob("*"):
-        if file.name == document_id:
-            logger.info(f"Found document by name: {file}")
-            return file
-
-    # If not found in processed docs, look in chunked docs directory
-    chunks_dir = Path(
-        os.getenv("CHUNKS_DIR", os.path.expanduser("~/Downloads/chunkedLegalDocs"))
-    )
-    logger.info(f"Searching in chunked docs directory: {chunks_dir}")
-
-    # First try the exact path if it exists
-    if (chunks_dir / document_id).exists():
-        logger.info(f"Found document at exact path: {chunks_dir / document_id}")
-        return chunks_dir / document_id
-
-    # Then try finding it by name only, including in subdirectories
-    for file in chunks_dir.rglob("*"):
-        if file.name == document_id:
-            logger.info(f"Found document by name: {file}")
-            return file
-
-    # If we get here, we didn't find the document
-    logger.error(f"Document not found: {document_id}")
-    raise FileNotFoundError(f"Document not found: {document_id}")
+        logger.error(f"Error during RAG search: {e}")
+        logger.exception(e)  # Log full traceback for debugging
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 async def find_document(document_id: str) -> Path:
@@ -823,7 +589,7 @@ async def find_document(document_id: str) -> Path:
     logger.info(f"Looking for document: {document_id}")
 
     # Look in processed docs directory first
-    docs_root = Path(get_docs_root())
+    docs_root = get_docs_root()
     logger.info(f"Searching in processed docs directory: {docs_root}")
 
     # First try the exact path if it exists
@@ -838,9 +604,7 @@ async def find_document(document_id: str) -> Path:
             return file
 
     # If not found in processed docs, look in chunked docs directory
-    chunks_dir = Path(
-        os.getenv("CHUNKS_DIR", os.path.expanduser("~/Downloads/chunkedLegalDocs"))
-    )
+    chunks_dir = get_chunks_dir()
     logger.info(f"Searching in chunked docs directory: {chunks_dir}")
 
     # First try the exact path if it exists
@@ -928,7 +692,7 @@ async def get_document(document_id: str) -> DocumentResponse:
             content=content,
             metadata=metadata,
             source=metadata.get("source", ""),
-            chunks=[],  # Empty chunks since we're not using Chroma here
+            chunks=[],  # Empty chunks since we're retrieving whole document
         )
 
     except HTTPException:
@@ -939,49 +703,9 @@ async def get_document(document_id: str) -> DocumentResponse:
         ) from e
 
 
-def upload_document(file_path: str) -> dict:
-    """Upload a document to the document store.
-
-    Args:
-        file_path: Path to the document file
-
-    Returns:
-        dict: Information about the uploaded document
-
-    Raises:
-        FileNotFoundError: If document cannot be found
-        IOError: If document cannot be read
-    """
-    # Handle only local file storage
-    try:
-        # Ensure file exists
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Document not found: {file_path}")
-
-        # Copy to documents directory
-        document_name = os.path.basename(file_path)
-        destination = os.path.join(DOCUMENTS_DIR, document_name)
-
-        # Create directory if it doesn't exist
-        os.makedirs(DOCUMENTS_DIR, exist_ok=True)
-
-        # Copy file
-        shutil.copy2(file_path, destination)
-        logger.info(f"Document uploaded to {destination}")
-
-        # Return document info
-        return {
-            "filename": document_name,
-            "path": destination,
-            "size": os.path.getsize(destination),
-            "upload_time": datetime.now().isoformat(),
-        }
-    except Exception as e:
-        logger.error(f"Error uploading document: {str(e)}")
-        raise
-
-
 if __name__ == "__main__":
-    # Using 0.0.0.0 for development only; in production, the application
-    # should be behind a reverse proxy or restricted by firewall rules
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    port = int(os.getenv("API_PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+
+    logger.info(f"Starting API server on {host}:{port}")
+    uvicorn.run("api:app", host=host, port=port, reload=True)

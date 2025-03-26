@@ -1,0 +1,40 @@
+# Version control
+.git/
+.gitignore
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment directories
+.env
+.venv
+env/
+venv/
+ENV/
+.pixi/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Data directories (handled with volumes)
+/cache/
+/data/
+
+# Build artifacts
+dist/
+build/

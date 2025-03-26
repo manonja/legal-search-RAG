@@ -5,49 +5,46 @@ services:
     env: docker
     dockerfilePath: ./api/Dockerfile
     dockerContext: ./api
-    branch: main
-    buildCommand: docker build -t legal-search-rag-api:latest .
+    healthCheckPath: /health
+    plan: starter
     envVars:
+      - key: PORT
+        value: 8000
+      - key: TENANT_ID
+        value: default
       - key: OPENAI_API_KEY
         sync: false
       - key: GOOGLE_API_KEY
         sync: false
-      - key: GCP_PROJECT_ID
-        sync: false
-      - key: GCS_BUCKET_NAME
-        sync: false
-      - key: PORT
-        value: 8000
-    healthCheckPath: /api/health
+      - key: DATA_ROOT
+        value: /app/data
+      - key: INPUT_DIR
+        value: /app/data/input
+      - key: OUTPUT_DIR
+        value: /app/data/processed
+      - key: CHUNKS_DIR
+        value: /app/data/chunks
+      - key: CHROMA_DATA_DIR
+        value: /app/data/chroma
+      - key: COLLECTION_NAME
+        value: legal_docs
     disk:
       name: data
-      mountPath: /app/cache
+      mountPath: /app/data
       sizeGB: 10
-    plan: starter
-    region: oregon
 
-  # Frontend Service - Next.js
+  # Frontend Service
   - type: web
     name: legal-search-frontend
     env: docker
     plan: starter
-    runtime: docker
-    region: oregon
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
-    branch: main
-    buildFilter:
-      paths:
-        - frontend/**
     envVars:
       - key: NEXT_PUBLIC_API_URL
         fromService:
           name: legal-search-api
           type: web
-          property: hostport
+          property: url
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
-    healthCheckPath: /
-    autoDeploy: true

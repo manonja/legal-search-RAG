@@ -1,5 +1,5 @@
-# Use a Python base image with conda pre-installed (Mambaforge)
-FROM condaforge/mambaforge:latest
+# Use a Python base image
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
@@ -15,42 +15,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     ca-certificates \
-    tini \
+    git \
     wget \
-    unzip \
-    python3 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 
-# Copy configuration files and code
-COPY --chown=appuser:appuser . .
-
 # Create cache directory for ChromaDB and query cache
 RUN mkdir -p /app/cache/chroma /app/cache/usage && \
     chown -R appuser:appuser /app/cache
 
-# Create credentials directory for GCP
-RUN mkdir -p /app/credentials && \
-    chown -R appuser:appuser /app/credentials
+# Copy requirements file
+COPY requirements.txt .
 
-# Switch to non-root user
-USER appuser
-WORKDIR /app
-
-# Install Python dependencies directly with pip instead of relying on pixi
-# since pixi.toml only supports osx-64 platform
-# Use quotes around version constraints to avoid shell redirection issues
-RUN pip install --no-cache-dir \
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
     PyMuPDF \
     python-docx \
     tqdm \
-    google-generativeai \
     Pillow \
-    "chromadb>=0.4.22" \
+    "chromadb>=0.4.18" \
     python-dotenv \
     langchain \
     openai \
@@ -59,18 +46,23 @@ RUN pip install --no-cache-dir \
     uvicorn \
     pydantic \
     "tiktoken>=0.9.0,<0.10" \
-    "google-cloud-storage>=2.9.0" \
-    "google-api-core>=2.11.0"
+    "grpcio>=1.54.0" \
+    "protobuf>=4.22.3" \
+    grpcio-tools \
+    && pip install --upgrade pip
+
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Switch to non-root user
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:$PORT/api/health || exit 1
+    CMD curl -f http://localhost:$PORT/health || exit 1
 
 # Expose port
 EXPOSE $PORT
 
-# Use tini as init
-ENTRYPOINT ["/usr/bin/tini", "--"]
-
-# Run the application with uvicorn directly
-CMD ["python3", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application
+CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

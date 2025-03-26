@@ -14,16 +14,14 @@ from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from tqdm import tqdm
+from utils.env import get_chroma_dir, get_chunks_dir
 
 # Load environment variables
 load_dotenv()
 
 # Constants
-EMBEDDING_MODEL = "text-embedding-ada-002"
-CACHE_DIR = Path("cache/embeddings")
-CHROMA_PERSIST_DIR = Path("cache/chroma")
-TENANT_ID = os.getenv("TENANT_ID", "default")
-COLLECTION_NAME = f"legal_docs_{TENANT_ID}"
+EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "legal_docs")
 
 # Initialize OpenAI embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -32,44 +30,16 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
 )
 
 
-def get_cached_embedding(text: str, cache_file: Path) -> Optional[List[float]]:
-    """Retrieve cached embedding if it exists.
-
-    Args:
-        text: The text to get embeddings for
-        cache_file: Path to the cache file
-
-    Returns:
-        Cached embedding if it exists, None otherwise
-    """
-    if cache_file.exists():
-        with open(cache_file, "r", encoding="utf-8") as f:
-            cache: Dict[str, List[float]] = json.load(f)
-            return cache.get(text)
-    return None
-
-
-def save_embedding_cache(cache: Dict[str, List[float]], cache_file: Path) -> None:
-    """Save embeddings cache to disk.
-
-    Args:
-        cache: Dictionary mapping text to embeddings
-        cache_file: Path to save cache to
-    """
-    cache_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(cache_file, "w", encoding="utf-8") as f:
-        json.dump(cache, f)
-
-
-def process_chunks(chunks_dir: Path) -> None:
+def process_chunks(chunks_dir: Path, chroma_dir: Path) -> None:
     """Process all chunked documents and store their embeddings in Chroma.
 
     Args:
         chunks_dir: Directory containing chunked text files
+        chroma_dir: Directory to store ChromaDB database
     """
     # Initialize Chroma with settings
     chroma_client = chromadb.PersistentClient(
-        path=str(CHROMA_PERSIST_DIR),
+        path=str(chroma_dir),
         settings=Settings(
             anonymized_telemetry=False,
             allow_reset=True,
@@ -86,6 +56,13 @@ def process_chunks(chunks_dir: Path) -> None:
 
     # Process each chunked file
     chunk_files = list(chunks_dir.glob("chunked_*.txt"))
+
+    if not chunk_files:
+        print(f"No chunked files found in {chunks_dir}")
+        return
+
+    print(f"Found {len(chunk_files)} chunked files to process")
+
     for file_path in tqdm(chunk_files, desc="Processing files"):
         doc_id = file_path.stem.replace("chunked_", "")
 
@@ -114,7 +91,7 @@ def process_chunks(chunks_dir: Path) -> None:
                 print(f"Error processing batch: {e}")
                 continue
 
-    print(f"\nProcessing complete! Documents stored in Chroma at {CHROMA_PERSIST_DIR}")
+    print(f"\nProcessing complete! Documents stored in Chroma at {chroma_dir}")
 
 
 def main() -> None:
@@ -123,22 +100,17 @@ def main() -> None:
     Reads chunked documents from the specified directory and generates embeddings
     using OpenAI's API, storing them in a Chroma vector database.
     """
-    # Get chunked documents directory from environment with default
-    chunks_dir = os.getenv(
-        "CHUNKS_DIR", os.path.expanduser("~/Downloads/chunkedLegalDocs")
-    )
-    chunks_path = Path(chunks_dir)
-
-    if not chunks_path.exists():
-        print(f"Error: Chunks directory not found: {chunks_path}")
-        return
+    # Get directories from environment utils
+    chunks_dir = get_chunks_dir()
+    chroma_dir = get_chroma_dir()
 
     if not os.getenv("OPENAI_API_KEY"):
         print("Error: OPENAI_API_KEY environment variable not set")
         return
 
-    print(f"\nProcessing chunks from: {chunks_path}")
-    process_chunks(chunks_path)
+    print(f"\nProcessing chunks from: {chunks_dir}")
+    print(f"Storing embeddings in: {chroma_dir}")
+    process_chunks(chunks_dir, chroma_dir)
 
 
 if __name__ == "__main__":

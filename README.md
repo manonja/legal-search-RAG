@@ -13,13 +13,16 @@ A Retrieval-Augmented Generation (RAG) system designed for legal document search
 
 ## Development Options
 
-This project can be set up in two ways:
+This project can be set up in three ways:
 
 ### Option 1: Docker-based (Recommended for Quick Start)
 Ideal for quickly testing the application or for production-like environments.
 
 ### Option 2: Local Development
 Better for active development with hot reloading and direct access to services.
+
+### Option 3: Render.com Deployment
+For production deployment using Render.com.
 
 ## Option 1: Docker-based Development
 
@@ -34,32 +37,21 @@ Better for active development with hot reloading and direct access to services.
    cd legal-search-rag
    ```
 
-2. Set environment variables:
+2. Run the setup script:
    ```bash
-   cp api/.env.example api/.env
-   # Edit .env to add your OPENAI_API_KEY and GOOGLE_API_KEY (if using Gemini)
+   ./scripts/run_with_docker.sh
    ```
 
-3. Start the containers:
+3. Process your documents:
    ```bash
-   docker-compose -f shared/docker-compose.yml up -d
+   ./scripts/process_docs_docker.sh
    ```
 
-4. Process your documents:
-   ```bash
-   # Copy your documents
-   mkdir -p ~/Downloads/legaldocs
-   cp /path/to/your/legal/documents/*.pdf ~/Downloads/legaldocs/
-
-   # Process them
-   docker exec legal-search-api-default python process_docs.py
-   docker exec legal-search-api-default python chunk.py
-   docker exec legal-search-api-default python embeddings.py
-   ```
-
-5. Access the application:
+4. Access the application:
    - Frontend: http://localhost:3000
-   - API: http://localhost:8000/docs
+   - API: http://localhost:8001/docs
+
+For more details, see [DOCKER_SETUP.md](DOCKER_SETUP.md).
 
 ## Option 2: Local Development
 
@@ -109,15 +101,20 @@ Better for active development with hot reloading and direct access to services.
    - Frontend: http://localhost:3000
    - API: http://localhost:8000/docs
 
-## Cloud Deployment (Render.com)
+## Deployment to Render.com
 
-1. Connect your GitHub repository to Render
-2. Use the provided `render.yaml` blueprint
-3. Set required environment variables:
+This project includes a `render.yaml` Blueprint for easy deployment:
+
+1. Push your code to a Git repository
+2. Connect your GitHub repository to Render
+3. Deploy as a Blueprint using the provided `render.yaml` file
+4. Set required environment variables:
    - `OPENAI_API_KEY`
    - `GOOGLE_API_KEY` (optional)
-   - `GCP_PROJECT_ID` (optional)
-   - `GCS_BUCKET_NAME` (optional)
+
+After deployment, your services will be available at:
+- Frontend: https://legal-search-frontend.onrender.com
+- API: https://legal-search-api.onrender.com
 
 ## Usage
 
