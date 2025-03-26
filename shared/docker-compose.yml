@@ -1,39 +1,21 @@
-version: '3.8'
-
 services:
   api:
-    build: ./api
+    build: ../api
     image: legal-search-rag-api:${TENANT_ID:-default}
     container_name: legal-search-api-${TENANT_ID:-default}
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8001}:8000"
     env_file:
-      - ${ENV_FILE:-./api/.env}
+      - ${ENV_FILE:-../api/.env}
     environment:
       - PORT=8000
       - TENANT_ID=${TENANT_ID:-default}
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-key.json
     volumes:
       - legal_search_data:/app/cache
-      - ./api:/app
-      - ${GOOGLE_APPLICATION_CREDENTIALS:-/Users/manonjacquin/Downloads/legal-search-454723-9c632bace529.json}:/app/credentials/gcp-key.json
-    develop:
-      watch:
-        - action: sync+restart
-          path: ./api/api.py
-          target: /app/api.py
-        - action: sync+restart
-          path: ./api/api_modules
-          target: /app/api_modules
-        - action: sync+restart
-          path: ./api/utils
-          target: /app/utils
-        - action: sync+restart
-          path: ./api/middleware
-          target: /app/middleware
+      - ../api:/app
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -42,39 +24,20 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    command: ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
 
   frontend:
-    build: ./frontend
+    build: ../frontend
     image: legal-search-rag-frontend:${TENANT_ID:-default}
     container_name: legal-search-frontend-${TENANT_ID:-default}
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3000}:10000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8000}
-      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:${API_PORT:-8001}
+      - NODE_ENV=development
       - TENANT_ID=${TENANT_ID:-default}
     depends_on:
       - api
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  nginx:
-    image: nginx:alpine
-    container_name: legal-search-nginx-${TENANT_ID:-default}
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-    volumes:
-      - ./shared/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-      - ./nginx/logs:/var/log/nginx
-    depends_on:
-      - api
-      - frontend
     restart: unless-stopped
     logging:
       driver: "json-file"
