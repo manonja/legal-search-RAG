@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "legal-search-rag"
+version = "0.1.0"
+description = "Legal search RAG project"
+readme = "README.md"
+requires-python = ">=3.9,<3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Legal Search Team" }
+]
+
+dependencies = [
+    "PyMuPDF>=1.22.0",
+    "python-docx>=0.8.11",
+    "tqdm>=4.65.0",
+    "google-generativeai",
+    "Pillow>=9.5.0",
+    "chromadb>=0.4.22,<0.6.0",
+    "python-dotenv>=1.0.0",
+    "langchain>=0.0.235",
+    "openai>=1.1.0",
+    "tokenizers>=0.13.3",
+    "grpcio>=1.54.0",
+    "protobuf>=4.22.3",
+    "grpcio-tools>=1.54.0",
+    "googleapis-common-protos",
+    "google-api-core",
+    "google-cloud-storage>=3.1.0,<4",
+    "tiktoken>=0.9.0,<0.10",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.23.2",
+    "pydantic>=2.4.2",
+    "onnxruntime>=1.16.3",
+    "onnx",
+    "sentence-transformers>=2.2.2",
+    "chroma-hnswlib>=0.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "ruff>=0.11.2,<0.12",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

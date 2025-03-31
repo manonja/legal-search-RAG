@@ -1,5 +1,5 @@
 # Use a Python base image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
@@ -27,29 +27,15 @@ RUN useradd -m -u 1000 appuser && \
 RUN mkdir -p /app/cache/chroma /app/cache/usage && \
     chown -R appuser:appuser /app/cache
 
-# Copy requirements file
-COPY requirements.txt .
+# Install uv
+RUN curl -sSf https://astral.sh/uv/install.sh | sh && \
+    mv -f ~/.cargo/bin/uv /usr/local/bin/uv
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir \
-    PyMuPDF \
-    python-docx \
-    tqdm \
-    Pillow \
-    "chromadb>=0.4.18" \
-    python-dotenv \
-    langchain \
-    openai \
-    tokenizers \
-    fastapi \
-    uvicorn \
-    pydantic \
-    "tiktoken>=0.9.0,<0.10" \
-    "grpcio>=1.54.0" \
-    "protobuf>=4.22.3" \
-    grpcio-tools \
-    && pip install --upgrade pip
+# Copy project files
+COPY --chown=appuser:appuser pyproject.toml ./
+
+# Install dependencies with uv
+RUN uv pip install -e .
 
 # Copy application code
 COPY --chown=appuser:appuser . .
@@ -65,4 +51,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 EXPOSE $PORT
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

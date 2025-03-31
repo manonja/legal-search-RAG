@@ -54,11 +54,20 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from middleware.cost_control import CostControlMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-from utils.env import get_chroma_dir, get_chunks_dir, get_docs_root
-from utils.usage_db import init_usage_db, record_usage
+
+from app.api import api_router
+from app.core.config import (
+    API_DESCRIPTION,
+    API_PREFIX,
+    API_TITLE,
+    API_VERSION,
+    COLLECTION_NAME,
+    EMBEDDING_MODEL,
+)
+from app.utils.env import get_chroma_dir, get_chunks_dir, get_docs_root
+from app.utils.usage_db import init_usage_db, record_usage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -131,8 +140,8 @@ def initialize_chroma_client():
 
 # Initialize FastAPI app with metadata
 app = FastAPI(
-    title="Legal Document Search API",
-    description="API for searching legal documents using semantic similarity",
+    title=API_TITLE,
+    description=API_DESCRIPTION,
     version=API_VERSION,
     docs_url="/",  # Swagger UI at root endpoint
 )
@@ -146,8 +155,8 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-# Add cost control middleware
-app.add_middleware(CostControlMiddleware)
+# Include API router
+app.include_router(api_router, prefix=API_PREFIX)
 
 
 # Initialize usage database
@@ -382,7 +391,7 @@ async def search_documents(request: SearchQuery):
 
     except Exception as e:
         logger.error(f"Error during search: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/search", response_model=QueryResponse, tags=["Search"])
@@ -425,7 +434,7 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
 
         # Process results
         formatted_results = []
-        for idx, (doc, metadata, distance) in enumerate(
+        for _, (doc, metadata, distance) in enumerate(
             zip(documents, metadatas, distances)
         ):
             # Convert distance to similarity score (0 to 1)
@@ -568,7 +577,7 @@ async def rag_search(request: RAGQuery):
     except Exception as e:
         logger.error(f"Error during RAG search: {e}")
         logger.exception(e)  # Log full traceback for debugging
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 async def find_document(document_id: str) -> Path:
@@ -705,7 +714,7 @@ async def get_document(document_id: str) -> DocumentResponse:
 
 if __name__ == "__main__":
     port = int(os.getenv("API_PORT", 8000))
-    host = os.getenv("HOST", "0.0.0.0")
+    host = os.getenv("HOST", "127.0.0.1")  # Default to localhost instead of 0.0.0.0
 
     logger.info(f"Starting API server on {host}:{port}")
-    uvicorn.run("api:app", host=host, port=port, reload=True)
+    uvicorn.run("app.main:app", host=host, port=port, reload=True)
