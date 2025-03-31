@@ -39,12 +39,49 @@ npm run build
 npm run start
 ```
 
-### Docker
+### Docker Build & Deployment
+
+The project includes a Makefile to simplify Docker image building and deployment to GCP Cloud Run.
+
+#### Prerequisites
+
+- Docker installed locally
+- GCP CLI configured for your project
+- Access to the specified artifact registries
+
+#### Available Make Commands
 
 ```bash
-docker build -t legal-search-frontend .
-docker run -p 3000:3000 -e NEXT_PUBLIC_API_URL=http://localhost:8000 legal-search-frontend
+# Show all available commands
+make help
+
+# Build for different environments (local is default if ENV not specified)
+make build
+make ENV=local build
+make ENV=dev build
+make ENV=prod build
+
+# Push to registry (for dev and prod only)
+make ENV=dev push
+make ENV=prod push
+
+# Run the local container
+make run
+# or
+make ENV=local run
+
+# Remove local Docker images
+make clean
 ```
+
+#### Version Management
+
+The Docker image versioning is controlled by the `VERSION` file in the project root. Update this file before building production images.
+
+#### Artifact Registry Paths
+
+- Dev: `us-central1-docker.pkg.dev/maja-dev/maja-dev/`
+- Prod: `us-central1-docker.pkg.dev/maja-prod/maja-prod/`
 
 ## Pages
 
