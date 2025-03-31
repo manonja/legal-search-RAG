@@ -12,14 +12,14 @@ license = { text = "MIT" }
 authors = [
     { name = "Legal Search Team" }
 ]
-
 dependencies = [
+    "numpy>=1.0.0,<2.0.0",
     "PyMuPDF>=1.22.0",
     "python-docx>=0.8.11",
     "tqdm>=4.65.0",
     "google-generativeai",
     "Pillow>=9.5.0",
-    "chromadb>=0.4.22,<0.6.0",
+    "chromadb>=0.6.3,<0.7.0",
     "python-dotenv>=1.0.0",
     "langchain>=0.0.235",
     "openai>=1.1.0",
@@ -39,6 +39,11 @@ dependencies = [
     "sentence-transformers>=2.2.2",
     "chroma-hnswlib>=0.7.1",
 ]
+
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [project.optional-dependencies]
 dev = [
