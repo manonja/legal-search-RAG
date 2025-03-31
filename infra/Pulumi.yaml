@@ -1,0 +1,10 @@
+name: maja-infra
+description: Maja legal search GCP deployment
+runtime:
+  name: python
+  options:
+    toolchain: uv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: gcp-python
