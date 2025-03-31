@@ -18,7 +18,7 @@ def get_env_file_path() -> Path:
     Returns:
         Path: Path to the .env file.
     """
-    return Path(__file__).parent.parent / ".env"
+    return Path(__file__).parent.parent.parent / ".env"
 
 
 def validate_env_vars() -> list[str]:

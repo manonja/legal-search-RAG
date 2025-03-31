@@ -222,3 +222,6 @@ docker-volumes/
 
 # Pixi
 .pixi/
+
+# Data files
+data/

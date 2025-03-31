@@ -14,32 +14,39 @@ The API backend for the Legal Document Search RAG system, built with FastAPI, Ch
 
 ### Local Development
 
-1. Install dependencies:
+1. Install uv (if not already installed):
    ```bash
-   pixi install
-   # or
-   pip install -r requirements.txt
+   curl -sSf https://astral.sh/uv/install.sh | sh
    ```
 
-2. Set up environment variables:
+2. Install dependencies (using pyproject.toml):
+   ```bash
+   # Install regular dependencies
+   make install
+
+   # Install development dependencies
+   make install-dev
+   ```
+
+3. Set up environment variables:
    ```bash
    cp .env.example .env
    # Edit .env to add your API keys
    ```
 
-3. Process documents:
+4. Process documents:
    ```bash
-   python process_docs.py
-   python chunk.py
-   python embeddings.py
+   make process-docs
+   make chunk-docs
+   make embed-docs
    ```
 
-4. Start the API server:
+5. Start the API server:
    ```bash
-   python -m uvicorn api:app --reload --host 0.0.0.0 --port 8000
+   make serve-api
    ```
 
-5. Access the API at http://localhost:8000
+6. Access the API at http://localhost:8000
 
 ### Docker
 
@@ -71,11 +78,40 @@ Key environment variables:
 
 ## Project Structure
 
-- `api.py`: Main FastAPI application
-- `process_docs.py`: Document processing
-- `chunk.py`: Text chunking
-- `embeddings.py`: Generate embeddings
-- `query.py`: Search implementation
-- `api_modules/`: API endpoint modules
-- `middleware/`: FastAPI middleware
-- `utils/`: Utility functions
+```
+app/
+├── api/                  # API endpoints
+│   └── endpoints/        # API endpoint modules
+├── core/                 # Core application code
+│   └── config.py         # Configuration settings
+├── db/                   # Database utilities
+├── models/               # Data models
+├── schemas/              # Pydantic schemas
+├── services/             # Business logic services
+│   ├── chunk.py          # Text chunking
+│   ├── embeddings.py     # Generate embeddings
+│   ├── process_docs.py   # Document processing
+│   └── query.py          # Search implementation
+├── utils/                # Utility functions
+│   ├── env.py            # Environment utilities
+│   └── usage_db.py       # Usage tracking
+└── main.py               # Main FastAPI application
+```
+
+## Development
+
+- **Linting**: `make lint`
+- **Formatting**: `make format`
+- **Check Formatting**: `make check-format`
+
+## Dependency Management
+
+This project uses:
+- **pyproject.toml**: For defining all project dependencies and metadata (PEP 621 standard)
+- **uv**: Fast Python package installer and resolver
+- **Python 3.11**: Required for compatibility with all dependencies
+
+To lock dependencies for consistent installations:
+```bash
+make lock
+```

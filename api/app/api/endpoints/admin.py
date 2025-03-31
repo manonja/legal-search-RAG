@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 
-from utils.usage_db import (
+from app.core.config import ADMIN_API_KEY
+from app.utils.usage_db import (
     get_daily_usage,
     get_monthly_usage,
     get_quota_info,
@@ -23,7 +24,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 # API key security
-API_KEY = os.getenv("ADMIN_API_KEY", "1234")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
@@ -39,7 +39,7 @@ def get_api_key(api_key_header: str = Security(api_key_header)) -> str:
     Raises:
         HTTPException: If API key is invalid
     """
-    if not api_key_header or api_key_header != API_KEY:
+    if not api_key_header or api_key_header != ADMIN_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key",

@@ -14,7 +14,7 @@ import docx  # python-docx package
 import fitz  # PyMuPDF
 import google.generativeai as genai  # type: ignore
 from tqdm import tqdm  # type: ignore
-from utils.env import get_google_api_key, get_input_dir, get_output_dir
+from app.utils.env import get_google_api_key, get_input_dir, get_output_dir
 
 # Configure logging
 logging.basicConfig(

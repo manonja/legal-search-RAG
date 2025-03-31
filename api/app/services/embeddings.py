@@ -14,14 +14,11 @@ from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from tqdm import tqdm
-from utils.env import get_chroma_dir, get_chunks_dir
+from app.utils.env import get_chroma_dir, get_chunks_dir
+from app.core.config import EMBEDDING_MODEL, COLLECTION_NAME
 
 # Load environment variables
 load_dotenv()
-
-# Constants
-EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "legal_docs")
 
 # Initialize OpenAI embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
