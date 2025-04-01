@@ -1,10 +1,12 @@
-"""Environment variable utilities for configuration management."""
+"""Environment utility functions.
+
+This module provides utility functions for handling environment variables and paths.
+"""
 
 import logging
 import os
 from pathlib import Path
-
-from dotenv import load_dotenv
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +54,6 @@ def load_env(validate: bool = True) -> None:
             "Please copy .env.example to .env and configure your environment variables."
         )
 
-    load_dotenv(env_path)
-
     if validate:
         missing_vars = validate_env_vars()
         if missing_vars:
@@ -82,98 +82,90 @@ def get_google_api_key() -> str:
     return api_key
 
 
-def get_docs_root() -> Path:
-    """Get the root directory for document storage.
+def get_data_root() -> Path:
+    """Get the data root directory.
 
     Returns:
-        Path: Expanded absolute path to the docs root directory
+        Path to the data root directory
     """
-    docs_root = os.getenv("DOCS_ROOT")
-
-    if not docs_root:
-        # Default to a documents directory in the user's home
-        docs_root = os.path.expanduser("~/Downloads/legaldocs_store")
-    else:
-        # Expand user and environment variables
-        docs_root = os.path.expanduser(docs_root)
-
-    # Create the directory if it doesn't exist
-    os.makedirs(docs_root, exist_ok=True)
-
-    return Path(docs_root)
+    settings = get_settings()
+    return Path(settings.DATA_ROOT).expanduser()
 
 
 def get_input_dir() -> Path:
-    """Get the input directory for raw document files.
+    """Get the input directory.
 
     Returns:
-        Path: Expanded absolute path to the input directory
+        Path to the input directory
     """
-    input_dir = os.getenv("INPUT_DIR")
-
-    if not input_dir:
-        # Default to a subdirectory within the docs root
-        input_dir = os.path.expanduser("~/Downloads/legaldocs_input")
-    else:
-        # Expand user and environment variables
-        input_dir = os.path.expanduser(input_dir)
-
-    # Create the directory if it doesn't exist
-    os.makedirs(input_dir, exist_ok=True)
-
-    return Path(input_dir)
+    settings = get_settings()
+    return Path(settings.INPUT_DIR).expanduser()
 
 
 def get_output_dir() -> Path:
-    """Get the output directory for processed documents.
+    """Get the output directory.
 
     Returns:
-        Path: Expanded absolute path to the output directory
+        Path to the output directory
     """
-    output_dir = os.getenv("OUTPUT_DIR")
-
-    if not output_dir:
-        # Default to a subdirectory within the docs root
-        output_dir = os.path.expanduser("~/Downloads/legaldocs_processed")
-    else:
-        # Expand user and environment variables
-        output_dir = os.path.expanduser(output_dir)
-
-    # Create the directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-
-    return Path(output_dir)
-
-
-def get_chunks_dir() -> Path:
-    """Get the directory where chunked documents are stored.
-
-    Returns:
-        Path to the chunked documents directory
-    """
-    chunks_dir = os.getenv(
-        "CHUNKS_DIR", os.path.expanduser("~/Downloads/legaldocs_chunks")
-    )
-
-    # Create directory if it doesn't exist
-    os.makedirs(chunks_dir, exist_ok=True)
-
-    logger.info(f"Using chunks directory: {chunks_dir}")
-    return Path(chunks_dir)
+    settings = get_settings()
+    return Path(settings.OUTPUT_DIR).expanduser()
 
 
 def get_chroma_dir() -> Path:
-    """Get the ChromaDB data directory.
+    """Get the ChromaDB directory.
 
     Returns:
-        Path to the ChromaDB data directory
+        Path to the ChromaDB directory
     """
-    chroma_dir = os.getenv(
-        "CHROMA_DATA_DIR", os.path.expanduser("~/Downloads/legal_chroma")
-    )
+    settings = get_settings()
+    return Path(settings.CHROMA_DATA_DIR).expanduser()
 
-    # Create directory if it doesn't exist
-    os.makedirs(chroma_dir, exist_ok=True)
 
-    logger.info(f"Using ChromaDB directory: {chroma_dir}")
-    return Path(chroma_dir)
+def get_chunks_dir() -> Path:
+    """Get the chunks directory.
+
+    Returns:
+        Path to the chunks directory
+    """
+    settings = get_settings()
+    return Path(settings.CHUNKS_DIR).expanduser()
+
+
+def get_tenant_root() -> Path:
+    """Get the tenant root directory.
+
+    Returns:
+        Path to the tenant root directory
+    """
+    settings = get_settings()
+    return Path(settings.TENANT_ROOT)
+
+
+def get_cache_dir() -> Path:
+    """Get the cache directory.
+
+    Returns:
+        Path to the cache directory
+    """
+    settings = get_settings()
+    return Path(settings.CACHE_DIR)
+
+
+def ensure_directories() -> None:
+    """Ensure all required directories exist.
+
+    Creates any missing directories that are required for the application to function.
+    """
+    directories = [
+        get_data_root(),
+        get_input_dir(),
+        get_output_dir(),
+        get_chroma_dir(),
+        get_chunks_dir(),
+        get_tenant_root(),
+        get_cache_dir(),
+    ]
+
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)

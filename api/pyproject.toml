@@ -17,7 +17,6 @@ dependencies = [
     "python-docx>=0.8.11",
     "google-generativeai",
     "chromadb>=0.6.3,<0.7.0",
-    "python-dotenv>=1.0.0",
     "langchain>=0.0.235",
     "openai>=1.1.0",
     "google-cloud-storage>=3.1.0,<4",

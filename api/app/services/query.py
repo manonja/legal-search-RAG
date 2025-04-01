@@ -11,10 +11,10 @@ from typing import Any, Dict, List, Optional
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
-from dotenv import load_dotenv
+from app.core.config import get_settings
 
-# Load environment variables
-load_dotenv()
+# Get application settings
+settings = get_settings()
 
 # Constants
 EMBEDDING_MODEL = "text-embedding-ada-002"

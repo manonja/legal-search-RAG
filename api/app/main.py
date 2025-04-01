@@ -59,6 +59,9 @@ from pydantic import BaseModel, Field
 import sentry_sdk
 
 from app.api import api_router
+from app.routers.documents.upload import router as documents_router
+from app.routers.documents.query import router as query_router
+from app.routers.health import router as health_router
 from app.core.config import (
     API_DESCRIPTION,
     API_PREFIX,
@@ -66,9 +69,9 @@ from app.core.config import (
     API_VERSION,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
+    get_settings,
 )
 from app.utils.env import get_chroma_dir, get_chunks_dir, get_docs_root
-from app.utils.usage_db import init_usage_db, record_usage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -149,25 +152,31 @@ if not os.getenv("TESTING"):
         send_default_pii=True,
     )
 
-# Initialize FastAPI app with metadata
+# Get application settings
+settings = get_settings()
+
+# Initialize FastAPI app
 app = FastAPI(
-    title=API_TITLE,
-    description=API_DESCRIPTION,
-    version=API_VERSION,
-    docs_url="/",  # Swagger UI at root endpoint
+    title=settings.API_TITLE,
+    description=settings.API_DESCRIPTION,
+    version=settings.API_VERSION,
+    docs_url=f"{settings.API_PREFIX}/docs",
+    redoc_url=f"{settings.API_PREFIX}/redoc",
 )
 
-# Add CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for local development
+    allow_origins=["*"],  # In production, replace with specific origins
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Include API router
-app.include_router(api_router, prefix=API_PREFIX)
+# Include routers
+app.include_router(health_router, prefix=settings.API_PREFIX)
+app.include_router(documents_router, prefix=f"{settings.API_PREFIX}/documents")
+app.include_router(query_router, prefix=f"{settings.API_PREFIX}/query")
 
 
 # Initialize usage database
@@ -175,15 +184,52 @@ app.include_router(api_router, prefix=API_PREFIX)
 async def startup_event():
     """Initialize components on application startup."""
     try:
-        # Initialize usage database
-        init_usage_db()
-        logger.info("Usage database initialized")
+        # Get settings
+        settings = get_settings()
 
-        # Initialize cache directories
-        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-        logger.info(f"Cache directory created at {os.path.dirname(CACHE_PATH)}")
+        # Create necessary directories
+        settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        settings.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+        settings.CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
+
+        logger.info("Created necessary directories")
+
+        # Initialize Chroma client
+        client = chromadb.PersistentClient(
+            path=str(settings.CHROMA_DIR),
+            settings=Settings(
+                anonymized_telemetry=False,
+                allow_reset=True,
+                is_persistent=True,
+            ),
+        )
+
+        # Initialize OpenAI embedding function
+        openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+            api_key=settings.OPENAI_API_KEY,
+            model_name=settings.EMBEDDING_MODEL,
+        )
+
+        # Create or get collection
+        try:
+            collection = client.get_collection(
+                settings.COLLECTION_NAME, embedding_function=openai_ef
+            )
+            logger.info(
+                f"Collection '{settings.COLLECTION_NAME}' exists with "
+                f"{collection.count()} embeddings"
+            )
+        except (ValueError, InvalidCollectionException):
+            collection = client.create_collection(
+                name=settings.COLLECTION_NAME,
+                embedding_function=openai_ef,
+                metadata={"hnsw:space": "cosine"},
+            )
+            logger.info(f"Created new collection '{settings.COLLECTION_NAME}'")
+
     except Exception as e:
         logger.error(f"Error during initialization: {e}")
+        raise
 
 
 # Initialize OpenAI client

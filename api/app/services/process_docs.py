@@ -7,14 +7,12 @@ It handles document parsing, text extraction, and prepare vector storage.
 
 import logging
 import os
-import tempfile
 from typing import List, Tuple
 
 import docx  # python-docx package
 import fitz  # PyMuPDF
-import google.generativeai as genai  # type: ignore
 from tqdm import tqdm  # type: ignore
-from app.utils.env import get_google_api_key, get_input_dir, get_output_dir
+from app.utils.env import get_input_dir, get_output_dir
 
 # Configure logging
 logging.basicConfig(
@@ -22,18 +20,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-
-def configure_gemini():
-    """Configure and initialize the Gemini model.
-
-    Returns:
-        GenerativeModel: Configured Gemini model instance ready for text
-        generation.
-    """
-    api_key = get_google_api_key()
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-1.5-flash")
 
 
 def extract_pdf_text(file_path):
@@ -60,14 +46,12 @@ def extract_docx_text(file_path):
 
 
 def process_documents(input_dir: str, output_dir: str) -> None:
-    """Process legal documents and extract their content using Gemini.
+    """Process legal documents and extract their content.
 
     Args:
         input_dir: Directory containing the input PDF and DOCX files.
         output_dir: Directory where the processed text files will be saved.
     """
-    model = configure_gemini()
-
     # Create output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -102,20 +86,10 @@ def process_documents(input_dir: str, output_dir: str) -> None:
             logger.warning(f"No text extracted from {filename}. Skipping...")
             continue
 
-        # Build the prompt for the Gemini API
-        prompt = (
-            "Extract full text from this legal document. "
-            "Preserve section numbers, article headers, and numbered paragraphs. "
-            "Include any relevant metadata such as parties involved, "
-            "jurisdiction, and effective dates.\n\n"
-            f"{file_text}"
-        )
-
         try:
-            # Send the prompt to the Gemini API for further processing
-            response = model.generate_content(prompt)
+            # Save the extracted text
             with open(output_file, "w", encoding="utf-8") as f:
-                f.write(response.text)
+                f.write(file_text)
             logger.info(f"Processed: {filename}")
 
         except Exception as e:
@@ -127,7 +101,7 @@ def main():
 
     This function orchestrates the document processing workflow:
     1. Gets input/output directories from environment variables
-    2. Processes documents using Gemini API
+    2. Processes documents
     """
     # Get input/output directories from environment variables
     input_dir = get_input_dir()

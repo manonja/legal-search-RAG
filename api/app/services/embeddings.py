@@ -12,18 +12,17 @@ from typing import Dict, List, Optional
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
-from dotenv import load_dotenv
 from tqdm import tqdm
 from app.utils.env import get_chroma_dir, get_chunks_dir
-from app.core.config import EMBEDDING_MODEL, COLLECTION_NAME
+from app.core.config import get_settings
 
-# Load environment variables
-load_dotenv()
+# Get application settings
+settings = get_settings()
 
 # Initialize OpenAI embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    model_name=EMBEDDING_MODEL,
+    api_key=settings.OPENAI_API_KEY,
+    model_name=settings.EMBEDDING_MODEL,
 )
 
 
@@ -46,7 +45,7 @@ def process_chunks(chunks_dir: Path, chroma_dir: Path) -> None:
 
     # Create or get collection with OpenAI embedding function
     collection = chroma_client.get_or_create_collection(
-        name=COLLECTION_NAME,
+        name=settings.COLLECTION_NAME,
         metadata={"description": "Legal document embeddings"},
         embedding_function=openai_ef,
     )
@@ -101,7 +100,7 @@ def main() -> None:
     chunks_dir = get_chunks_dir()
     chroma_dir = get_chroma_dir()
 
-    if not os.getenv("OPENAI_API_KEY"):
+    if not settings.OPENAI_API_KEY:
         print("Error: OPENAI_API_KEY environment variable not set")
         return
 
