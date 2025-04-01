@@ -1,27 +1,16 @@
-.PHONY: install install-dev lint format check-format process-docs chunk-docs embed-docs serve-api lock check-deps
+.PHONY: install install-dev lint format check-format process-docs chunk-docs embed-docs serve-api lock
 
 # Install dependencies using uv
-install: lock
-	echo "Installing from uv.lock and pyproject.toml..."
-	uv pip sync pyproject.toml -v
+install:
 	uv pip install -e .
-	@echo "Checking for missing dependencies..."
-	@make check-deps
 
 # Install development dependencies
-install-dev: install
+install-dev:
 	uv pip install -e ".[dev]"
 
 # Lock dependencies
 lock:
 	./scripts/lock-dependencies.sh
-
-# Check if dependencies are properly installed
-check-deps:
-	@echo "Verifying that chromadb is installed..."
-	@python -c "import chromadb; print(f'chromadb version: {chromadb.__version__}')" || echo "chromadb is not installed properly!"
-	@echo "Verifying that other key packages are installed..."
-	@python -c "import langchain, openai, tiktoken, fastapi, uvicorn, pydantic, sentence_transformers; print('All key packages are installed')" || echo "Some packages are missing!"
 
 # Lint the codebase
 lint:

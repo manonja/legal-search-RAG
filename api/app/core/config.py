@@ -1,26 +1,30 @@
-"""Core configuration settings for the application."""
+"""Configuration settings for the application."""
 
 import os
 from pathlib import Path
 
-# API settings
+# API Configuration
+API_TITLE = "Legal Search RAG API"
+API_DESCRIPTION = "API for legal document search and RAG system"
 API_VERSION = "1.0.0"
-API_TITLE = "Legal Document Search API"
-API_DESCRIPTION = "API for searching legal documents using semantic similarity"
 API_PREFIX = "/api"
 
-# Model settings
-EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+# Collection Configuration
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "legal_docs")
 
-# Cache settings
-CACHE_PATH = os.path.join(os.path.dirname(__file__), "../../cache", "query_cache.json")
+# Embedding Model Configuration
+EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
 
-# API key settings
-ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "1234")
+# Document Processing Configuration
+DOCUMENTS_DIR = os.getenv(
+    "DOCUMENTS_DIR", os.path.join(os.path.dirname(__file__), "..", "..", "data")
+)
 
+# Cache Configuration
+CACHE_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "cache", "query_cache.json"
+)
 
-# Directory settings
-def get_app_dir() -> Path:
-    """Get the application directory."""
-    return Path(__file__).parent.parent.parent.absolute()
+# Ensure directories exist
+os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)

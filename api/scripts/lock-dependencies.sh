@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to lock dependencies using uv native lock
+# Script to lock dependencies using uv
 
 echo "Locking dependencies using uv..."
 
@@ -15,14 +15,8 @@ if [[ "$PYTHON_VERSION" == "3.12" ]]; then
     echo "Installation may fail or behave unexpectedly with Python 3.12."
 fi
 
-# Use uv lock to generate uv.lock with all extras
-echo "Generating uv.lock from pyproject.toml..."
-uv lock --upgrade  --verbose
+# Use highest resolution mode
+echo "Using highest resolution mode for dependencies..."
+uv pip compile pyproject.toml --resolution=highest -o requirements-lock.txt
 
-# Verify lock file was generated
-if [ ! -f "uv.lock" ]; then
-    echo "Error: Failed to generate uv.lock file."
-    exit 1
-fi
-
-echo "Dependencies locked successfully in uv.lock"
+echo "Dependencies locked successfully in requirements-lock.txt"

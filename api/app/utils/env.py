@@ -177,9 +177,3 @@ def get_chroma_dir() -> Path:
 
     logger.info(f"Using ChromaDB directory: {chroma_dir}")
     return Path(chroma_dir)
-
-
-# Function to indicate GCP is not configured for local dev
-def is_gcp_configured():
-    """Check if GCP is configured in the environment."""
-    return False

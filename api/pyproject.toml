@@ -34,7 +34,7 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.23.2",
     "pydantic>=2.4.2",
-    "onnxruntime>=1.16.3",
+    "onnxruntime>=1.17.0",
     "onnx",
     "sentence-transformers>=2.2.2",
     "chroma-hnswlib>=0.7.1",
@@ -50,6 +50,10 @@ packages = ["app"]
 dev = [
     "pre-commit",
     "ruff>=0.11.2,<0.12",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.1",
+    "httpx>=0.25.0",
+    "pytest-cov>=4.1.0",
 ]
 
 [tool.hatch.metadata]

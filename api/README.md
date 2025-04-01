@@ -8,7 +8,6 @@ The API backend for the Legal Document Search RAG system, built with FastAPI, Ch
 - **Vector Search**: Semantic search using ChromaDB
 - **RAG Implementation**: LLM-powered question answering
 - **Cost Control**: Token counting and usage monitoring
-- **Cloud Storage**: AWS S3 and GCP integration
 
 ## Quick Start
 
@@ -69,9 +68,6 @@ Key environment variables:
 
 - `OPENAI_API_KEY`: Your OpenAI API key
 - `GOOGLE_API_KEY`: Your Google API key (optional, for Gemini)
-- `USE_GCP_STORAGE`: Set to 'true' to use GCP
-- `GCP_PROJECT_ID`: Your GCP project ID
-- `GCS_BUCKET_NAME`: Your GCS bucket name
 - `DOCUMENTS_DIR`: Path to documents directory
 - `LIMIT_TOKENS_PER_MINUTE`: Token rate limit
 - `LIMIT_TOKENS_PER_DAY`: Daily token limit

@@ -51,11 +51,12 @@ from chromadb.config import Settings
 from chromadb.errors import InvalidCollectionException
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
+import sentry_sdk
 
 from app.api import api_router
 from app.core.config import (
@@ -139,12 +140,14 @@ def initialize_chroma_client():
     )
 
 
-sentry_sdk.init(
-    dsn=SENTRY_DSN,
-    # Add data like request headers and IP for users,
-    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-    send_default_pii=True,
-)
+# Initialize Sentry only if not in test environment
+if not os.getenv("TESTING"):
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        # Add data like request headers and IP for users,
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=True,
+    )
 
 # Initialize FastAPI app with metadata
 app = FastAPI(
@@ -718,6 +721,40 @@ async def get_document(document_id: str) -> DocumentResponse:
         raise HTTPException(
             status_code=500, detail=f"Failed to retrieve document: {str(e)}"
         ) from e
+
+
+@app.post("/api/documents/upload")
+async def upload_document(file: UploadFile) -> Dict[str, Any]:
+    """Upload a document to the system.
+
+    Args:
+        file: The document file to upload
+
+    Returns:
+        Dict containing upload status and document ID
+    """
+    try:
+        # Read file content
+        content = await file.read()
+
+        # Save file to processed docs directory
+        docs_root = get_docs_root()
+        docs_root.mkdir(parents=True, exist_ok=True)
+        file_path = docs_root / file.filename
+
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        # Process document (you might want to add more processing here)
+        # For now, we'll just save it
+
+        return {
+            "message": "Document uploaded successfully",
+            "document_id": file.filename,
+        }
+    except Exception as e:
+        logger.error(f"Error uploading document: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":
