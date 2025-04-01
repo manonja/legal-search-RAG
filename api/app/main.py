@@ -109,6 +109,7 @@ DOCUMENTS_DIR = os.getenv(
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "cache", "query_cache.json")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "legal_docs")
 API_VERSION = "1.0.0"
+SENTRY_DSN = os.getenv("SENTRY_DSN")
 
 # Type variables
 T = TypeVar("T", bound=BaseModel)
@@ -137,6 +138,13 @@ def initialize_chroma_client():
         ),
     )
 
+
+sentry_sdk.init(
+    dsn=SENTRY_DSN,
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 
 # Initialize FastAPI app with metadata
 app = FastAPI(

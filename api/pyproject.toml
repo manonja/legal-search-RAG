@@ -38,6 +38,7 @@ dependencies = [
     "onnx",
     "sentence-transformers>=2.2.2",
     "chroma-hnswlib>=0.7.1",
+    "sentry-sdk[fastapi]>=2.25.0"
 ]
 
 
