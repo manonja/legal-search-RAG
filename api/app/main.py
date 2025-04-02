@@ -14,6 +14,7 @@ os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
 
 # Patch sys.modules to prevent OpenTelemetry imports from failing
 import sys
+from contextlib import asynccontextmanager
 
 
 class DisabledModule:
@@ -92,6 +93,22 @@ if not os.getenv("TESTING"):
         send_default_pii=True,
     )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle application lifespan events.
+
+    This replaces the deprecated on_event handlers.
+    """
+    # Startup: initialize components
+    await initialize_application()
+
+    yield
+
+    # Shutdown: cleanup if needed
+    # No cleanup needed at the moment
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.API_TITLE,
@@ -100,6 +117,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 # Configure CORS
@@ -118,12 +136,6 @@ app.include_router(documents_router, prefix=settings.API_PREFIX)
 app.include_router(query_router, prefix=settings.API_PREFIX)
 app.include_router(search_router, prefix=settings.API_PREFIX)
 app.include_router(document_router, prefix=settings.API_PREFIX)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize components on application startup."""
-    await initialize_application()
 
 
 if __name__ == "__main__":
