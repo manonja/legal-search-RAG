@@ -37,7 +37,6 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
             timeout="300s",
             service_account=service_account.email,
             execution_environment="EXECUTION_ENVIRONMENT_GEN2",
-            startup_cpu_boost=True,  # Enable CPU burst at startup
             containers=[
                 cloudrunv2.ServiceTemplateContainerArgs(
                     image=pulumi.Output.concat(
@@ -92,15 +91,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             ),
                         ),
                         # Data directories
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(name="DATA_ROOT", value="/data"),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="INPUT_DIR", value="/data/input"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="OUTPUT_DIR", value="/data/processed"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="CHUNKS_DIR", value="/data/chunks"
+                            name="DATA_DIR", value="/data/data"
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="CHROMA_DATA_DIR", value="/data/chroma"
@@ -108,35 +100,12 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="COLLECTION_NAME", value="legal_docs"
                         ),
-                        # Tenant settings
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="TENANT_ROOT", value="/data/tenants/default"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="CACHE_DIR", value="/data/tenants/default/cache"
-                        ),
                         # Model settings
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="OPENAI_MODEL", value="gpt-4-turbo"
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="OPENAI_EMBEDDING_MODEL", value="text-embedding-3-small"
-                        ),
-                        # API settings
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(name="HOST", value="0.0.0.0"),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(name="API_PORT", value="8000"),
-                        # Cost control
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="OPENAI_MONTHLY_BUDGET", value="30"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="MAX_QUERIES_PER_MONTH", value="100"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="DEFAULT_MODEL", value="gpt-3.5-turbo"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="ENABLE_COST_WARNINGS", value="true"
                         ),
                         # Application settings
                         cloudrunv2.ServiceTemplateContainerEnvArgs(name="LOG_LEVEL", value="INFO"),
