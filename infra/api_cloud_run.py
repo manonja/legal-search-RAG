@@ -78,7 +78,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="GOOGLE_API_KEY",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="google-api-key", version="latest"
+                                    secret="google-gemini-api-key", version="latest"
                                 )
                             ),
                         ),
@@ -133,7 +133,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                     name="legal-data-bucket",
                     gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
                         bucket=chroma_bucket.name,
-                        mount_options=["implicit_dirs", "file_mode=777", "dir_mode=777"],
+                        read_only=False,
                     ),
                 ),
             ],
@@ -190,6 +190,14 @@ def grant_secret_access(sa):
     secretmanager.SecretIamMember(
         "openai-api-key-access",
         secret_id="projects/952577461734/secrets/openai-api-key",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access to Google Gemini API key secret
+    secretmanager.SecretIamMember(
+        "google-gemini-api-key-access",
+        secret_id="projects/952577461734/secrets/google-gemini-api-key",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
