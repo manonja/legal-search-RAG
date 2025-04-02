@@ -28,6 +28,21 @@ sys.path.insert(0, str(project_root))
 # Set testing environment variable
 os.environ["TESTING"] = "true"
 
+# Explicitly disable Sentry for tests
+os.environ["SENTRY_DSN"] = ""
+
+# Disable Sentry client if it's initialized
+try:
+    import sentry_sdk
+
+    # Initialize with empty DSN to disable
+    sentry_sdk.init(dsn="")
+except ImportError as e:
+    # Log using print since logger might not be configured yet
+    print(f"Sentry SDK not installed, no need to disable: {e}")
+except Exception as e:
+    print(f"Error while disabling Sentry SDK: {e}")
+
 # Get settings
 settings = get_settings()
 
@@ -139,3 +154,23 @@ from tests.fixtures.document_fixtures import (
     mock_document_not_found,
     mock_process_uploaded_document,
 )
+
+
+@pytest.fixture(autouse=True)
+def disable_sentry():
+    """Disable Sentry SDK for all tests."""
+    try:
+        import sentry_sdk
+
+        # Initialize with an empty DSN to disable Sentry
+        sentry_sdk.init(dsn="")
+
+        yield
+
+    except ImportError as e:
+        # Sentry not installed, nothing to do
+        print(f"Sentry SDK not available, skipping disable: {e}")
+        yield
+    except Exception as e:
+        print(f"Error in disable_sentry fixture: {e}")
+        yield
