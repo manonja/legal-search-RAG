@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 # Required environment variables
 REQUIRED_ENV_VARS = ["GOOGLE_API_KEY", "OPENAI_API_KEY"]
 
+# Read version from VERSION file
+ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+version_file = ROOT_DIR / "VERSION"
+with open(version_file, "r") as f:
+    VERSION = f.read().strip()
+
 
 class Settings(BaseSettings):
     """Application settings.
@@ -26,7 +32,7 @@ class Settings(BaseSettings):
     # API Settings
     API_TITLE: str = "Legal Document RAG API"
     API_DESCRIPTION: str = "API for legal document retrieval and question answering"
-    API_VERSION: str = "1.0.0"
+    API_VERSION: str = VERSION
     API_PREFIX: str = "/api"
     API_TOKEN: Optional[str] = None
 

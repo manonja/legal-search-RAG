@@ -1,5 +1,7 @@
 """Module for setting up Cloud Run service for the Legal Search RAG API"""
 
+import os
+
 import pulumi
 from pulumi_gcp import cloudrunv2, secretmanager, serviceaccount, storage
 
@@ -17,6 +19,13 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
     Returns:
         The created Cloud Run service
     """
+    # Read version from file
+    version_file = f"VERSION-api_cloud_run-{stack}"
+    version = "latest"
+    if os.path.exists(version_file):
+        with open(version_file, "r") as f:
+            version = f.read().strip()
+
     # Create service account for the Cloud Run service
     service_account = create_service_account(stack, chroma_bucket)
 
@@ -45,7 +54,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         docker_repository.project,
                         "/",
                         docker_repository.repository_id,
-                        "/legal-search-api:latest",
+                        "/legal-search-api:",
+                        version,
                     ),
                     resources=cloudrunv2.ServiceTemplateContainerResourcesArgs(
                         limits={"memory": "2Gi", "cpu": "1"},

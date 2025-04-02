@@ -4,7 +4,7 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 WORKDIR /app
 
 # Copy all necessary files for installation
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md VERSION ./
 
 # Set UV to use system Python
 ENV UV_SYSTEM_PYTHON=1
@@ -17,6 +17,18 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 # Set working directory
 WORKDIR /app
+
+# Add version label from VERSION file
+COPY --from=builder /app/VERSION /app/VERSION
+ARG VERSION_ARG
+RUN if [ -z "$VERSION_ARG" ]; then \
+        export VERSION_ARG=$(cat /app/VERSION); \
+    fi && \
+    echo "Building image version: $VERSION_ARG"
+
+LABEL version="$VERSION_ARG" \
+      description="Legal Document RAG API" \
+      maintainer="maja"
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
