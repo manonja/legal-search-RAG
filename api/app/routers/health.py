@@ -4,6 +4,7 @@ This module provides endpoints for checking the health status of the API.
 """
 
 import os
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -13,6 +14,7 @@ from app.core.config import get_settings
 from app.core.auth import security, TokenManager
 
 router = APIRouter(tags=["health"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/health")

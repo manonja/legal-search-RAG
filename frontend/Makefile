@@ -75,4 +75,4 @@ clean:
 	-docker rmi $(APP_NAME):local
 	-docker rmi $(DEV_REGISTRY)/$(APP_NAME):latest
 	-docker rmi $(PROD_REGISTRY)/$(APP_NAME):$(VERSION)
-	-docker rmi $(PROD_REGISTRY)/$(APP_NAME):latest 
+	-docker rmi $(PROD_REGISTRY)/$(APP_NAME):latest

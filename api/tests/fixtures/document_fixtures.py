@@ -1,8 +1,9 @@
 """Document-related fixtures for tests."""
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from pathlib import Path
+import uuid
 
 from tests.constants import MOCK_PDF_TEXT, MOCK_DOCX_TEXT, MOCK_DOCUMENT_CHUNKS
 
@@ -44,9 +45,11 @@ def mock_process_chunks(mocker):
 @pytest.fixture
 def mock_process_uploaded_document(mocker):
     """Mock the document processing function."""
+    test_uuid = str(uuid.uuid4())
     mock_process = mocker.AsyncMock(
         return_value={
-            "document_id": "test_document.pdf",
+            "document_id": test_uuid,
+            "original_filename": "test_document.pdf",
             "num_chunks": 3,
             "status": "success",
         }
@@ -98,3 +101,51 @@ def mock_document_not_found(mocker):
         "app.routers.documents.document.get_document_content",
         side_effect=mock_get_content_error,
     )
+
+
+@pytest.fixture
+def mock_datastore_service(mocker):
+    """Mock the datastore service."""
+    test_uuid = str(uuid.uuid4())
+
+    # Create a dynamic mock that uses the actual filename from the UploadFile argument
+    async def mock_save_document(file, text_content=""):
+        # Get the original filename from the file argument
+        original_filename = (
+            file.filename if hasattr(file, "filename") else "test_document.pdf"
+        )
+
+        # Create mock DocumentMetadata
+        mock_metadata = mocker.MagicMock()
+        mock_metadata.document_id = test_uuid
+        mock_metadata.original_filename = original_filename
+        mock_metadata.original_file_path = f"/data/{test_uuid}/{original_filename}"
+        mock_metadata.text_file_path = f"/data/{test_uuid}/extracted_text.txt"
+        mock_metadata.document_dir = f"/data/{test_uuid}"
+
+        # Support dictionary-style access
+        mock_metadata.__getitem__.side_effect = lambda key: getattr(mock_metadata, key)
+        mock_metadata.get.side_effect = lambda key, default=None: getattr(
+            mock_metadata, key, default
+        )
+        mock_metadata.model_dump.return_value = {
+            "document_id": test_uuid,
+            "original_filename": original_filename,
+            "original_file_path": f"/data/{test_uuid}/{original_filename}",
+            "text_file_path": f"/data/{test_uuid}/extracted_text.txt",
+            "document_dir": f"/data/{test_uuid}",
+        }
+
+        return mock_metadata
+
+    # Create mock datastore service
+    mock_datastore = mocker.MagicMock()
+    mock_datastore.save_document = AsyncMock(side_effect=mock_save_document)
+
+    # Patch the service
+    mocker.patch(
+        "app.services.documents.upload.get_datastore_service",
+        return_value=mock_datastore,
+    )
+
+    return mock_datastore

@@ -4,11 +4,11 @@ This module provides functionality for searching documents using vector similari
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from app.core.config import get_settings
-from app.models.search import SearchQuery, SearchResult, QueryRequest, QueryResponse
-from app.utils.chroma import get_collection
+from app.models.search import QueryRequest, QueryResponse, SearchQuery, SearchResult
+from app.services.database.chroma import get_collection
 
 logger = logging.getLogger(__name__)
 

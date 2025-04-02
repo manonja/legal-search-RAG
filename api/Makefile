@@ -1,4 +1,4 @@
-.PHONY: install install-dev lint format check-format process-docs chunk-docs embed-docs serve-api lock docker-build docker-push
+.PHONY: install install-dev lint format check-format process-docs chunk-docs embed-docs serve-api lock docker-build docker-push minor patch get-version
 
 # Install dependencies using uv
 install:
@@ -40,11 +40,27 @@ embed-docs:
 serve-api:
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
+# Version management
+get-version:
+	@cat VERSION
+
+# Bump minor version (x.Y.0): increments minor and resets patch to 0
+minor:
+	@v=$$(cat VERSION | awk -F. '{print $$1"."($$2+1)".0"}'); \
+	echo $$v > VERSION; \
+	echo "Version updated to $$v"
+
+# Bump patch version (x.y.Z): increments patch
+patch:
+	@v=$$(cat VERSION | awk -F. '{print $$1"."$$2"."($$3+1)}'); \
+	echo $$v > VERSION; \
+	echo "Version updated to $$v"
+
 # Docker repository paths
 DEV_REPO=us-central1-docker.pkg.dev/maja-dev/maja-dev
 PROD_REPO=us-central1-docker.pkg.dev/maja-dev/maja-prod
 ENV ?= dev
-VERSION ?= latest
+VERSION = $$(cat VERSION)
 
 # Set repository based on environment
 ifeq ($(ENV),dev)
@@ -57,7 +73,10 @@ endif
 
 # Build Docker image
 docker-build:
-	docker build -t legal-search-api:$(VERSION) .
+ifeq ($(ENV),dev)
+	$(MAKE) patch
+endif
+	docker build -t legal-search-api:$(VERSION) --build-arg VERSION_ARG=$(VERSION) .
 	docker tag legal-search-api:$(VERSION) $(REPO)/legal-search-api:$(VERSION)
 
 # Push Docker image to repository

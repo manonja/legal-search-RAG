@@ -12,8 +12,81 @@ os.environ["ANONYMIZED_TELEMETRY"] = "FALSE"
 os.environ["CHROMADB_TELEMETRY_ENABLED"] = "FALSE"
 os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
 
-# Patch sys.modules to prevent OpenTelemetry imports from failing
+# Initialize Sentry as early as possible
+import logging
 import sys
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.threading import ThreadingIntegration
+
+# Configure basic logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Get settings without importing app yet (to avoid circular imports)
+import importlib.util
+
+spec = importlib.util.find_spec("app.core.config")
+config_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(config_module)
+get_settings = config_module.get_settings
+settings = get_settings()
+
+# Initialize Sentry if DSN is available and not in test mode
+if not os.getenv("TESTING") == "true" and settings.SENTRY_DSN:
+    logger.info("Initializing Sentry for environment: %s", settings.SENTRY_ENVIRONMENT)
+
+    # Setup integrations
+    integrations = [
+        FastApiIntegration(),
+        LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+        AsyncioIntegration(),
+        ThreadingIntegration(propagate_hub=True),
+    ]
+
+    # Event filtering function
+    def before_send_handler(event, hint):
+        """Filter events before sending to Sentry."""
+        # Don't send health check endpoint events
+        if event.get("request", {}).get("url", "").startswith("/api/health"):
+            return None
+        return event
+
+    # Initialize Sentry SDK
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        integrations=integrations,
+        enable_tracing=settings.SENTRY_ENABLE_TRACING,
+        environment=settings.SENTRY_ENVIRONMENT,
+        traces_sample_rate=0.1
+        if settings.SENTRY_ENVIRONMENT.lower() == "production"
+        else 0.5,
+        profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+        debug=settings.DEBUG,
+        send_default_pii=settings.SENTRY_SEND_PII,
+        auto_enabling_integrations=False,
+        attach_stacktrace=True,
+        before_send=before_send_handler,
+    )
+
+    # Add app tag
+    sentry_sdk.set_tag("app_name", "legal-search-rag-api")
+
+    # Test event in non-production
+    if settings.SENTRY_ENVIRONMENT.lower() != "production":
+        sentry_sdk.capture_message(
+            "Sentry initialized at application startup", level="info"
+        )
+
+    logger.info("Sentry initialized successfully")
+else:
+    logger.info("Sentry disabled (testing or no DSN configured)")
+    # Disable Sentry explicitly
+    sentry_sdk.init(dsn="")
+
+# Patch sys.modules to prevent OpenTelemetry imports from failing
 from contextlib import asynccontextmanager
 
 
@@ -45,15 +118,12 @@ if os.getenv("TESTING") == "true" and "google.cloud.secretmanager" not in sys.mo
     sys.modules["google.cloud.secretmanager"] = MagicMock()
     sys.modules["google.cloud.secretmanager_v1"] = MagicMock()
 
-import logging
 import uvicorn
-import sentry_sdk
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer
 
-from app.core.config import get_settings
+from app.core.config import get_settings as app_get_settings
 
 # Import the dependency from the health router
 from app.routers.health import auth_dependency
@@ -63,10 +133,6 @@ from app.routers.documents.query import router as query_router
 from app.routers.documents.search import router as search_router
 from app.routers.documents.document import router as document_router
 from app.services.startup import initialize_application
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 # Add a filter to suppress ChromaDB warnings about existing embedding IDs
@@ -93,29 +159,8 @@ class ChromaWarningFilter(logging.Filter):
 chroma_logger = logging.getLogger("chromadb.segment.impl.vector.local_persistent_hnsw")
 chroma_logger.addFilter(ChromaWarningFilter())
 
-# Get application settings
-settings = get_settings()
-
-# Initialize Sentry only if not in test environment
-if not os.getenv("TESTING") == "true" and os.getenv("SENTRY_DSN"):
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        # Add data like request headers and IP for users,
-        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-        send_default_pii=True,
-        traces_sample_rate=0.1,  # Adjust sampling rate to reduce volume
-        environment=os.getenv("ENVIRONMENT", "development"),
-    )
-    logger.info("Sentry initialized for error reporting")
-else:
-    # Explicitly disable Sentry
-    logger.info("Sentry disabled (testing or no DSN configured)")
-    try:
-        # Use empty DSN to disable Sentry
-        sentry_sdk.init(dsn="")
-    except Exception as e:
-        logger.debug(f"Error while disabling Sentry: {e}")
-        # Continue execution - Sentry not being disabled is not critical
+# Ensure we're using the same settings
+settings = app_get_settings()
 
 
 @asynccontextmanager

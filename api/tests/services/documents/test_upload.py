@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 from fastapi import UploadFile
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 import shutil
 import os
 import aiofiles
@@ -11,6 +11,7 @@ import tempfile
 from app.services.documents.upload import process_uploaded_document
 from app.services.process_docs import extract_pdf_text, extract_docx_text
 from app.services.embeddings import process_chunks
+from app.services.datastore import DocumentMetadata
 from app.core.config import get_settings
 
 # Get settings
@@ -21,19 +22,16 @@ settings = get_settings()
 def setup_test_directories():
     """Create test directories and clean them up after tests."""
     # Create test directories
-    os.makedirs(settings.DOCS_ROOT, exist_ok=True)
-    os.makedirs(settings.CHUNKS_DIR, exist_ok=True)
     os.makedirs(settings.CHROMA_DIR, exist_ok=True)
+    os.makedirs(settings.DATA_DIR, exist_ok=True)
 
     yield
 
     # Clean up test directories
-    if os.path.exists(settings.DOCS_ROOT):
-        shutil.rmtree(settings.DOCS_ROOT)
-    if os.path.exists(settings.CHUNKS_DIR):
-        shutil.rmtree(settings.CHUNKS_DIR)
     if os.path.exists(settings.CHROMA_DIR):
         shutil.rmtree(settings.CHROMA_DIR)
+    if os.path.exists(settings.DATA_DIR):
+        shutil.rmtree(settings.DATA_DIR)
 
 
 @pytest.fixture
@@ -164,6 +162,28 @@ def mock_extract_docx(mocker):
     return mock_extract
 
 
+@pytest.fixture
+def mock_datastore_service(mocker):
+    """Mock the datastore service."""
+    # Create a mock DocumentMetadata instance
+    test_metadata = DocumentMetadata(
+        document_id="test-uuid-12345",
+        original_filename="test.pdf",
+        original_file_path="/data/test-uuid-12345/original.pdf",
+        text_file_path="/data/test-uuid-12345/extracted_text.txt",
+        document_dir="/data/test-uuid-12345",
+    )
+
+    mock_datastore = mocker.MagicMock()
+    mock_datastore.save_document = AsyncMock(return_value=test_metadata)
+
+    mocker.patch(
+        "app.services.documents.upload.get_datastore_service",
+        return_value=mock_datastore,
+    )
+    return mock_datastore
+
+
 @pytest.mark.asyncio
 async def test_process_pdf_document(
     test_pdf_file,
@@ -172,24 +192,39 @@ async def test_process_pdf_document(
     mock_text_splitter,
     mock_process_chunks,
     mock_extract_pdf,
+    mock_datastore_service,
 ):
     """Test processing a PDF document."""
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_pdf_file.name
+    mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
     mock_file.read = AsyncMock()
     # We need to set the return_value directly, not when creating the AsyncMock
     mock_file.read.return_value = test_pdf_file.read_bytes()
 
+    # Process the document
     result = await process_uploaded_document(mock_file, settings)
+
+    # Check the result
     assert result["status"] == "success"
-    assert result["document_id"] == test_pdf_file.name
+    assert result["document_id"] == "test-uuid-12345"
+    assert result["original_filename"] == "test.pdf"
     assert result["num_chunks"] == 2
+
+    # Verify mock calls
     mock_extract_pdf.assert_called_once()
     mock_text_splitter.split_text.assert_called_once()
+    mock_datastore_service.save_document.assert_called_once()
+
+    # Verify process_chunks was called with the correct metadata dict
     mock_process_chunks.assert_called_once()
+    args = mock_process_chunks.call_args[0]
+    metadata_dict = args[2]  # Third argument is the metadata_dict
+    assert isinstance(metadata_dict, dict)
+    assert metadata_dict["document_id"] == "test-uuid-12345"
 
 
 @pytest.mark.asyncio
@@ -200,47 +235,67 @@ async def test_process_docx_document(
     mock_text_splitter,
     mock_process_chunks,
     mock_extract_docx,
+    mock_datastore_service,
 ):
     """Test processing a DOCX document."""
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_docx_file.name
+    mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
     mock_file.read = AsyncMock()
     mock_file.read.return_value = test_docx_file.read_bytes()
 
+    # Process the document
     result = await process_uploaded_document(mock_file, settings)
+
+    # Check the result
     assert result["status"] == "success"
-    assert result["document_id"] == test_docx_file.name
+    assert result["document_id"] == "test-uuid-12345"
+    assert result["original_filename"] == "test.pdf"
     assert result["num_chunks"] == 2
+
+    # Verify mock calls
     mock_extract_docx.assert_called_once()
     mock_text_splitter.split_text.assert_called_once()
+    mock_datastore_service.save_document.assert_called_once()
+
+    # Verify process_chunks was called with the correct metadata dict
     mock_process_chunks.assert_called_once()
+    args = mock_process_chunks.call_args[0]
+    metadata_dict = args[2]  # Third argument is the metadata_dict
+    assert isinstance(metadata_dict, dict)
+    assert metadata_dict["document_id"] == "test-uuid-12345"
 
 
 @pytest.mark.asyncio
-async def test_process_unsupported_file(
-    test_txt_file,
+async def test_process_unsupported_file_type(
+    test_pdf_file,
     mock_chroma_client,
     mock_openai_client,
     mock_text_splitter,
     mock_process_chunks,
+    mock_extract_pdf,
+    mock_datastore_service,
 ):
     """Test processing an unsupported file type."""
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
-    mock_file.filename = test_txt_file.name
+    mock_file.filename = "test.xyz"  # Unsupported file type
+    mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
     mock_file.read = AsyncMock()
-    mock_file.read.return_value = test_txt_file.read_bytes()
+    mock_file.read.return_value = test_pdf_file.read_bytes()
 
     with pytest.raises(ValueError) as exc_info:
         await process_uploaded_document(mock_file, settings)
     assert "Unsupported file type" in str(exc_info.value)
+    mock_extract_pdf.assert_not_called()
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
+    mock_datastore_service.save_document.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -251,11 +306,13 @@ async def test_process_empty_document(
     mock_text_splitter,
     mock_process_chunks,
     mock_extract_pdf,
+    mock_datastore_service,
 ):
     """Test processing a document with no content."""
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_pdf_file.name
+    mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
     mock_file.read = AsyncMock()
@@ -267,6 +324,7 @@ async def test_process_empty_document(
     assert "No text extracted from document" in str(exc_info.value)
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
+    mock_datastore_service.save_document.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -277,11 +335,13 @@ async def test_process_document_with_error(
     mock_text_splitter,
     mock_process_chunks,
     mock_extract_pdf,
+    mock_datastore_service,
 ):
     """Test processing a document with an error."""
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_pdf_file.name
+    mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
     mock_file.read = AsyncMock()
@@ -293,3 +353,4 @@ async def test_process_document_with_error(
     assert "Test error" in str(exc_info.value)
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
+    mock_datastore_service.save_document.assert_not_called()

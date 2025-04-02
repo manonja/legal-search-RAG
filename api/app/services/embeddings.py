@@ -5,19 +5,26 @@ and store them in a Chroma vector database for efficient retrieval.
 """
 
 import json
+import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from tqdm import tqdm
-from app.utils import get_chroma_dir, get_chunks_dir
+
 from app.core.config import get_settings
+from app.services.database.chroma import get_chroma_client
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Get application settings
 settings = get_settings()
+
+BATCH_SIZE = 100
 
 # Initialize OpenAI embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -26,22 +33,21 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
 )
 
 
-def process_chunks(chunks_dir: Path, chroma_dir: Path) -> None:
+def process_chunks(
+    chunk_file: Path,
+    chroma_dir: Path,
+    document_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
     """Process all chunked documents and store their embeddings in Chroma.
 
     Args:
-        chunks_dir: Directory containing chunked text files
+        chunk_file: Path to the chunked text file
         chroma_dir: Directory to store ChromaDB database
+        document_metadata: Optional metadata for the document
     """
-    # Initialize Chroma with settings
-    chroma_client = chromadb.PersistentClient(
-        path=str(chroma_dir),
-        settings=Settings(
-            anonymized_telemetry=False,
-            allow_reset=True,
-            is_persistent=True,
-        ),
-    )
+
+    # Use the shared Chroma client
+    chroma_client = get_chroma_client()
 
     # Create or get collection with OpenAI embedding function
     collection = chroma_client.get_or_create_collection(
@@ -50,64 +56,39 @@ def process_chunks(chunks_dir: Path, chroma_dir: Path) -> None:
         embedding_function=openai_ef,
     )
 
-    # Process each chunked file
-    chunk_files = list(chunks_dir.glob("chunked_*.txt"))
+    doc_id = (
+        document_metadata.get("document_id", chunk_file.stem)
+        if document_metadata
+        else chunk_file.stem
+    )
 
-    if not chunk_files:
-        print(f"No chunked files found in {chunks_dir}")
-        return
+    with open(chunk_file, "r", encoding="utf-8") as f:
+        text = f.read()
+        chunks = text.split("### CHUNK")[1:]  # Split on chunk markers
+        chunks = [chunk.strip() for chunk in chunks]
 
-    print(f"Found {len(chunk_files)} chunked files to process")
+    # Process chunks in batches
+    for i in range(0, len(chunks), BATCH_SIZE):
+        batch = chunks[i : i + BATCH_SIZE]
 
-    for file_path in tqdm(chunk_files, desc="Processing files"):
-        doc_id = file_path.stem.replace("chunked_", "")
+        # Generate IDs for batch
+        ids = [f"{doc_id}_chunk_{j + i + 1}" for j in range(len(batch))]
 
-        with open(file_path, "r", encoding="utf-8") as f:
-            text = f.read()
-            chunks = text.split("### CHUNK")[1:]  # Split on chunk markers
-            chunks = [chunk.strip() for chunk in chunks]
+        # Prepare chunk metadata
+        metadatas = []
+        for _ in batch:
+            chunk_metadata = {"source": str(chunk_file)}
+            if document_metadata:
+                # Include document metadata with each chunk
+                chunk_metadata.update(document_metadata)
+            metadatas.append(chunk_metadata)
 
-        # Process chunks in batches
-        batch_size = 100
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i : i + batch_size]
+        # Add to Chroma (it will handle embeddings through OpenAI)
+        collection.add(
+            ids=ids,
+            documents=batch,
+            metadatas=metadatas,
+        )
+        logger.info(f"Successfully added batch of {len(batch)} chunks")
 
-            # Generate IDs for batch
-            ids = [f"{doc_id}_chunk_{j + i + 1}" for j in range(len(batch))]
-
-            # Add to Chroma (it will handle embeddings through OpenAI)
-            try:
-                collection.add(
-                    ids=ids,
-                    documents=batch,
-                    metadatas=[{"source": str(file_path)} for _ in batch],
-                )
-                print(f"Successfully added batch of {len(batch)} chunks")
-            except Exception as e:
-                print(f"Error processing batch: {e}")
-                continue
-
-    print(f"\nProcessing complete! Documents stored in Chroma at {chroma_dir}")
-
-
-def main() -> None:
-    """Process chunks and generate embeddings.
-
-    Reads chunked documents from the specified directory and generates embeddings
-    using OpenAI's API, storing them in a Chroma vector database.
-    """
-    # Get directories from environment utils
-    chunks_dir = get_chunks_dir()
-    chroma_dir = get_chroma_dir()
-
-    if not settings.OPENAI_API_KEY:
-        print("Error: OPENAI_API_KEY environment variable not set")
-        return
-
-    print(f"\nProcessing chunks from: {chunks_dir}")
-    print(f"Storing embeddings in: {chroma_dir}")
-    process_chunks(chunks_dir, chroma_dir)
-
-
-if __name__ == "__main__":
-    main()
+    logger.info(f"Processing complete! Documents stored in Chroma at {chroma_dir}")

@@ -1,7 +1,7 @@
 """Module to enable required GCP APIs for the project"""
 
-import pulumi
 from pulumi_gcp import projects
+
 
 def enable_required_apis():
     """
@@ -10,12 +10,14 @@ def enable_required_apis():
     """
     # List of APIs that need to be enabled
     required_apis = [
-        "artifactregistry.googleapis.com",     # Artifact Registry API
-        "containerregistry.googleapis.com",    # Container Registry API (related dependency)
-        "storage.googleapis.com",              # Storage API (required by Artifact Registry)
-        "iam.googleapis.com",                  # IAM API for permissions
+        "artifactregistry.googleapis.com",  # Artifact Registry API
+        "containerregistry.googleapis.com",  # Container Registry API (related dependency)
+        "storage.googleapis.com",  # Storage API (required by Artifact Registry)
+        "iam.googleapis.com",  # IAM API for permissions
+        "run.googleapis.com",  # Cloud Run API
+        "secretmanager.googleapis.com",  # Secret Manager API
     ]
-    
+
     # Enable each API
     enabled_apis = []
     for api in required_apis:
@@ -26,5 +28,5 @@ def enable_required_apis():
             disable_on_destroy=False,  # Keep API enabled when Pulumi stack is destroyed
         )
         enabled_apis.append(enabled_service)
-    
-    return enabled_apis 
+
+    return enabled_apis

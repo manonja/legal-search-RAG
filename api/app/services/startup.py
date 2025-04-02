@@ -5,6 +5,8 @@ on startup.
 """
 
 import logging
+import os
+import sentry_sdk
 from pathlib import Path
 
 from app.core.config import get_settings
@@ -31,7 +33,6 @@ async def initialize_application():
         # Create necessary directories
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
         settings.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-        settings.CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
         logger.info("Created necessary directories")
 
         # Initialize ChromaDB collection
@@ -41,4 +42,6 @@ async def initialize_application():
 
     except Exception as e:
         logger.error(f"Error during application initialization: {e}")
+        # Capture startup errors in Sentry
+        sentry_sdk.capture_exception(e)
         raise
