@@ -30,6 +30,7 @@ def initialize_sentry():
 
     # Only initialize Sentry if not in test mode and DSN is provided
     if not os.getenv("TESTING") == "true" and settings.SENTRY_DSN:
+        logger.info("Initializing Sentry")
         # Configure Sentry integrations
         logging_integration = LoggingIntegration(
             level=logging.INFO,  # Capture info and above as breadcrumbs
