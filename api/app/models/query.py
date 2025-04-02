@@ -12,13 +12,14 @@ class QueryRequest(BaseModel):
     """Request model for document queries."""
 
     query: str
-    top_k: Optional[int] = 5
-    include_metadata: Optional[bool] = True
+    max_results: Optional[int] = 5
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 1000
 
 
 class QueryResponse(BaseModel):
     """Response model for document queries."""
 
-    results: List[dict]
-    query: str
-    total_results: int
+    answer: str
+    sources: List[str]
+    confidence: float

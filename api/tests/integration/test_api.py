@@ -244,7 +244,12 @@ def test_rag_search(
     """Test the RAG search endpoint."""
     response = test_client.post(
         "/api/rag-search",
-        json={"query": TEST_QUERY, "limit": 5, "max_tokens": 1000, "temperature": 0.7},
+        json={
+            "query": TEST_QUERY,
+            "max_results": 5,
+            "temperature": 0.7,
+            "max_tokens": 1000,
+        },
     )
     assert response.status_code == 200  # noqa: S101
     assert "answer" in response.json()
