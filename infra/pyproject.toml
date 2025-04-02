@@ -1,9 +1,28 @@
 [project]
 name = "infra"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.12"
+description = "Maja legal search GCP infrastructure"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "pulumi>=3.0.0,<4.0.0",
     "pulumi-gcp>=8.0.0,<9.0.0",
+    "pulumi-command>=0.9.0,<1.0.0", # For running commands
+    "pulumi-random>=4.15.0,<5.0.0", # For generating random values
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes
+    "I", # isort
+    "B", # flake8-bugbear
 ]
