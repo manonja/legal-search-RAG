@@ -129,4 +129,30 @@ Visit the documentation at `/api/docs` for complete API details and interactive 
 Key environment variables:
 
 ```bash
-# ... existing code ...
+# API Keys
+OPENAI_API_KEY=your_openai_api_key
+GOOGLE_API_KEY=your_google_api_key
+
+# Vector DB Configuration
+CHROMA_DB_PATH=/data/chroma
+EMBEDDING_MODEL=text-embedding-3-small
+
+# Document Processing
+CHUNK_SIZE=512
+CHUNK_OVERLAP=50
+INPUT_DIR=/data/input
+PROCESSED_DIR=/data/processed
+
+# Server Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+API_WORKERS=4
+API_PREFIX=/api
+
+# LLM Settings
+LLM_MODEL=gpt-4-turbo
+MAX_TOKENS=1024
+TEMPERATURE=0.0
+```
+
+You can customize these variables in your `.env` file. See `.env.example` for a complete list of supported variables.
