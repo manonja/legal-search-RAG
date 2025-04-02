@@ -3,7 +3,6 @@
 import os
 import tempfile
 from pathlib import Path
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -42,7 +41,6 @@ def test_upload_document(
     mock_extract_docx_text,
     mock_create_text_splitter,
     mock_process_chunks,
-    mock_chroma_client,
     mock_datastore_service,
     test_pdf_document,
 ):
