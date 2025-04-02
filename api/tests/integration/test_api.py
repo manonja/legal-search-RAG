@@ -166,9 +166,7 @@ def mock_create_text_splitter(mocker):
 @pytest.fixture
 def mock_process_chunks(mocker):
     """Mock the chunk processing function."""
-    mock_process = mocker.MagicMock(
-        return_value=["embedding1", "embedding2", "embedding3"]
-    )
+    mock_process = mocker.MagicMock()
     mocker.patch("app.services.documents.upload.process_chunks", new=mock_process)
     return mock_process
 
@@ -176,11 +174,20 @@ def mock_process_chunks(mocker):
 @pytest.fixture
 def mock_chroma_client(mocker):
     """Mock the ChromaDB client."""
-    mock_client = MagicMock()
+    # Create a mock collection
     mock_collection = MagicMock()
-    mock_collection.add.return_value = True
+    mock_collection.add = MagicMock()
+
+    # Create a mock client
+    mock_client = MagicMock()
     mock_client.get_or_create_collection.return_value = mock_collection
-    mocker.patch("app.utils.chroma.initialize_chroma_client", return_value=mock_client)
+
+    # Patch the PersistentClient in the embeddings module
+    # This is what process_chunks uses internally
+    mocker.patch(
+        "app.services.embeddings.chromadb.PersistentClient", return_value=mock_client
+    )
+
     return mock_client
 
 
@@ -281,13 +288,11 @@ def test_upload_document(
         "This is extracted text from the PDF document. It contains multiple paragraphs that will be split into chunks."
     )
 
-    # Verify chunk processing
+    # Verify that process_chunks was called with the correct arguments
+    # We don't need to check the returned embeddings since that function is mocked
     mock_process_chunks.assert_called_once()
-
-    # Verify ChromaDB interaction
-    mock_chroma_client.get_or_create_collection.assert_called_once()
-    collection = mock_chroma_client.get_or_create_collection.return_value
-    collection.add.assert_called_once()
+    args = mock_process_chunks.call_args[0]
+    assert args[0].name.endswith("chunked_sample.pdf.txt")
 
 
 def test_upload_document_docx(
