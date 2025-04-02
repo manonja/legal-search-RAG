@@ -41,6 +41,13 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
         HTTPException: If upload or processing fails
     """
     try:
+        # Validate file type
+        if not file.filename.lower().endswith((".pdf", ".docx")):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.filename}. Only PDF and DOCX files are supported.",
+            )
+
         # Get settings
         settings = get_settings()
 
@@ -54,6 +61,9 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
             "status": "success",
         }
 
+    except ValueError as e:
+        logger.error(f"Error processing document: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error processing document: {e}")
         raise HTTPException(

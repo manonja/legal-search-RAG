@@ -77,7 +77,7 @@ async def process_uploaded_document(
                 f.write("\n\n")
 
         # Process chunks and store in ChromaDB
-        process_chunks(chunks_file, settings.chroma_dir)
+        process_chunks(chunks_file, settings.CHROMA_DIR)
 
         return {
             "document_id": file.filename,

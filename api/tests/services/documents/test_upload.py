@@ -7,8 +7,10 @@ from unittest.mock import Mock, patch, AsyncMock
 import shutil
 import os
 import aiofiles
-
+import tempfile
 from app.services.documents.upload import process_uploaded_document
+from app.services.process_docs import extract_pdf_text, extract_docx_text
+from app.services.embeddings import process_chunks
 from app.core.config import get_settings
 
 # Get settings
@@ -41,106 +43,197 @@ def mock_settings():
 
 
 @pytest.fixture
+def test_dir():
+    """Create a temporary directory for test files."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield Path(temp_dir)
+        shutil.rmtree(temp_dir)
+
+
+@pytest.fixture
 def sample_pdf_content():
-    """Create sample PDF content for testing."""
-    return b"%PDF-1.4\n%Test PDF content"
+    """Create a sample PDF file with test content."""
+    return b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
 
 
 @pytest.fixture
 def sample_docx_content():
-    """Create sample DOCX content for testing."""
-    return b"PK\x03\x04\x14\x00\x00\x00\x08\x00"  # Minimal DOCX header
+    """Create a sample DOCX file with test content."""
+    return b"PK\x03\x04\x14\x00\x00\x00\x08\x00"
+
+
+@pytest.fixture
+def sample_txt_content():
+    """Create a sample text file with test content."""
+    return b"This is a test document."
+
+
+@pytest.fixture
+def test_pdf_file(test_dir, sample_pdf_content):
+    """Create a test PDF file."""
+    pdf_path = test_dir / "test.pdf"
+    pdf_path.write_bytes(sample_pdf_content)
+    return pdf_path
+
+
+@pytest.fixture
+def test_docx_file(test_dir, sample_docx_content):
+    """Create a test DOCX file."""
+    docx_path = test_dir / "test.docx"
+    docx_path.write_bytes(sample_docx_content)
+    return docx_path
+
+
+@pytest.fixture
+def test_txt_file(test_dir, sample_txt_content):
+    """Create a test text file."""
+    txt_path = test_dir / "test.txt"
+    txt_path.write_bytes(sample_txt_content)
+    return txt_path
+
+
+@pytest.fixture
+def mock_chroma_client(mocker):
+    """Mock the ChromaDB client."""
+    mock_client = mocker.MagicMock()
+    mocker.patch("app.services.embeddings.get_chroma_client", return_value=mock_client)
+    return mock_client
+
+
+@pytest.fixture
+def mock_openai_client(mocker):
+    """Mock the OpenAI client."""
+    mock_client = mocker.MagicMock()
+    mocker.patch("app.services.embeddings.get_openai_client", return_value=mock_client)
+    return mock_client
+
+
+@pytest.fixture
+def mock_text_splitter(mocker):
+    """Mock the text splitter."""
+    mock_splitter = mocker.MagicMock()
+    mock_splitter.split_text.return_value = ["chunk1", "chunk2"]
+    mocker.patch(
+        "app.services.documents.upload.create_text_splitter", return_value=mock_splitter
+    )
+    return mock_splitter
+
+
+@pytest.fixture
+def mock_process_chunks(mocker):
+    """Mock the process_chunks function."""
+    mock_process = mocker.MagicMock()
+    mocker.patch(
+        "app.services.documents.upload.process_chunks", return_value=mock_process
+    )
+    return mock_process
+
+
+@pytest.fixture
+def mock_extract_pdf(mocker):
+    """Mock the extract_pdf_text function."""
+    mock_extract = mocker.MagicMock(return_value="Test PDF content")
+    mocker.patch(
+        "app.services.documents.upload.extract_pdf_text", return_value=mock_extract
+    )
+    return mock_extract
+
+
+@pytest.fixture
+def mock_extract_docx(mocker):
+    """Mock the extract_docx_text function."""
+    mock_extract = mocker.MagicMock(return_value="Test DOCX content")
+    mocker.patch(
+        "app.services.documents.upload.extract_docx_text", return_value=mock_extract
+    )
+    return mock_extract
 
 
 @pytest.mark.asyncio
-async def test_process_pdf_document(sample_pdf_content):
+async def test_process_pdf_document(
+    test_pdf_file,
+    mock_chroma_client,
+    mock_openai_client,
+    mock_text_splitter,
+    mock_process_chunks,
+    mock_extract_pdf,
+):
     """Test processing a PDF document."""
-    # Create a test PDF file
-    test_file = Path(settings.DOCS_ROOT) / "test.pdf"
-    test_file.write_bytes(sample_pdf_content)
-
-    # Create UploadFile object
-    upload_file = UploadFile(file=open(test_file, "rb"), filename="test.pdf")
-
-    # Process the document
-    result = await process_uploaded_document(upload_file, settings)
-
-    # Check result
-    assert result["status"] == "success"  # noqa: S101
-    assert "document_id" in result  # noqa: S101
-    assert result["num_chunks"] > 0  # noqa: S101
+    result = await process_uploaded_document(test_pdf_file, settings)
+    assert result["status"] == "success"
+    assert result["document_id"] == test_pdf_file.name
+    assert result["num_chunks"] == 2
+    mock_extract_pdf.assert_called_once()
+    mock_text_splitter.split_text.assert_called_once()
+    mock_process_chunks.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_process_docx_document(sample_docx_content):
+async def test_process_docx_document(
+    test_docx_file,
+    mock_chroma_client,
+    mock_openai_client,
+    mock_text_splitter,
+    mock_process_chunks,
+    mock_extract_docx,
+):
     """Test processing a DOCX document."""
-    # Create a test DOCX file
-    test_file = Path(settings.DOCS_ROOT) / "test.docx"
-    test_file.write_bytes(sample_docx_content)
-
-    # Create UploadFile object
-    upload_file = UploadFile(file=open(test_file, "rb"), filename="test.docx")
-
-    # Process the document
-    result = await process_uploaded_document(upload_file, settings)
-
-    # Check result
-    assert result["status"] == "success"  # noqa: S101
-    assert "document_id" in result  # noqa: S101
-    assert result["num_chunks"] > 0  # noqa: S101
+    result = await process_uploaded_document(test_docx_file, settings)
+    assert result["status"] == "success"
+    assert result["document_id"] == test_docx_file.name
+    assert result["num_chunks"] == 2
+    mock_extract_docx.assert_called_once()
+    mock_text_splitter.split_text.assert_called_once()
+    mock_process_chunks.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_process_invalid_file():
-    """Test processing an invalid file type."""
-    # Create a test file with invalid extension
-    test_file = Path(settings.DOCS_ROOT) / "test.invalid"
-    test_file.write_text("Test content")
-
-    # Create UploadFile object
-    upload_file = UploadFile(file=open(test_file, "rb"), filename="test.invalid")
-
-    # Process the document
-    result = await process_uploaded_document(upload_file, settings)
-
-    # Check result
-    assert result["status"] == "error"  # noqa: S101
-    assert "error" in result  # noqa: S101
-    assert "Unsupported file type" in result["error"]  # noqa: S101
+async def test_process_unsupported_file(
+    test_txt_file,
+    mock_chroma_client,
+    mock_openai_client,
+    mock_text_splitter,
+    mock_process_chunks,
+):
+    """Test processing an unsupported file type."""
+    with pytest.raises(ValueError) as exc_info:
+        await process_uploaded_document(test_txt_file, settings)
+    assert "Unsupported file type" in str(exc_info.value)
+    mock_text_splitter.split_text.assert_not_called()
+    mock_process_chunks.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_unsupported_file_type():
-    """Test handling of unsupported file types."""
-    # Create a mock file with unsupported type
-    mock_file = AsyncMock()
-    mock_file.read.return_value = b"Test content"
-    mock_file.filename = "test.xyz"
-
-    # Create UploadFile object
-    upload_file = UploadFile(file=mock_file, filename="test.xyz")
-
-    # Process the document
-    result = await process_uploaded_document(upload_file, settings)
-
-    # Check result
-    assert result["status"] == "error"  # noqa: S101
-    assert "error" in result  # noqa: S101
-    assert "Unsupported file type" in result["error"]  # noqa: S101
+async def test_process_empty_document(
+    test_pdf_file,
+    mock_chroma_client,
+    mock_openai_client,
+    mock_text_splitter,
+    mock_process_chunks,
+    mock_extract_pdf,
+):
+    """Test processing a document with no content."""
+    mock_extract_pdf.return_value = ""
+    with pytest.raises(ValueError) as exc_info:
+        await process_uploaded_document(test_pdf_file, settings)
+    assert "No text extracted from document" in str(exc_info.value)
+    mock_text_splitter.split_text.assert_not_called()
+    mock_process_chunks.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_empty_document(mock_settings, sample_pdf_content):
-    """Test handling of empty documents."""
-    # Create mock file
-    mock_file = Mock(spec=UploadFile)
-    mock_file.filename = "test.pdf"
-    mock_file.read.return_value = sample_pdf_content
-
-    # Mock empty text extraction
-    with patch("app.services.documents.upload.extract_pdf_text") as mock_extract:
-        mock_extract.return_value = ""
-
-        # Process document and expect error
-        with pytest.raises(ValueError, match="No text extracted from document"):
-            await process_uploaded_document(mock_file, mock_settings)
+async def test_process_document_with_error(
+    test_pdf_file,
+    mock_chroma_client,
+    mock_openai_client,
+    mock_text_splitter,
+    mock_process_chunks,
+    mock_extract_pdf,
+):
+    """Test processing a document with an error."""
+    mock_extract_pdf.side_effect = Exception("Test error")
+    with pytest.raises(Exception) as exc_info:
+        await process_uploaded_document(test_pdf_file, settings)
+    assert "Test error" in str(exc_info.value)
+    mock_text_splitter.split_text.assert_not_called()
+    mock_process_chunks.assert_not_called()
