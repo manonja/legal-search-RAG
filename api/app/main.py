@@ -47,6 +47,8 @@ if os.getenv("TESTING") == "true" and "google.cloud.secretmanager" not in sys.mo
 
 import logging
 import uvicorn
+
+# Import sentry_sdk but don't initialize it here - moved to startup.py
 import sentry_sdk
 
 from fastapi import FastAPI, Depends
@@ -96,26 +98,7 @@ chroma_logger.addFilter(ChromaWarningFilter())
 # Get application settings
 settings = get_settings()
 
-# Initialize Sentry only if not in test environment
-if not os.getenv("TESTING") == "true" and os.getenv("SENTRY_DSN"):
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        # Add data like request headers and IP for users,
-        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-        send_default_pii=True,
-        traces_sample_rate=0.1,  # Adjust sampling rate to reduce volume
-        environment=os.getenv("ENVIRONMENT", "development"),
-    )
-    logger.info("Sentry initialized for error reporting")
-else:
-    # Explicitly disable Sentry
-    logger.info("Sentry disabled (testing or no DSN configured)")
-    try:
-        # Use empty DSN to disable Sentry
-        sentry_sdk.init(dsn="")
-    except Exception as e:
-        logger.debug(f"Error while disabling Sentry: {e}")
-        # Continue execution - Sentry not being disabled is not critical
+# Sentry initialization moved to app/services/startup.py
 
 
 @asynccontextmanager

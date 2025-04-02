@@ -55,7 +55,33 @@ class Settings(BaseSettings):
     # Other Settings
     LOG_LEVEL: str = "INFO"
     DEBUG: bool = False
+
+    # Sentry Settings
     SENTRY_DSN: Optional[str] = None
+    SENTRY_ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    SENTRY_TRACES_SAMPLE_RATE: float = 1
+    SENTRY_PROFILES_SAMPLE_RATE: float = 1
+    SENTRY_ENABLE_TRACING: bool = True
+    SENTRY_SEND_PII: bool = True  # Send personally identifiable information
+
+    # Additional Sentry settings for production
+    @property
+    def is_production(self) -> bool:
+        """Check if the application is running in production environment.
+
+        Returns:
+            bool: True if in production environment, False otherwise.
+        """
+        return self.SENTRY_ENVIRONMENT.lower() == "production"
+
+    @property
+    def sentry_traces_sample_rate(self) -> float:
+        """Get the appropriate traces sample rate based on environment.
+
+        Returns:
+            float: Lower sample rate in production to reduce volume.
+        """
+        return 0.1 if self.is_production else 0.5
 
     model_config = SettingsConfigDict(
         env_file=".env",
