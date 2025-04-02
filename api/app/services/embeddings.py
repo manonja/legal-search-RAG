@@ -13,7 +13,7 @@ import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from tqdm import tqdm
-from app.utils.env import get_chroma_dir, get_chunks_dir
+from app.utils import get_chroma_dir, get_chunks_dir
 from app.core.config import get_settings
 
 # Get application settings

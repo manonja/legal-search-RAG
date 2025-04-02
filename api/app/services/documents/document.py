@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
-from app.utils.env import get_docs_root, get_chunks_dir
+from app.utils import get_docs_root, get_chunks_dir
 
 logger = logging.getLogger(__name__)
 

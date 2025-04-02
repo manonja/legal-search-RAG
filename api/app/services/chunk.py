@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from tqdm import tqdm
-from app.utils.env import get_chunks_dir, get_output_dir
+from app.utils import get_chunks_dir, get_output_dir
 
 
 def create_text_splitter(

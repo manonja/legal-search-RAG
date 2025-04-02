@@ -11,7 +11,7 @@ from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 
 from app.core.config import get_settings
-from app.utils.env import get_chroma_dir
+from app.utils import get_chroma_dir
 
 logger = logging.getLogger(__name__)
 

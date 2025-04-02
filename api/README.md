@@ -50,8 +50,54 @@ The API backend for the Legal Document Search RAG system, built with FastAPI, Ch
 ### Docker
 
 ```bash
+# Build the Docker image
 docker build -t legal-search-api .
-docker run -p 8000:8000 -v $(pwd)/cache:/app/cache legal-search-api
+
+# Run the container with proper volume mounting for data persistence
+docker run -p 8000:8000 \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/chroma:/data/chroma \
+  -v $(pwd)/data/input:/data/input \
+  -v $(pwd)/data/processed:/data/processed \
+  -e OPENAI_API_KEY=your_openai_key \
+  -e GOOGLE_API_KEY=your_google_key \
+  legal-search-api
+```
+
+Environment variables can also be passed via an env file:
+
+```bash
+docker run -p 8000:8000 \
+  -v $(pwd)/data:/data \
+  --env-file .env \
+  legal-search-api
+```
+
+For production deployment, consider using Docker Compose:
+
+```yaml
+# docker-compose.yml
+version: '3'
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+```
+
+Start services with:
+```bash
+docker-compose up -d
 ```
 
 ## API Endpoints
