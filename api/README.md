@@ -61,6 +61,7 @@ docker run -p 8000:8000 \
   -v $(pwd)/data/processed:/data/processed \
   -e OPENAI_API_KEY=your_openai_key \
   -e GOOGLE_API_KEY=your_google_key \
+  --env-file .env \
   legal-search-api
 ```
 
@@ -99,6 +100,29 @@ Start services with:
 ```bash
 docker-compose up -d
 ```
+
+## Running with Docker
+
+To run the container properly with environment variables:
+
+```bash
+# Run the container with environment variables
+docker run -p 8000:8000 \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/data/chroma:/data/chroma \
+  -v $(pwd)/data/input:/data/input \
+  -v $(pwd)/data/processed:/data/processed \
+  --env-file .env \
+  -e SENTRY_DSN=https://your-sentry-dsn \
+  legal-search-api
+```
+
+Remember to:
+1. Never bake secrets into the container
+2. Pass all necessary environment variables at runtime
+3. Use Docker secrets for production environments
+4. Keep different .env files for different environments (dev, staging, prod)
+5. Consider using a vault service for sensitive credentials in production
 
 ## API Endpoints
 

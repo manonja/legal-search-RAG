@@ -3,34 +3,14 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy all necessary files for installation
 COPY pyproject.toml README.md ./
 
 # Set UV to use system Python
 ENV UV_SYSTEM_PYTHON=1
 
-# Install dependencies explicitly from pyproject.toml
-RUN uv pip install --no-cache "numpy>=1.0.0,<2.0.0" \
-    "python-docx>=0.8.11" \
-    "google-generativeai" \
-    "chromadb>=0.6.3,<0.7.0" \
-    "langchain>=0.0.235" \
-    "openai>=1.1.0" \
-    "google-cloud-storage>=3.1.0,<4" \
-    "fastapi>=0.104.0" \
-    "uvicorn>=0.23.2" \
-    "pydantic>=2.4.2" \
-    "onnxruntime>=1.21.0" \
-    "onnx" \
-    "chroma-hnswlib>=0.7.1" \
-    "sentry-sdk[fastapi]>=2.25.0" \
-    "aiofiles>=23.2.1"
+# Install dependencies from pyproject.toml
+RUN uv pip install --no-cache -e .
 
 # Second stage
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
@@ -60,7 +40,8 @@ ENV PYTHONUNBUFFERED=1 \
     HOST=0.0.0.0 \
     LOG_LEVEL=INFO \
     # UV settings
-    UV_SYSTEM_PYTHON=1
+    UV_SYSTEM_PYTHON=1 \
+    SENTRY_DSN=https://sentry.io/api/1234567890/store/
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -79,7 +60,7 @@ RUN mkdir -p /data/chroma /data/input /data/processed /data/docs /data/chunks /d
 # Copy installed dependencies from builder stage
 COPY --from=builder --chown=appuser:appuser /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
-# Copy application code
+# Copy application code (excluding .env files)
 COPY --chown=appuser:appuser . .
 
 # Switch to non-root user
