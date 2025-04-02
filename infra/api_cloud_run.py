@@ -138,12 +138,6 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                 ),
             ],
         ),
-        traffic=[
-            cloudrunv2.ServiceTrafficArgs(
-                percent=100,
-                type="TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
-            )
-        ],
         opts=pulumi.ResourceOptions(depends_on=dependencies if dependencies else None),
     )
 
