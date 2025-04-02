@@ -22,7 +22,6 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
-    PORT=8000 \
     # ChromaDB specific settings
     CHROMA_DATA_DIR=/data/chroma \
     DATA_ROOT=/data \
@@ -32,12 +31,7 @@ ENV PYTHONUNBUFFERED=1 \
     CHUNKS_DIR=/data/chunks \
     COLLECTION_NAME=legal_docs \
     # Tenant settings
-    TENANT_ROOT=/data/tenants/default \
     CACHE_DIR=/data/tenants/default/cache \
-    # API settings
-    API_HOST=0.0.0.0 \
-    API_PORT=8000 \
-    HOST=0.0.0.0 \
     LOG_LEVEL=INFO \
     # UV settings
     UV_SYSTEM_PYTHON=1 \

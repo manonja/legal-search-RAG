@@ -5,6 +5,7 @@ This module provides settings and configuration management for the application.
 
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -27,21 +28,19 @@ class Settings(BaseSettings):
     API_DESCRIPTION: str = "API for legal document retrieval and question answering"
     API_VERSION: str = "1.0.0"
     API_PREFIX: str = "/api"
-    API_HOST: str = "127.0.0.1"
-    API_PORT: int = 8000
     API_TOKEN: Optional[str] = None
 
     # File Storage Settings
     DATA_DIR: Path = Path("data")
     CHROMA_DIR: Path = Path("data/chroma")
     CHUNKS_DIR: Path = Path("data/chunks")
-    DATA_ROOT: str = "~/legal-search-data"
-    INPUT_DIR: str = "~/legal-search-data/input"
-    OUTPUT_DIR: str = "~/legal-search-data/processed"
-    CHROMA_DATA_DIR: str = "~/legal-search-data/chroma"
-    DOCS_ROOT: str = "~/legal-search-data/docs"
-    CACHE_DIR: str = "~/legal-search-data/cache"
-    TENANT_ROOT: str = "~/legal-search-data/tenants/default"
+    _temp_dir: str = tempfile.mkdtemp(prefix="legal-search-")
+    DATA_ROOT: str = os.path.join(_temp_dir, "data")
+    INPUT_DIR: str = os.path.join(_temp_dir, "input")
+    OUTPUT_DIR: str = os.path.join(_temp_dir, "processed")
+    CHROMA_DATA_DIR: str = os.path.join(_temp_dir, "chroma")
+    DOCS_ROOT: str = os.path.join(_temp_dir, "docs")
+    CHUNKS_ROOT: str = os.path.join(_temp_dir, "chunks")
 
     # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = None
@@ -65,14 +64,12 @@ class Settings(BaseSettings):
     USE_GCP_STORAGE: bool = False
     GCP_PROJECT_ID: str = "952577461734"
     GCS_BUCKET_NAME: str = "justice-legal-docs"
-    GCP_SECRET_NAME: str = "maja-legal-api-token"
-    GCP_SECRET_VERSION: str = "1"
+    GCP_SECRET_NAME: str = "maja-legal-api-token"  # noqa: S105
+    GCP_SECRET_VERSION: str = "1"  # noqa: S105
 
     # Other Settings
     HOST: str = "127.0.0.1"
     FRONTEND_PORT: int = 3000
-    HTTP_PORT: int = 80
-    HTTPS_PORT: int = 443
     LOG_LEVEL: str = "INFO"
     DEBUG: bool = False
     ADMIN_API_KEY: str = "your_admin_api_key_here"
@@ -83,54 +80,6 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="allow",  # Allow extra fields from env file
     )
-
-    # Path methods
-    def get_env_file_path(self) -> Path:
-        """Get the path to the .env file.
-
-        Returns:
-            Path: Path to the .env file.
-        """
-        return Path(__file__).parent.parent.parent / ".env"
-
-    def validate_env_vars(self) -> List[str]:
-        """Validate that all required environment variables are set.
-
-        Returns:
-            List[str]: List of missing environment variables.
-        """
-        missing_vars = []
-        for var in REQUIRED_ENV_VARS:
-            if not getattr(self, var):
-                missing_vars.append(var)
-        return missing_vars
-
-    def load_env(self, validate: bool = True) -> None:
-        """Load environment variables from .env file.
-
-        Args:
-            validate: Whether to validate required environment variables.
-
-        Raises:
-            FileNotFoundError: If .env file doesn't exist.
-            ValueError: If required environment variables are missing.
-        """
-        env_path = self.get_env_file_path()
-
-        if not env_path.exists():
-            raise FileNotFoundError(
-                f".env file not found at {env_path}. "
-                "Please copy .env.example to .env and configure your environment variables."
-            )
-
-        if validate:
-            missing_vars = self.validate_env_vars()
-            if missing_vars:
-                raise ValueError(
-                    "Missing required environment variables: "
-                    f"{', '.join(missing_vars)}. "
-                    "Please check your .env file."
-                )
 
     def get_google_api_key(self) -> str:
         """Get the Google API key.
@@ -148,78 +97,60 @@ class Settings(BaseSettings):
             )
         return self.GOOGLE_API_KEY
 
-    # Path property methods that handle expanduser()
+    # Path property methods
     @property
     def data_root_path(self) -> Path:
         """Get the data root directory.
 
         Returns:
-            Path to the data root directory
+            Path: Path to the data root directory
         """
-        return Path(self.DATA_ROOT).expanduser()
+        return Path(self.DATA_ROOT)
 
     @property
     def input_dir_path(self) -> Path:
         """Get the input directory.
 
         Returns:
-            Path to the input directory
+            Path: Path to the input directory
         """
-        return Path(self.INPUT_DIR).expanduser()
+        return Path(self.INPUT_DIR)
 
     @property
     def output_dir_path(self) -> Path:
         """Get the output directory.
 
         Returns:
-            Path to the output directory
+            Path: Path to the output directory
         """
-        return Path(self.OUTPUT_DIR).expanduser()
+        return Path(self.OUTPUT_DIR)
 
     @property
     def chroma_dir_path(self) -> Path:
         """Get the ChromaDB directory.
 
         Returns:
-            Path to the ChromaDB directory
+            Path: Path to the ChromaDB directory
         """
-        return Path(self.CHROMA_DATA_DIR).expanduser()
+        return Path(self.CHROMA_DATA_DIR)
 
     @property
     def chunks_dir_path(self) -> Path:
         """Get the chunks directory.
 
         Returns:
-            Path to the chunks directory
+            Path: Path to the chunks directory
         """
-        return Path(self.CHUNKS_DIR).expanduser()
+        return Path(self.CHUNKS_ROOT)
 
     @property
     def docs_root_path(self) -> Path:
         """Get the path to the documents root directory.
 
         Returns:
-            Path: The path to the documents root directory.
+            Path: The path to the documents root directory
         """
-        return Path(self.DOCS_ROOT).expanduser()
-
-    @property
-    def cache_dir_path(self) -> Path:
-        """Get the cache directory.
-
-        Returns:
-            Path to the cache directory
-        """
-        return Path(self.CACHE_DIR).expanduser()
-
-    @property
-    def tenant_root_path(self) -> Path:
-        """Get the tenant root directory.
-
-        Returns:
-            Path to the tenant root directory
-        """
-        return Path(self.TENANT_ROOT).expanduser()
+        return Path(self.DOCS_ROOT)
 
     def ensure_directories(self) -> None:
         """Ensure all required directories exist.
@@ -233,8 +164,6 @@ class Settings(BaseSettings):
             self.chroma_dir_path,
             self.chunks_dir_path,
             self.docs_root_path,
-            self.cache_dir_path,
-            self.tenant_root_path,
         ]
 
         for directory in directories:

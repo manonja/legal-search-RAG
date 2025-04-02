@@ -163,12 +163,6 @@ CHUNK_OVERLAP=50
 INPUT_DIR=/data/input
 PROCESSED_DIR=/data/processed
 
-# Server Configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-API_WORKERS=4
-API_PREFIX=/api
-
 # LLM Settings
 LLM_MODEL=gpt-4-turbo
 MAX_TOKENS=1024

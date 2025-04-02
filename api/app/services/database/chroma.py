@@ -13,7 +13,6 @@ from chromadb.errors import InvalidCollectionException
 from chromadb.utils import embedding_functions
 
 from app.core.config import get_settings
-from app.utils import get_chroma_dir
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,8 @@ def initialize_chroma_client() -> chromadb.PersistentClient:
     logger.info("Initializing Chroma client")
 
     # Get ChromaDB directory
-    chroma_dir = get_chroma_dir()
+    settings = get_settings()
+    chroma_dir = settings.chroma_dir_path
     logger.info(f"Using local ChromaDB storage: {chroma_dir}")
 
     # Create client with telemetry disabled

@@ -6,17 +6,17 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import AsyncGenerator, Generator
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from unittest.mock import MagicMock, patch
 
-from app.main import app
 from app.core.config import get_settings
+from app.main import app
+from app.services.database.chroma import get_collection
 from app.services.documents.query import process_query
 from app.services.documents.search import search_documents
-from app.utils.chroma import get_collection
 
 # Set testing environment variable
 os.environ["TESTING"] = "true"

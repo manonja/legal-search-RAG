@@ -10,7 +10,8 @@ from typing import List, Optional
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from tqdm import tqdm
-from app.utils import get_chunks_dir, get_output_dir
+
+from app.core.config import get_settings
 
 
 def create_text_splitter(
@@ -73,8 +74,9 @@ def main():
     Uses environment variables for input/output directories from env utils.
     """
     # Get input/output directories from environment utilities
-    input_path = get_output_dir()  # Processed docs from previous step
-    output_path = get_chunks_dir()  # Where to save chunked docs
+    settings = get_settings()
+    input_path = settings.output_dir_path  # Processed docs from previous step
+    output_path = settings.chunks_dir_path  # Where to save chunked docs
 
     if not input_path.exists():
         print(f"Error: Input directory not found: {input_path}")

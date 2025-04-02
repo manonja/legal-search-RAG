@@ -13,7 +13,7 @@ import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from tqdm import tqdm
-from app.utils import get_chroma_dir, get_chunks_dir
+
 from app.core.config import get_settings
 
 # Get application settings
@@ -96,9 +96,9 @@ def main() -> None:
     Reads chunked documents from the specified directory and generates embeddings
     using OpenAI's API, storing them in a Chroma vector database.
     """
-    # Get directories from environment utils
-    chunks_dir = get_chunks_dir()
-    chroma_dir = get_chroma_dir()
+    # Get directories from configuration
+    chunks_dir = settings.chunks_dir_path
+    chroma_dir = settings.chroma_dir_path
 
     if not settings.OPENAI_API_KEY:
         print("Error: OPENAI_API_KEY environment variable not set")

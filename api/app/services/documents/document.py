@@ -6,9 +6,9 @@ This module provides functionality for retrieving and managing documents.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
-from app.utils import get_docs_root, get_chunks_dir
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,8 @@ async def find_document(document_id: str) -> Path:
     logger.info(f"Looking for document: {document_id}")
 
     # Look in processed docs directory first
-    docs_root = get_docs_root()
+    settings = get_settings()
+    docs_root = settings.docs_root_path
     logger.info(f"Searching in processed docs directory: {docs_root}")
 
     # First try the exact path if it exists
@@ -46,7 +47,7 @@ async def find_document(document_id: str) -> Path:
             return file
 
     # If not found in processed docs, look in chunked docs directory
-    chunks_dir = get_chunks_dir()
+    chunks_dir = settings.chunks_dir_path
     logger.info(f"Searching in chunked docs directory: {chunks_dir}")
 
     # First try the exact path if it exists
