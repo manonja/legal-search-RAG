@@ -447,4 +447,7 @@ def test_cors_middleware(test_client: TestClient) -> None:
         },
     )
     assert response.status_code == 200  # noqa: S101
-    assert response.headers["access-control-allow-origin"] == "*"  # noqa: S101
+    # FastAPI returns the specific origin instead of '*' when allow_credentials=True
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"  # noqa: S101
+    assert "access-control-allow-credentials" in response.headers  # noqa: S101
+    assert response.headers["access-control-allow-credentials"] == "true"  # noqa: S101
