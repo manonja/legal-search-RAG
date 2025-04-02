@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import chromadb
 from chromadb.config import Settings
@@ -33,12 +33,17 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
 )
 
 
-def process_chunks(chunk_file: Path, chroma_dir: Path) -> None:
+def process_chunks(
+    chunk_file: Path,
+    chroma_dir: Path,
+    document_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
     """Process all chunked documents and store their embeddings in Chroma.
 
     Args:
         chunk_file: Path to the chunked text file
         chroma_dir: Directory to store ChromaDB database
+        document_metadata: Optional metadata for the document
     """
 
     # Use the shared Chroma client
@@ -51,7 +56,11 @@ def process_chunks(chunk_file: Path, chroma_dir: Path) -> None:
         embedding_function=openai_ef,
     )
 
-    doc_id = chunk_file.stem
+    doc_id = (
+        document_metadata.get("document_id", chunk_file.stem)
+        if document_metadata
+        else chunk_file.stem
+    )
 
     with open(chunk_file, "r", encoding="utf-8") as f:
         text = f.read()
@@ -65,11 +74,20 @@ def process_chunks(chunk_file: Path, chroma_dir: Path) -> None:
         # Generate IDs for batch
         ids = [f"{doc_id}_chunk_{j + i + 1}" for j in range(len(batch))]
 
+        # Prepare chunk metadata
+        metadatas = []
+        for _ in batch:
+            chunk_metadata = {"source": str(chunk_file)}
+            if document_metadata:
+                # Include document metadata with each chunk
+                chunk_metadata.update(document_metadata)
+            metadatas.append(chunk_metadata)
+
         # Add to Chroma (it will handle embeddings through OpenAI)
         collection.add(
             ids=ids,
             documents=batch,
-            metadatas=[{"source": str(chunk_file)} for _ in batch],
+            metadatas=metadatas,
         )
         logger.info(f"Successfully added batch of {len(batch)} chunks")
 

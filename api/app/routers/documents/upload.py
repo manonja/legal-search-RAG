@@ -4,11 +4,12 @@ This module provides endpoints for uploading and processing legal documents.
 """
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from typing import Dict, Any
+from typing import Dict, Any, Union
 import logging
 from pathlib import Path
 
 from app.services.documents.upload import process_uploaded_document
+from app.services.datastore import DocumentMetadata
 from app.core.config import get_settings
 
 # Configure logging
@@ -54,10 +55,34 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
         # Process the uploaded document
         result = await process_uploaded_document(file, settings)
 
+        # Extract values safely, supporting both dict and Pydantic model access patterns
+        document_id = (
+            result.get("document_id")
+            if isinstance(result, dict)
+            else getattr(result, "document_id", None)
+        )
+        original_filename = (
+            result.get("original_filename")
+            if isinstance(result, dict)
+            else getattr(result, "original_filename", None)
+        )
+        num_chunks = (
+            result.get("num_chunks")
+            if isinstance(result, dict)
+            else getattr(result, "num_chunks", 0)
+        )
+
+        if not document_id:
+            raise HTTPException(
+                status_code=500,
+                detail="Document processing failed: No document ID returned",
+            )
+
         return {
             "message": "Document processed successfully",
-            "document_id": result["document_id"],
-            "chunks": result["num_chunks"],
+            "document_id": document_id,  # UUID-based ID
+            "original_filename": original_filename,  # Return the original filename for reference
+            "chunks": num_chunks,
             "status": "success",
         }
 

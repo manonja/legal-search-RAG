@@ -46,12 +46,6 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
-    OPENAI_MONTHLY_BUDGET: float = 30.0
-    MAX_QUERIES_PER_MONTH: int = 100
-    ENABLE_COST_WARNINGS: bool = True
-    MAX_MONTHLY_COST: float = 50.0
-    MAX_EMBEDDING_TOKENS: int = 1000000
-
     # ChromaDB Settings
     COLLECTION_NAME: str = "legal_docs"
     CHROMA_HOST: str = "127.0.0.1"
