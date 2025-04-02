@@ -35,19 +35,16 @@ TEST_UUID = "test-uuid-12345-67890"
 def setup_test_directories():
     """Create test directories and clean them up after tests."""
     # Create test directories
-    os.makedirs(settings.DOCS_ROOT, exist_ok=True)
-    os.makedirs(settings.CHUNKS_DIR, exist_ok=True)
     os.makedirs(settings.CHROMA_DIR, exist_ok=True)
+    os.makedirs(settings.DATA_DIR, exist_ok=True)
 
     yield
 
     # Clean up test directories
-    if os.path.exists(settings.DOCS_ROOT):
-        shutil.rmtree(settings.DOCS_ROOT)
-    if os.path.exists(settings.CHUNKS_DIR):
-        shutil.rmtree(settings.CHUNKS_DIR)
     if os.path.exists(settings.CHROMA_DIR):
         shutil.rmtree(settings.CHROMA_DIR)
+    if os.path.exists(settings.DATA_DIR):
+        shutil.rmtree(settings.DATA_DIR)
 
 
 @pytest.fixture

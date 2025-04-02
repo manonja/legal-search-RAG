@@ -35,6 +35,7 @@ def test_upload_document(
     file_type,
     file_content,
     mime_type,
+    expected_text,
     filename,
     mock_extract_pdf_text,
     mock_extract_docx_text,

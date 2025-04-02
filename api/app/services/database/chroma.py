@@ -51,7 +51,7 @@ def initialize_chroma_client() -> chromadb.PersistentClient:
 
     # Get ChromaDB directory
     settings = get_settings()
-    chroma_dir = settings.chroma_dir_path
+    chroma_dir = settings.CHROMA_DIR
     logger.info(f"Using local ChromaDB storage: {chroma_dir}")
 
     # Create client with telemetry disabled
@@ -106,7 +106,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
             break
         except Exception as e:
             logger.warning(f"ChromaDB initialization attempt {attempt} failed: {e}")
-            if attempt >= max_attempts:
+            if attempt >= MAX_CHROMA_CONNECTION_ATTEMPTS:
                 raise
             time.sleep(1)  # Wait before retrying
 
