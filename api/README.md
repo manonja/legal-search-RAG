@@ -74,6 +74,25 @@ docker run -p 8000:8000 \
   legal-search-api
 ```
 
+#### Building and Pushing Docker Images
+
+You can build and push Docker images to different environments using Make:
+
+```bash
+# Build and push to development repository
+make docker-push ENV=dev
+
+# Build and push to production repository
+make docker-push ENV=prod
+
+# Specify a custom version tag (default is 'latest')
+make docker-push ENV=prod VERSION=1.0.0
+```
+
+Repositories:
+- Development: `us-central1-docker.pkg.dev/maja-dev/maja-dev`
+- Production: `us-central1-docker.pkg.dev/maja-dev/maja-prod`
+
 For production deployment, consider using Docker Compose:
 
 ```yaml
