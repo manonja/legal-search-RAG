@@ -3,6 +3,7 @@
 import asyncio
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import AsyncGenerator, Generator
 
@@ -72,6 +73,29 @@ def test_document(tmp_path: Path) -> Generator:
 
 
 @pytest.fixture
+def test_pdf_document() -> Generator:
+    """Create a test PDF document for testing document upload."""
+    doc_path = Path("tests/fixtures/sample.pdf")
+    yield doc_path
+
+
+@pytest.fixture
+def mock_process_uploaded_document(mocker):
+    """Mock the document processing function."""
+    mock_process = mocker.AsyncMock(
+        return_value={
+            "document_id": "test_document.pdf",
+            "num_chunks": 3,
+            "status": "success",
+        }
+    )
+    mocker.patch(
+        "app.services.documents.upload.process_uploaded_document", new=mock_process
+    )
+    return mock_process
+
+
+@pytest.fixture
 def mock_chroma_collection(mocker):
     """Mock the ChromaDB collection."""
     mock_collection = MagicMock()
@@ -102,6 +126,61 @@ def mock_openai_client(mocker):
     mocker.patch(
         "app.services.documents.query.get_openai_client", return_value=mock_client
     )
+    return mock_client
+
+
+@pytest.fixture
+def mock_extract_pdf_text(mocker):
+    """Mock the PDF text extraction function."""
+    mock_extract = mocker.MagicMock(
+        return_value="This is extracted text from the PDF document. It contains multiple paragraphs that will be split into chunks."
+    )
+    mocker.patch("app.services.documents.upload.extract_pdf_text", new=mock_extract)
+    return mock_extract
+
+
+@pytest.fixture
+def mock_extract_docx_text(mocker):
+    """Mock the DOCX text extraction function."""
+    mock_extract = mocker.MagicMock(
+        return_value="This is extracted text from the DOCX document."
+    )
+    mocker.patch("app.services.documents.upload.extract_docx_text", new=mock_extract)
+    return mock_extract
+
+
+@pytest.fixture
+def mock_create_text_splitter(mocker):
+    """Mock the text splitter creation function."""
+    mock_splitter = mocker.MagicMock()
+    mock_splitter.split_text.return_value = [
+        "This is chunk 1",
+        "This is chunk 2",
+        "This is chunk 3",
+    ]
+    mock_create = mocker.MagicMock(return_value=mock_splitter)
+    mocker.patch("app.services.documents.upload.create_text_splitter", new=mock_create)
+    return mock_create
+
+
+@pytest.fixture
+def mock_process_chunks(mocker):
+    """Mock the chunk processing function."""
+    mock_process = mocker.MagicMock(
+        return_value=["embedding1", "embedding2", "embedding3"]
+    )
+    mocker.patch("app.services.documents.upload.process_chunks", new=mock_process)
+    return mock_process
+
+
+@pytest.fixture
+def mock_chroma_client(mocker):
+    """Mock the ChromaDB client."""
+    mock_client = MagicMock()
+    mock_collection = MagicMock()
+    mock_collection.add.return_value = True
+    mock_client.get_or_create_collection.return_value = mock_collection
+    mocker.patch("app.utils.chroma.initialize_chroma_client", return_value=mock_client)
     return mock_client
 
 
@@ -168,13 +247,86 @@ def test_rag_search(
     assert isinstance(response.json()["confidence"], float)
 
 
-def test_upload_document(test_client: TestClient, test_document: Path) -> None:
+def test_upload_document(
+    test_client: TestClient,
+    test_pdf_document: Path,
+    mock_extract_pdf_text,
+    mock_extract_docx_text,
+    mock_create_text_splitter,
+    mock_process_chunks,
+    mock_chroma_client,
+) -> None:
     """Test document upload endpoint."""
-    with open(test_document, "rb") as f:
-        files = {"file": (TEST_DOCUMENT_ID, f, "text/plain")}
+    with open(test_pdf_document, "rb") as f:
+        files = {"file": ("sample.pdf", f, "application/pdf")}
         response = test_client.post("/api/documents/upload", files=files)
 
     assert response.status_code == 200  # noqa: S101
+    response_json = response.json()
+    assert response_json["document_id"] == "sample.pdf"
+    assert (
+        response_json["chunks"] == 3
+    )  # Should match the number of chunks from mock_create_text_splitter
+    assert response_json["status"] == "success"
+    assert response_json["message"] == "Document processed successfully"
+
+    # Verify the processing pipeline
+    mock_extract_pdf_text.assert_called_once()
+    mock_extract_docx_text.assert_not_called()  # Should not be called for PDF
+
+    # Verify text splitting
+    mock_create_text_splitter.assert_called_once()
+    splitter_instance = mock_create_text_splitter.return_value
+    splitter_instance.split_text.assert_called_once_with(
+        "This is extracted text from the PDF document. It contains multiple paragraphs that will be split into chunks."
+    )
+
+    # Verify chunk processing
+    mock_process_chunks.assert_called_once()
+
+    # Verify ChromaDB interaction
+    mock_chroma_client.get_or_create_collection.assert_called_once()
+    collection = mock_chroma_client.get_or_create_collection.return_value
+    collection.add.assert_called_once()
+
+
+def test_upload_document_docx(
+    test_client: TestClient,
+    mock_extract_pdf_text,
+    mock_extract_docx_text,
+    mock_create_text_splitter,
+    mock_process_chunks,
+) -> None:
+    """Test document upload endpoint with DOCX file."""
+    # Create a test DOCX file
+    docx_content = b"PK\x03\x04\x14\x00\x00\x00\x08\x00"  # Minimal DOCX header
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
+        f.write(docx_content)
+        docx_path = f.name
+
+    try:
+        with open(docx_path, "rb") as f:
+            files = {
+                "file": (
+                    "test_document.docx",
+                    f,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            }
+            response = test_client.post("/api/documents/upload", files=files)
+
+        assert response.status_code == 200  # noqa: S101
+        assert response.json()["document_id"] == "test_document.docx"
+        assert response.json()["num_chunks"] == 3
+        assert response.json()["status"] == "success"
+
+        # Verify the processing pipeline
+        mock_extract_pdf_text.assert_not_called()  # Should not be called for DOCX
+        mock_extract_docx_text.assert_called_once()
+        mock_create_text_splitter.assert_called_once()
+        mock_process_chunks.assert_called_once()
+    finally:
+        os.unlink(docx_path)
 
 
 def test_get_document(test_client: TestClient, test_document: Path) -> None:
