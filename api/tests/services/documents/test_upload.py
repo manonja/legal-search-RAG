@@ -3,9 +3,10 @@
 import pytest
 from pathlib import Path
 from fastapi import UploadFile
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 import shutil
 import os
+import aiofiles
 
 from app.services.documents.upload import process_uploaded_document
 from app.core.config import get_settings
@@ -52,77 +53,80 @@ def sample_docx_content():
 
 
 @pytest.mark.asyncio
-async def test_process_pdf_document():
+async def test_process_pdf_document(sample_pdf_content):
     """Test processing a PDF document."""
     # Create a test PDF file
     test_file = Path(settings.DOCS_ROOT) / "test.pdf"
-    test_file.write_text("Test content")
+    test_file.write_bytes(sample_pdf_content)
 
     # Create UploadFile object
-    upload_file = UploadFile(
-        file=open(test_file, "rb"), filename="test.pdf", content_type="application/pdf"
-    )
+    upload_file = UploadFile(file=open(test_file, "rb"), filename="test.pdf")
 
     # Process the document
     result = await process_uploaded_document(upload_file, settings)
 
     # Check result
-    pytest.assume(result["status"] == "success")
-    pytest.assume("document_id" in result)
-    pytest.assume(result["num_chunks"] > 0)
+    assert result["status"] == "success"  # noqa: S101
+    assert "document_id" in result  # noqa: S101
+    assert result["num_chunks"] > 0  # noqa: S101
 
 
 @pytest.mark.asyncio
-async def test_process_docx_document():
+async def test_process_docx_document(sample_docx_content):
     """Test processing a DOCX document."""
     # Create a test DOCX file
     test_file = Path(settings.DOCS_ROOT) / "test.docx"
-    test_file.write_text("Test content")
+    test_file.write_bytes(sample_docx_content)
 
     # Create UploadFile object
-    upload_file = UploadFile(
-        file=open(test_file, "rb"),
-        filename="test.docx",
-        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
+    upload_file = UploadFile(file=open(test_file, "rb"), filename="test.docx")
 
     # Process the document
     result = await process_uploaded_document(upload_file, settings)
 
     # Check result
-    pytest.assume(result["status"] == "success")
-    pytest.assume("document_id" in result)
-    pytest.assume(result["num_chunks"] > 0)
+    assert result["status"] == "success"  # noqa: S101
+    assert "document_id" in result  # noqa: S101
+    assert result["num_chunks"] > 0  # noqa: S101
 
 
 @pytest.mark.asyncio
 async def test_process_invalid_file():
     """Test processing an invalid file type."""
     # Create a test file with invalid extension
-    test_file = Path(settings.DOCS_ROOT) / "test.txt"
+    test_file = Path(settings.DOCS_ROOT) / "test.invalid"
     test_file.write_text("Test content")
 
     # Create UploadFile object
-    upload_file = UploadFile(
-        file=open(test_file, "rb"), filename="test.txt", content_type="text/plain"
-    )
+    upload_file = UploadFile(file=open(test_file, "rb"), filename="test.invalid")
 
-    # Process the document and expect an error
-    with pytest.raises(ValueError) as exc_info:
-        await process_uploaded_document(upload_file, settings)
-    pytest.assume("Unsupported file type" in str(exc_info.value))
+    # Process the document
+    result = await process_uploaded_document(upload_file, settings)
+
+    # Check result
+    assert result["status"] == "error"  # noqa: S101
+    assert "error" in result  # noqa: S101
+    assert "Unsupported file type" in result["error"]  # noqa: S101
 
 
 @pytest.mark.asyncio
-async def test_unsupported_file_type(mock_settings):
+async def test_unsupported_file_type():
     """Test handling of unsupported file types."""
-    # Create mock file
-    mock_file = Mock(spec=UploadFile)
-    mock_file.filename = "test.txt"
+    # Create a mock file with unsupported type
+    mock_file = AsyncMock()
+    mock_file.read.return_value = b"Test content"
+    mock_file.filename = "test.xyz"
 
-    # Process document and expect error
-    with pytest.raises(ValueError, match="Unsupported file type"):
-        await process_uploaded_document(mock_file, mock_settings)
+    # Create UploadFile object
+    upload_file = UploadFile(file=mock_file, filename="test.xyz")
+
+    # Process the document
+    result = await process_uploaded_document(upload_file, settings)
+
+    # Check result
+    assert result["status"] == "error"  # noqa: S101
+    assert "error" in result  # noqa: S101
+    assert "Unsupported file type" in result["error"]  # noqa: S101
 
 
 @pytest.mark.asyncio

@@ -26,7 +26,8 @@ dependencies = [
     "onnxruntime>=1.21.0",
     "onnx",
     "chroma-hnswlib>=0.7.1",
-    "sentry-sdk[fastapi]>=2.25.0"
+    "sentry-sdk[fastapi]>=2.25.0",
+    "aiofiles>=23.2.1"
 ]
 
 

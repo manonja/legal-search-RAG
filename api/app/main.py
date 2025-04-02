@@ -97,8 +97,9 @@ app = FastAPI(
     title=settings.API_TITLE,
     description=settings.API_DESCRIPTION,
     version=settings.API_VERSION,
-    docs_url=f"{settings.API_PREFIX}/docs",
-    redoc_url=f"{settings.API_PREFIX}/redoc",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # Configure CORS
@@ -110,12 +111,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Mount routers
 app.include_router(health_router, prefix=settings.API_PREFIX)
-app.include_router(documents_router, prefix=f"{settings.API_PREFIX}/documents")
-app.include_router(query_router, prefix=f"{settings.API_PREFIX}/query")
-app.include_router(search_router, prefix=f"{settings.API_PREFIX}/search")
-app.include_router(document_router, prefix=f"{settings.API_PREFIX}/documents")
+app.include_router(documents_router, prefix=settings.API_PREFIX)
+app.include_router(query_router, prefix=settings.API_PREFIX)
+app.include_router(search_router, prefix=settings.API_PREFIX)
 
 
 @app.on_event("startup")

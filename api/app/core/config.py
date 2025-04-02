@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     INPUT_DIR: str = "~/legal-search-data/input"
     OUTPUT_DIR: str = "~/legal-search-data/processed"
     CHROMA_DATA_DIR: str = "~/legal-search-data/chroma"
+    DOCS_ROOT: str = "~/legal-search-data/docs"
 
     # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = None

@@ -152,6 +152,17 @@ def get_cache_dir() -> Path:
     return Path(settings.CACHE_DIR)
 
 
+def get_docs_root() -> Path:
+    """Get the path to the documents root directory.
+
+    Returns:
+        Path: The path to the documents root directory.
+    """
+    settings = get_settings()
+    docs_root = settings.DOCS_ROOT
+    return Path(docs_root)
+
+
 def ensure_directories() -> None:
     """Ensure all required directories exist.
 
