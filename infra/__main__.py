@@ -1,4 +1,5 @@
 """A Google Cloud Python Pulumi program for setting up infrastructure on GCP"""
+"""A Google Cloud Python Pulumi program for setting up infrastructure on GCP"""
 
 import pulumi
 
@@ -44,7 +45,25 @@ pulumi.export(
         "/myimage:latest",
     ),
 )
+pulumi.export(
+    "docker_push_example",
+    pulumi.Output.concat(
+        "docker tag myimage:latest ",
+        docker_repository.location,
+        "-docker.pkg.dev/",
+        docker_repository.project,
+        "/",
+        docker_repository.repository_id,
+        "/myimage:latest",
+    ),
+)
 
+pulumi.export(
+    "gcloud_auth_command",
+    pulumi.Output.concat(
+        "gcloud auth configure-docker ", docker_repository.location, "-docker.pkg.dev"
+    ),
+)
 pulumi.export(
     "gcloud_auth_command",
     pulumi.Output.concat(
