@@ -90,6 +90,14 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                                 )
                             ),
                         ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="SENTRY_DSN",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="sentry-dsn", version="latest"
+                                )
+                            ),
+                        ),
                         # Data directories
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="DATA_DIR", value="/data/data"
@@ -198,6 +206,14 @@ def grant_secret_access(sa):
     secretmanager.SecretIamMember(
         "google-gemini-api-key-access",
         secret_id="projects/952577461734/secrets/google-gemini-api-key",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access to Sentry DSN secret
+    secretmanager.SecretIamMember(
+        "sentry-dsn-access",
+        secret_id="projects/952577461734/secrets/sentry-dsn",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
