@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 _client: Optional[chromadb.PersistentClient] = None
 _collection: Optional[chromadb.Collection] = None
 
+MAX_CHROMA_CONNECTION_ATTEMPTS = 3
+
 
 def get_chroma_client() -> chromadb.PersistentClient:
     """Get the shared ChromaDB client instance.
@@ -89,13 +91,14 @@ async def initialize_chroma_collection() -> chromadb.Collection:
 
     # Initialize Chroma client and collection with a retry mechanism
     logger.info("Initializing Chroma client and collection")
-    max_attempts = 3
     attempt = 0
 
-    while attempt < max_attempts:
+    while attempt < MAX_CHROMA_CONNECTION_ATTEMPTS:
         try:
             attempt += 1
-            logger.info(f"ChromaDB initialization attempt {attempt}/{max_attempts}")
+            logger.info(
+                f"ChromaDB initialization attempt {attempt}/{MAX_CHROMA_CONNECTION_ATTEMPTS}"
+            )
             if _client is None:
                 _client = initialize_chroma_client()
             # Test connection with a simple operation
