@@ -95,7 +95,7 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         # Process results
         formatted_results = []
         for _, (doc, metadata, distance) in enumerate(
-            zip(documents, metadatas, distances)
+            zip(documents, metadatas, distances, strict=False)
         ):
             # Convert distance to similarity score (0 to 1)
             similarity = 1 - (distance / 2)
