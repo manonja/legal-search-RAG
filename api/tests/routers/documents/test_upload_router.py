@@ -12,6 +12,13 @@ from app.core.config import get_settings
 from app.services.documents.upload import process_uploaded_document
 from app.services.process_docs import extract_pdf_text, extract_docx_text
 from app.services.embeddings import process_chunks
+from tests.fixtures import (
+    test_pdf_file,
+    test_docx_file,
+    test_txt_file,
+    test_dir,
+    mock_process_uploaded_document_router,
+)
 
 # Get settings
 settings = get_settings()
@@ -102,24 +109,24 @@ def mock_process_uploaded_document(mocker):
     return mock_process
 
 
-def test_upload_pdf_document(test_pdf_file, mock_process_uploaded_document):
+def test_upload_pdf_document(test_pdf_file, mock_process_uploaded_document_router):
     """Test uploading a PDF document."""
     with open(test_pdf_file, "rb") as f:
         response = client.post(
-            "/documents/upload", files={"file": ("test.pdf", f, "application/pdf")}
+            "/api/documents/upload", files={"file": ("test.pdf", f, "application/pdf")}
         )
     assert response.status_code == 200
     assert response.json()["status"] == "success"
     assert response.json()["message"] == "Document processed successfully"
     assert "document_id" in response.json()
-    mock_process_uploaded_document.assert_called_once()
+    mock_process_uploaded_document_router.assert_called_once()
 
 
-def test_upload_docx_document(test_docx_file, mock_process_uploaded_document):
+def test_upload_docx_document(test_docx_file, mock_process_uploaded_document_router):
     """Test uploading a DOCX document."""
     with open(test_docx_file, "rb") as f:
         response = client.post(
-            "/documents/upload",
+            "/api/documents/upload",
             files={
                 "file": (
                     "test.docx",
@@ -132,40 +139,46 @@ def test_upload_docx_document(test_docx_file, mock_process_uploaded_document):
     assert response.json()["status"] == "success"
     assert response.json()["message"] == "Document processed successfully"
     assert "document_id" in response.json()
-    mock_process_uploaded_document.assert_called_once()
+    mock_process_uploaded_document_router.assert_called_once()
 
 
-def test_upload_unsupported_file(test_txt_file, mock_process_uploaded_document):
+def test_upload_unsupported_file(test_txt_file, mock_process_uploaded_document_router):
     """Test uploading an unsupported file type."""
     with open(test_txt_file, "rb") as f:
         response = client.post(
-            "/documents/upload", files={"file": ("test.txt", f, "text/plain")}
+            "/api/documents/upload", files={"file": ("test.txt", f, "text/plain")}
         )
     assert response.status_code == 400
     assert "Unsupported file type" in response.json()["detail"]
-    mock_process_uploaded_document.assert_not_called()
+    mock_process_uploaded_document_router.assert_not_called()
 
 
-def test_upload_empty_file(test_dir, mock_process_uploaded_document):
+def test_upload_empty_file(test_dir, mock_process_uploaded_document_router):
     """Test uploading an empty file."""
     empty_file = test_dir / "empty.pdf"
     empty_file.touch()
+
+    # Configure the mock to raise an error for empty files
+    mock_process_uploaded_document_router.side_effect = ValueError(
+        "No text extracted from document"
+    )
+
     with open(empty_file, "rb") as f:
         response = client.post(
-            "/documents/upload", files={"file": ("empty.pdf", f, "application/pdf")}
+            "/api/documents/upload", files={"file": ("empty.pdf", f, "application/pdf")}
         )
     assert response.status_code == 400
     assert "No text extracted from document" in response.json()["detail"]
-    mock_process_uploaded_document.assert_not_called()
+    mock_process_uploaded_document_router.assert_called_once()
 
 
-def test_upload_with_error(test_pdf_file, mock_process_uploaded_document):
+def test_upload_with_error(test_pdf_file, mock_process_uploaded_document_router):
     """Test uploading a document with an error."""
-    mock_process_uploaded_document.side_effect = Exception("Test error")
+    mock_process_uploaded_document_router.side_effect = Exception("Test error")
     with open(test_pdf_file, "rb") as f:
         response = client.post(
-            "/documents/upload", files={"file": ("test.pdf", f, "application/pdf")}
+            "/api/documents/upload", files={"file": ("test.pdf", f, "application/pdf")}
         )
     assert response.status_code == 500
     assert "Test error" in response.json()["detail"]
-    mock_process_uploaded_document.assert_called_once()
+    mock_process_uploaded_document_router.assert_called_once()

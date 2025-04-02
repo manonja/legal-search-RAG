@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class SearchQuery(BaseModel):
     """Search query parameters for basic vector search."""
 
-    query: str = Field(..., description="Search query text")
+    query: str = Field(..., min_length=1, description="Search query text")
     limit: int = Field(5, description="Maximum number of results to return")
 
 

@@ -5,7 +5,7 @@ This module provides endpoints for searching documents using vector similarity.
 
 from typing import List
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from app.services.documents.search import search_documents, legacy_search_documents
 from app.models.search import SearchQuery, SearchResult, QueryRequest, QueryResponse
@@ -27,7 +27,13 @@ async def search_documents_endpoint(request: SearchQuery):
         HTTPException: If search fails
     """
     try:
+        if not request.query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
         return await search_documents(request)
+    except HTTPException:
+        raise
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to search documents: {str(e)}"
@@ -52,9 +58,13 @@ async def legacy_search_endpoint(request: QueryRequest) -> QueryResponse:
     try:
         if not request:
             raise HTTPException(status_code=400, detail="Missing request body")
+        if not request.query_text.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
         return await legacy_search_documents(request)
     except HTTPException:
         raise
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to search documents: {str(e)}"

@@ -4,14 +4,14 @@ This module defines the Pydantic models used for handling document query request
 and responses.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
 
 class QueryRequest(BaseModel):
     """Request model for document queries."""
 
-    query: str
+    query: str = Field(..., min_length=1, description="The text to search for")
     max_results: Optional[int] = 5
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 1000

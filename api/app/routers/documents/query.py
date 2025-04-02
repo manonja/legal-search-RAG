@@ -6,6 +6,7 @@ search and generating responses with OpenAI's API.
 
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
+from pydantic import ValidationError
 
 from app.services.documents.query import process_query
 from app.models.query import QueryRequest, QueryResponse
@@ -28,12 +29,19 @@ async def query_documents(request: QueryRequest) -> QueryResponse:
         HTTPException: If query processing fails
     """
     try:
+        if not request.query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+
         return await process_query(
             query=request.query,
             max_results=request.max_results,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
         )
+    except HTTPException:
+        raise
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to process query: {str(e)}"
@@ -57,12 +65,19 @@ async def rag_search(request: QueryRequest) -> QueryResponse:
         HTTPException: If RAG processing fails
     """
     try:
+        if not request.query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+
         return await process_query(
             query=request.query,
             max_results=request.max_results,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
         )
+    except HTTPException:
+        raise
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to process RAG query: {str(e)}"

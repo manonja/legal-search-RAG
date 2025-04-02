@@ -1,3 +1,5 @@
+"""Tests for document search and query routers."""
+
 import pytest
 from fastapi.testclient import TestClient
 from pathlib import Path
@@ -6,6 +8,11 @@ import shutil
 from app.main import app
 from app.services.documents.search import search_documents
 from app.services.documents.query import process_query
+from tests.fixtures import (
+    mock_search_documents_router,
+    mock_process_query_router,
+)
+from tests.constants import TEST_QUERY
 
 client = TestClient(app)
 
@@ -55,58 +62,96 @@ def mock_process_query(mocker):
     return mock_query
 
 
-def test_search_documents_success(mock_search_documents):
+def test_search_documents_success(mock_search_documents_router):
     """Test successfully searching documents."""
-    response = client.post(
-        "/documents/search", json={"query": "test query", "limit": 5}
-    )
+    response = client.post("/api/search", json={"query": TEST_QUERY, "limit": 5})
     assert response.status_code == 200
     assert len(response.json()) == 2
     assert response.json()[0]["text"] == "Test document 1"
     assert response.json()[1]["text"] == "Test document 2"
-    mock_search_documents.assert_called_once()
+    mock_search_documents_router.assert_called_once()
 
 
-def test_search_documents_empty_query(mock_search_documents):
+def test_search_documents_empty_query(mock_search_documents_router):
     """Test searching with an empty query."""
-    response = client.post("/documents/search", json={"query": "", "limit": 5})
-    assert response.status_code == 400
-    assert "Query cannot be empty" in response.json()["detail"]
-    mock_search_documents.assert_not_called()
+    response = client.post("/api/search", json={"query": "", "limit": 5})
+    assert response.status_code == 422
+
+    # FastAPI validation errors return a list of error details
+    error_details = response.json()["detail"]
+    assert isinstance(error_details, list)
+
+    # Check if any error is related to the query field
+    query_errors = [
+        error
+        for error in error_details
+        if error.get("loc") and "query" in error.get("loc")
+    ]
+    assert len(query_errors) > 0
+
+    mock_search_documents_router.assert_not_called()
 
 
-def test_search_documents_error(mock_search_documents):
+def test_search_documents_error(mock_search_documents_router):
     """Test searching documents with an error."""
-    mock_search_documents.side_effect = Exception("Search error")
-    response = client.post(
-        "/documents/search", json={"query": "test query", "limit": 5}
-    )
+    mock_search_documents_router.side_effect = Exception("Search error")
+    response = client.post("/api/search", json={"query": TEST_QUERY, "limit": 5})
     assert response.status_code == 500
     assert "Search error" in response.json()["detail"]
-    mock_search_documents.assert_called_once()
+    mock_search_documents_router.assert_called_once()
 
 
-def test_query_documents_success(mock_process_query):
+def test_query_documents_success(mock_process_query_router):
     """Test successfully querying documents."""
-    response = client.post("/documents/query", json={"query": "test query"})
+    response = client.post("/api/query", json={"query": TEST_QUERY})
     assert response.status_code == 200
     assert response.json()["answer"] == "This is a test response"
     assert len(response.json()["sources"]) == 2
-    mock_process_query.assert_called_once()
+    mock_process_query_router.assert_called_once()
 
 
-def test_query_documents_empty_query(mock_process_query):
+def test_query_documents_empty_query(mock_process_query_router):
     """Test querying with an empty query."""
-    response = client.post("/documents/query", json={"query": ""})
-    assert response.status_code == 400
-    assert "Query cannot be empty" in response.json()["detail"]
-    mock_process_query.assert_not_called()
+    response = client.post("/api/query", json={"query": ""})
+    assert response.status_code == 422
+
+    # FastAPI validation errors return a list of error details
+    error_details = response.json()["detail"]
+    assert isinstance(error_details, list)
+
+    # Check if any error is related to the query field
+    query_errors = [
+        error
+        for error in error_details
+        if error.get("loc") and "query" in error.get("loc")
+    ]
+    assert len(query_errors) > 0
+
+    mock_process_query_router.assert_not_called()
 
 
-def test_query_documents_error(mock_process_query):
+def test_query_documents_error(mock_process_query_router):
     """Test querying documents with an error."""
-    mock_process_query.side_effect = Exception("Query error")
-    response = client.post("/documents/query", json={"query": "test query"})
+    mock_process_query_router.side_effect = Exception("Query error")
+    response = client.post("/api/query", json={"query": TEST_QUERY})
     assert response.status_code == 500
     assert "Query error" in response.json()["detail"]
-    mock_process_query.assert_called_once()
+    mock_process_query_router.assert_called_once()
+
+
+def test_rag_search_success(mock_process_query_router):
+    """Test successfully performing RAG search."""
+    response = client.post(
+        "/api/rag-search",
+        json={
+            "query": TEST_QUERY,
+            "max_results": 5,
+            "temperature": 0.7,
+            "max_tokens": 1000,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["answer"] == "This is a test response"
+    assert len(response.json()["sources"]) == 2
+    assert response.json()["confidence"] == 0.8
+    mock_process_query_router.assert_called_once()
