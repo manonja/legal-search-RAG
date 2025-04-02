@@ -52,6 +52,12 @@ COPY --from=builder --chown=appuser:appuser /usr/local/lib/python3.11/site-packa
 # Copy application code (excluding .env files)
 COPY --chown=appuser:appuser . .
 
+# Create a startup script
+RUN echo '#!/bin/sh\n\
+exec python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1\n\
+' > /app/docker-entrypoint.sh && \
+    chmod +x /app/docker-entrypoint.sh
+
 # Switch to non-root user
 USER appuser
 
@@ -62,4 +68,4 @@ EXPOSE ${PORT}
 VOLUME ["/data/chroma", "/data/data"]
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", ${PORT}, "--workers", "1"]
+CMD ["/app/docker-entrypoint.sh"]

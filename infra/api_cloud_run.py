@@ -54,7 +54,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                     liveness_probe=cloudrunv2.ServiceTemplateContainerLivenessProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerLivenessProbeHttpGetArgs(
                             path="/api/health",
-                            port=8000,
+                            port=8080,
                         ),
                         initial_delay_seconds=10,
                         timeout_seconds=5,
@@ -65,7 +65,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                     startup_probe=cloudrunv2.ServiceTemplateContainerStartupProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerStartupProbeHttpGetArgs(
                             path="/api/health",
-                            port=8000,
+                            port=8080,
                         ),
                         initial_delay_seconds=0,
                         timeout_seconds=5,

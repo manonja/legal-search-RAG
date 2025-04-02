@@ -120,8 +120,4 @@ def get_settings() -> Settings:
     if _settings is None:
         _settings = Settings()
 
-    logger.info("CHROMA_DIR: %s", _settings.CHROMA_DIR)
-    logger.info("DATA_DIR: %s", _settings.DATA_DIR)
-    logger.info("COLLECTION_NAME: %s", _settings.COLLECTION_NAME)
-
     return _settings
