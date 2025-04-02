@@ -133,10 +133,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="GCP_PROJECT_ID", value="952577461734"
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="GCP_SECRET_NAME", value="maja-legal-api-token"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="GCP_SECRET_VERSION", value="1"
+                            name="API_TOKEN_SECRET_NAME",
+                            value="projects/952577461734/secrets/maja-legal-api-token/versions/1",
                         ),
                     ],
                     volume_mounts=[

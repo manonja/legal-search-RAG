@@ -22,13 +22,13 @@ WORKDIR /app
 COPY --from=builder /app/VERSION /app/VERSION
 ARG VERSION_ARG
 RUN if [ -z "$VERSION_ARG" ]; then \
-        export VERSION_ARG=$(cat /app/VERSION); \
+    export VERSION_ARG=$(cat /app/VERSION); \
     fi && \
     echo "Building image version: $VERSION_ARG"
 
 LABEL version="$VERSION_ARG" \
-      description="Legal Document RAG API" \
-      maintainer="maja"
+    description="Legal Document RAG API" \
+    maintainer="maja"
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -42,7 +42,9 @@ ENV PYTHONUNBUFFERED=1 \
     # UV settings
     UV_SYSTEM_PYTHON=1 \
     SENTRY_DSN=https://sentry.io/api/1234567890/store/ \
-    PORT=8000
+    PORT=8000 \
+    # Authentication settings
+    API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/versions/1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -66,8 +68,8 @@ COPY --chown=appuser:appuser . .
 
 # Create a startup script
 RUN echo '#!/bin/sh\n\
-exec python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1\n\
-' > /app/docker-entrypoint.sh && \
+    exec python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1\n\
+    ' > /app/docker-entrypoint.sh && \
     chmod +x /app/docker-entrypoint.sh
 
 # Switch to non-root user

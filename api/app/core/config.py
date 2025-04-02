@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     API_VERSION: str = VERSION
     API_PREFIX: str = "/api"
     API_TOKEN: Optional[str] = None
+    API_TOKEN_SECRET_NAME: Optional[str] = None
 
     # File Storage Settings
     _temp_dir: str = tempfile.mkdtemp(prefix="legal-search-")
@@ -55,8 +56,6 @@ class Settings(BaseSettings):
     USE_GCP_STORAGE: bool = False
     GCP_PROJECT_ID: str = "952577461734"
     GCS_BUCKET_NAME: str = "justice-legal-docs"
-    GCP_SECRET_NAME: str = "maja-legal-api-token"  # noqa: S105
-    GCP_SECRET_VERSION: str = "1"  # noqa: S105
 
     # Other Settings
     LOG_LEVEL: str = "INFO"

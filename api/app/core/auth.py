@@ -1,15 +1,16 @@
 """Authentication module for API security.
 
-This module provides authentication middleware and secret management
-functions for securing the API endpoints.
+This module provides authentication middleware and security functions
+for securing the API endpoints.
 """
 
 import logging
 import os
-from typing import Optional, Callable, Awaitable
+import warnings
+from typing import Awaitable, Callable, Optional
 
-from fastapi import Request, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -35,7 +36,7 @@ class TokenManager:
         """Get the API authentication token.
 
         If the token is already loaded, return it.
-        Otherwise, try to load it from environment or Secret Manager.
+        Otherwise, try to load it from environment, settings, or Secret Manager.
 
         Returns:
             str: The API token
@@ -53,42 +54,40 @@ class TokenManager:
             cls._token = token
             return token
 
-        # Try to get token from environment first
-        token = os.getenv("API_TOKEN")
+        # Try to get token from settings or environment
+        token = settings.API_TOKEN or os.getenv("API_TOKEN")
         if token:
             cls._token = token
             return token
 
         # Otherwise, get the token from GCP Secret Manager
-        try:
-            # Import here to avoid issues during testing
-            from google.cloud import secretmanager
+        # Import here to avoid issues during testing
+        from google.cloud import secretmanager
 
-            # Get configuration from settings
-            project_id = settings.GCP_PROJECT_ID
-            secret_name = settings.GCP_SECRET_NAME
-            secret_version = settings.GCP_SECRET_VERSION
-
-            # Build the secret path from configuration
-            secret_path = (
-                f"projects/{project_id}/secrets/{secret_name}/versions/{secret_version}"
+        if not settings.API_TOKEN_SECRET_NAME:
+            warnings.warn(
+                "API_TOKEN_SECRET_NAME is not set, using default token",
+                UserWarning,
+                stacklevel=2,
             )
-            logger.debug(f"Using secret path: {secret_path}")
+            cls._token = "test-token"  # noqa: S105
+            return cls._token
 
-            # Create the Secret Manager client
-            client = secretmanager.SecretManagerServiceClient()
+        # Use the full secret path directly
+        secret_path = settings.API_TOKEN_SECRET_NAME
+        logger.debug(f"Using secret path: {secret_path}")
 
-            # Access the secret version
-            response = client.access_secret_version(request={"name": secret_path})
+        # Create the Secret Manager client
+        client = secretmanager.SecretManagerServiceClient()
 
-            # Extract the payload as a string
-            token = response.payload.data.decode("UTF-8")
-            cls._token = token
+        # Access the secret version
+        response = client.access_secret_version(request={"name": secret_path})
 
-            return token
-        except Exception as e:
-            logger.error(f"Error retrieving token from Secret Manager: {e}")
-            raise Exception("Failed to retrieve authentication token") from e
+        # Extract the payload as a string
+        token = response.payload.data.decode("UTF-8")
+        cls._token = token
+
+        return token
 
     @classmethod
     async def verify_token(cls, token: str) -> bool:
@@ -134,19 +133,31 @@ async def generate_and_store_token() -> str:
         # Import here to avoid issues during testing
         from google.cloud import secretmanager
 
-        project_id = settings.GCP_PROJECT_ID
-        secret_name = settings.GCP_SECRET_NAME
+        # For token generation, we expect a simpler secret name
+        # (not the full path with version)
+        secret_path = settings.API_TOKEN_SECRET_NAME
+        logger.debug(f"Using secret path for storage: {secret_path}")
 
         # Create the Secret Manager client
         client = secretmanager.SecretManagerServiceClient()
 
-        # Build the parent resource name
-        parent = f"projects/{project_id}"
+        # If secret_path is a full path, we need to extract the parent and secret name
+        if secret_path.startswith("projects/") and "/secrets/" in secret_path:
+            # Extract the parent part (everything up to /secrets/)
+            parent = secret_path.split("/secrets/")[0]
+
+            # Extract the secret name (between /secrets/ and /versions/ if present)
+            secret_parts = secret_path.split("/secrets/")[1].split("/versions/")
+            secret_name = secret_parts[0]
+        else:
+            # Default case: use GCP project ID and the whole path as secret name
+            parent = f"projects/{settings.GCP_PROJECT_ID}"
+            secret_name = secret_path
 
         # Check if the secret already exists
-        secret_path = f"{parent}/secrets/{secret_name}"
+        full_secret_path = f"{parent}/secrets/{secret_name}"
         try:
-            client.get_secret(request={"name": secret_path})
+            client.get_secret(request={"name": full_secret_path})
             secret_exists = True
         except Exception:
             secret_exists = False
@@ -164,7 +175,7 @@ async def generate_and_store_token() -> str:
         # Add the new secret version
         client.add_secret_version(
             request={
-                "parent": secret_path,
+                "parent": full_secret_path,
                 "payload": {"data": token.encode("UTF-8")},
             }
         )
@@ -173,3 +184,63 @@ async def generate_and_store_token() -> str:
     except Exception as e:
         logger.error(f"Error storing token in Secret Manager: {e}")
         raise Exception("Failed to store authentication token") from e
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """Middleware for authentication handling."""
+
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """Process the request through the middleware.
+
+        Args:
+            request: The incoming request
+            call_next: The next middleware or route handler
+
+        Returns:
+            The response from the next handler
+        """
+        # Skip authentication for health check and docs endpoints
+        path = request.url.path
+        if (
+            path.startswith(f"{settings.API_PREFIX}/health")
+            and not path.endswith("/auth-test")
+            or path.startswith(f"{settings.API_PREFIX}/docs")
+            or path.startswith(f"{settings.API_PREFIX}/redoc")
+            or path.startswith(f"{settings.API_PREFIX}/openapi.json")
+        ):
+            return await call_next(request)
+
+        # Skip authentication in testing mode
+        if os.getenv("TESTING") == "true":
+            return await call_next(request)
+
+        # Get authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header is missing",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check if it's a Bearer token
+        scheme, _, token = auth_header.partition(" ")
+        if scheme.lower() != "bearer":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization scheme must be Bearer",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Verify token
+        if not await TokenManager.verify_token(token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Continue with the request
+        return await call_next(request)
