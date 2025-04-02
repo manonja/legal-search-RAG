@@ -1,2 +1,5 @@
 config:
   gcp:project: maja-dev
+  maja-infra:env: dev
+  pulumi:tags:
+    template: gcp-python
