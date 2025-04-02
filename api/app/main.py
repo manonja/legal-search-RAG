@@ -117,6 +117,7 @@ app.include_router(health_router, prefix=settings.API_PREFIX)
 app.include_router(documents_router, prefix=settings.API_PREFIX)
 app.include_router(query_router, prefix=settings.API_PREFIX)
 app.include_router(search_router, prefix=settings.API_PREFIX)
+app.include_router(document_router, prefix=settings.API_PREFIX)
 
 
 @app.on_event("startup")

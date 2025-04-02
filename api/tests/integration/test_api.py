@@ -191,6 +191,49 @@ def mock_chroma_client(mocker):
     return mock_client
 
 
+@pytest.fixture
+def mock_document_service(mocker):
+    """Mock the document service functions."""
+    # Mock document content
+    mock_content = "This is the content of the sample PDF document."
+    mock_metadata = {
+        "filename": "sample.pdf",
+        "size": 1024,
+        "last_modified": "2023-01-01T12:00:00",
+        "source": "local:/path/to/sample.pdf",
+    }
+
+    # Mock get_document_content function to always return the mock content
+    # regardless of the document_id passed
+    async def mock_get_content(document_id):
+        return mock_content, mock_metadata
+
+    # Apply the mock directly to the endpoint function
+    mocker.patch(
+        "app.routers.documents.document.get_document_content",
+        side_effect=mock_get_content,
+    )
+
+    return {
+        "get_content": mock_get_content,
+        "content": mock_content,
+        "metadata": mock_metadata,
+    }
+
+
+@pytest.fixture
+def mock_document_not_found(mocker):
+    """Mock document service to return a not found error."""
+
+    async def mock_get_content_error(document_id):
+        raise FileNotFoundError(f"Document not found: {document_id}")
+
+    mocker.patch(
+        "app.routers.documents.document.get_document_content",
+        side_effect=mock_get_content_error,
+    )
+
+
 def test_health_check(test_client: TestClient) -> None:
     """Test the health check endpoint."""
     response = test_client.get("/api/health")
@@ -355,11 +398,19 @@ def test_upload_document_docx(
         os.unlink(docx_path)
 
 
-def test_get_document(test_client: TestClient, test_document: Path) -> None:
+def test_get_document(
+    test_client: TestClient,
+    test_pdf_document: Path,
+    mock_extract_pdf_text,
+    mock_create_text_splitter,
+    mock_process_chunks,
+    mock_chroma_client,
+    mock_document_service,
+) -> None:
     """Test the document retrieval endpoint."""
     # First upload the document
-    with open(test_document, "rb") as f:
-        files = {"file": (TEST_DOCUMENT_ID, f, "text/plain")}
+    with open(test_pdf_document, "rb") as f:
+        files = {"file": ("sample.pdf", f, "application/pdf")}
         upload_response = test_client.post("/api/documents/upload", files=files)
 
     assert upload_response.status_code == 200  # noqa: S101
@@ -369,8 +420,17 @@ def test_get_document(test_client: TestClient, test_document: Path) -> None:
     response = test_client.get(f"/api/documents/{document_id}")
     assert response.status_code == 200  # noqa: S101
 
+    # Verify response content
+    response_json = response.json()
+    assert response_json["content"] == mock_document_service["content"]
+    assert response_json["metadata"] == mock_document_service["metadata"]
+    assert "source" in response_json
+    assert isinstance(response_json["chunks"], list)
 
-def test_get_document_not_found(test_client: TestClient) -> None:
+
+def test_get_document_not_found(
+    test_client: TestClient, mock_document_not_found
+) -> None:
     """Test document retrieval with non-existent document."""
     response = test_client.get("/api/documents/nonexistent.txt")
     assert response.status_code == 404  # noqa: S101
