@@ -29,7 +29,8 @@ ENV PYTHONUNBUFFERED=1 \
     LOG_LEVEL=INFO \
     # UV settings
     UV_SYSTEM_PYTHON=1 \
-    SENTRY_DSN=https://sentry.io/api/1234567890/store/
+    SENTRY_DSN=https://sentry.io/api/1234567890/store/ \
+    PORT=8000
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -61,4 +62,4 @@ EXPOSE ${PORT}
 VOLUME ["/data/chroma", "/data/data"]
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", ${PORT}, "--workers", "1"]
