@@ -1,6 +1,6 @@
 import pulumi
 
-from gcp_resources import create_chroma_datastore_bucket
+from buckets import create_chroma_datastore_bucket
 
 # Get the environment from Pulumi config
 config = pulumi.Config()
