@@ -6,6 +6,9 @@ import shutil
 from pathlib import Path
 from typing import AsyncGenerator, Generator
 
+# Import auth testing fixtures
+from tests.conftest_auth import testing_env, mock_api_token
+
 import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient

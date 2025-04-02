@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     API_HOST: str = "127.0.0.1"
     API_PORT: int = 8000
+    API_TOKEN: Optional[str] = None
 
     # File Storage Settings
     DATA_DIR: Path = Path("data")
@@ -62,20 +63,10 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: Optional[str] = None
     GOOGLE_MODEL: str = "gemini-pro"
     USE_GCP_STORAGE: bool = False
-    GCP_PROJECT_ID: str = "legal-search"
+    GCP_PROJECT_ID: str = "952577461734"
     GCS_BUCKET_NAME: str = "justice-legal-docs"
-
-    # JWT Settings
-    JWT_SECRET_KEY: str = "$(openssl rand -hex 32)"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
-    # Tenant Settings
-    TENANT_ID: str = "default"
-
-    # Rate Limiting
-    RATE_LIMIT_TOKENS: int = 100
-    RATE_LIMIT_REFILL_TIME: int = 60
+    GCP_SECRET_NAME: str = "maja-legal-api-token"
+    GCP_SECRET_VERSION: str = "1"
 
     # Other Settings
     HOST: str = "127.0.0.1"

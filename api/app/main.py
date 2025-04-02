@@ -37,14 +37,26 @@ for module_name in [
     if module_name not in sys.modules:
         sys.modules[module_name] = DisabledModule()
 
+# Mock Google Cloud Secret Manager in test mode
+if os.getenv("TESTING") == "true" and "google.cloud.secretmanager" not in sys.modules:
+    from unittest.mock import MagicMock
+
+    sys.modules["google.cloud"] = MagicMock()
+    sys.modules["google.cloud.secretmanager"] = MagicMock()
+    sys.modules["google.cloud.secretmanager_v1"] = MagicMock()
+
 import logging
 import uvicorn
 import sentry_sdk
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer
 
 from app.core.config import get_settings
+
+# Import the dependency from the health router
+from app.routers.health import auth_dependency
 from app.routers.health import router as health_router
 from app.routers.documents.upload import router as documents_router
 from app.routers.documents.query import router as query_router
@@ -85,7 +97,7 @@ chroma_logger.addFilter(ChromaWarningFilter())
 settings = get_settings()
 
 # Initialize Sentry only if not in test environment
-if not os.getenv("TESTING") and os.getenv("SENTRY_DSN"):
+if not os.getenv("TESTING") == "true" and os.getenv("SENTRY_DSN"):
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         # Add data like request headers and IP for users,
@@ -142,12 +154,22 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Mount routers
+# Mount routers using the correct dependency
 app.include_router(health_router, prefix=settings.API_PREFIX)
-app.include_router(documents_router, prefix=settings.API_PREFIX)
-app.include_router(query_router, prefix=settings.API_PREFIX)
-app.include_router(search_router, prefix=settings.API_PREFIX)
-app.include_router(document_router, prefix=settings.API_PREFIX)
+app.include_router(
+    documents_router,
+    prefix=settings.API_PREFIX,
+    dependencies=[Depends(auth_dependency)],
+)
+app.include_router(
+    query_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
+)
+app.include_router(
+    search_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
+)
+app.include_router(
+    document_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
+)
 
 
 if __name__ == "__main__":
