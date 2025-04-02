@@ -103,7 +103,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="DATA_DIR", value="/data/data"
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="CHROMA_DATA_DIR", value="/data/chroma"
+                            name="CHROMA_DIR", value="/data/chroma"
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="COLLECTION_NAME", value="legal_docs"

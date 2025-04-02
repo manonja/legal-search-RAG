@@ -23,7 +23,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
     # ChromaDB specific settings
-    CHROMA_DATA_DIR=/data/chroma \
+    CHROMA_DIR=/data/chroma \
     DATA_DIR=/data/data \
     COLLECTION_NAME=legal_docs \
     LOG_LEVEL=INFO \
