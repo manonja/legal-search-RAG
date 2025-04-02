@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     # File Storage Settings
     DATA_DIR: Path = Path("data")
     CHROMA_DIR: Path = Path("data/chroma")
-    CHUNKS_DIR: Path = Path("data/chunks")
     _temp_dir: str = tempfile.mkdtemp(prefix="legal-search-")
     DATA_ROOT: str = os.path.join(_temp_dir, "data")
     INPUT_DIR: str = os.path.join(_temp_dir, "input")
@@ -135,15 +134,6 @@ class Settings(BaseSettings):
         return Path(self.CHROMA_DATA_DIR)
 
     @property
-    def chunks_dir_path(self) -> Path:
-        """Get the chunks directory.
-
-        Returns:
-            Path: Path to the chunks directory
-        """
-        return Path(self.CHUNKS_ROOT)
-
-    @property
     def docs_root_path(self) -> Path:
         """Get the path to the documents root directory.
 
@@ -162,7 +152,6 @@ class Settings(BaseSettings):
             self.input_dir_path,
             self.output_dir_path,
             self.chroma_dir_path,
-            self.chunks_dir_path,
             self.docs_root_path,
         ]
 

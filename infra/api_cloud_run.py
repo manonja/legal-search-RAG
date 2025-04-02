@@ -79,7 +79,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="GOOGLE_API_KEY",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="google-gemini-api-key", version="latest"
+                                    secret="google-api-key", version="latest"
                                 )
                             ),
                         ),
@@ -154,61 +154,17 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                     ],
                     volume_mounts=[
                         cloudrunv2.ServiceTemplateContainerVolumeMountArgs(
-                            name="chroma-data", mount_path="/data/chroma"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerVolumeMountArgs(
-                            name="input-data", mount_path="/data/input"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerVolumeMountArgs(
-                            name="processed-data", mount_path="/data/processed"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerVolumeMountArgs(
-                            name="docs-data", mount_path="/data/docs"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerVolumeMountArgs(
-                            name="chunks-data", mount_path="/data/chunks"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerVolumeMountArgs(
-                            name="tenants-data", mount_path="/data/tenants"
+                            name="legal-data-bucket", mount_path="/data"
                         ),
                     ],
                 )
             ],
             volumes=[
                 cloudrunv2.ServiceTemplateVolumeArgs(
-                    name="chroma-data",
+                    name="legal-data-bucket",
                     gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
-                        bucket=chroma_bucket.name, path="chroma"
-                    ),
-                ),
-                cloudrunv2.ServiceTemplateVolumeArgs(
-                    name="input-data",
-                    gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
-                        bucket=chroma_bucket.name, path="input"
-                    ),
-                ),
-                cloudrunv2.ServiceTemplateVolumeArgs(
-                    name="processed-data",
-                    gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
-                        bucket=chroma_bucket.name, path="processed"
-                    ),
-                ),
-                cloudrunv2.ServiceTemplateVolumeArgs(
-                    name="docs-data",
-                    gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
-                        bucket=chroma_bucket.name, path="docs"
-                    ),
-                ),
-                cloudrunv2.ServiceTemplateVolumeArgs(
-                    name="chunks-data",
-                    gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
-                        bucket=chroma_bucket.name, path="chunks"
-                    ),
-                ),
-                cloudrunv2.ServiceTemplateVolumeArgs(
-                    name="tenants-data",
-                    gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
-                        bucket=chroma_bucket.name, path="tenants"
+                        bucket=chroma_bucket.name,
+                        mount_options=["implicit_dirs", "file_mode=777", "dir_mode=777"],
                     ),
                 ),
             ],

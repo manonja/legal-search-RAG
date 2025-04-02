@@ -5,6 +5,7 @@ and store them in a Chroma vector database for efficient retrieval.
 """
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -15,9 +16,15 @@ from chromadb.utils import embedding_functions
 from tqdm import tqdm
 
 from app.core.config import get_settings
+from app.services.database.chroma import get_chroma_client
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Get application settings
 settings = get_settings()
+
+BATCH_SIZE = 100
 
 # Initialize OpenAI embedding function
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -34,15 +41,8 @@ def process_chunks(chunk_file: Path, chroma_dir: Path) -> None:
         chroma_dir: Directory to store ChromaDB database
     """
 
-    # Initialize Chroma with settings
-    chroma_client = chromadb.PersistentClient(
-        path=str(chroma_dir),
-        settings=Settings(
-            anonymized_telemetry=False,
-            allow_reset=True,
-            is_persistent=True,
-        ),
-    )
+    # Use the shared Chroma client
+    chroma_client = get_chroma_client()
 
     # Create or get collection with OpenAI embedding function
     collection = chroma_client.get_or_create_collection(
@@ -59,9 +59,8 @@ def process_chunks(chunk_file: Path, chroma_dir: Path) -> None:
         chunks = [chunk.strip() for chunk in chunks]
 
     # Process chunks in batches
-    batch_size = 100
-    for i in range(0, len(chunks), batch_size):
-        batch = chunks[i : i + batch_size]
+    for i in range(0, len(chunks), BATCH_SIZE):
+        batch = chunks[i : i + BATCH_SIZE]
 
         # Generate IDs for batch
         ids = [f"{doc_id}_chunk_{j + i + 1}" for j in range(len(batch))]
@@ -70,7 +69,7 @@ def process_chunks(chunk_file: Path, chroma_dir: Path) -> None:
         collection.add(
             ids=ids,
             documents=batch,
-            metadatas=[{"source": str(file_path)} for _ in batch],
+            metadatas=[{"source": str(chunk_file)} for _ in batch],
         )
         logger.info(f"Successfully added batch of {len(batch)} chunks")
 

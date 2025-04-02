@@ -28,7 +28,6 @@ ENV PYTHONUNBUFFERED=1 \
     INPUT_DIR=/data/input \
     OUTPUT_DIR=/data/processed \
     DOCS_ROOT=/data/docs \
-    CHUNKS_DIR=/data/chunks \
     COLLECTION_NAME=legal_docs \
     # Tenant settings
     CACHE_DIR=/data/tenants/default/cache \

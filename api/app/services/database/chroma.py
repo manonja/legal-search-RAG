@@ -16,8 +16,21 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Global collection instance
+# Global instances
+_client: Optional[chromadb.PersistentClient] = None
 _collection: Optional[chromadb.Collection] = None
+
+
+def get_chroma_client() -> chromadb.PersistentClient:
+    """Get the shared ChromaDB client instance.
+
+    Returns:
+        chromadb.PersistentClient: The shared client instance
+    """
+    global _client
+    if _client is None:
+        _client = initialize_chroma_client()
+    return _client
 
 
 def initialize_chroma_client() -> chromadb.PersistentClient:
@@ -26,6 +39,12 @@ def initialize_chroma_client() -> chromadb.PersistentClient:
     Returns:
         chromadb.PersistentClient: Configured client for local storage
     """
+    global _client
+
+    # If client already exists, return it
+    if _client is not None:
+        return _client
+
     logger.info("Initializing Chroma client")
 
     # Get ChromaDB directory
@@ -34,7 +53,7 @@ def initialize_chroma_client() -> chromadb.PersistentClient:
     logger.info(f"Using local ChromaDB storage: {chroma_dir}")
 
     # Create client with telemetry disabled
-    return chromadb.PersistentClient(
+    _client = chromadb.PersistentClient(
         path=str(chroma_dir),
         settings=Settings(
             anonymized_telemetry=False,  # Disable telemetry
@@ -42,6 +61,8 @@ def initialize_chroma_client() -> chromadb.PersistentClient:
             is_persistent=True,
         ),
     )
+
+    return _client
 
 
 async def initialize_chroma_collection() -> chromadb.Collection:
@@ -53,7 +74,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
     Raises:
         Exception: If initialization fails after all retries
     """
-    global _collection
+    global _collection, _client
 
     if _collection is not None:
         return _collection
@@ -70,15 +91,15 @@ async def initialize_chroma_collection() -> chromadb.Collection:
     logger.info("Initializing Chroma client and collection")
     max_attempts = 3
     attempt = 0
-    client = None
 
     while attempt < max_attempts:
         try:
             attempt += 1
             logger.info(f"ChromaDB initialization attempt {attempt}/{max_attempts}")
-            client = initialize_chroma_client()
+            if _client is None:
+                _client = initialize_chroma_client()
             # Test connection with a simple operation
-            client.list_collections()
+            _client.list_collections()
             break
         except Exception as e:
             logger.warning(f"ChromaDB initialization attempt {attempt} failed: {e}")
@@ -88,7 +109,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
 
     # Check if collection exists before creating it
     try:
-        _collection = client.get_collection(
+        _collection = _client.get_collection(
             settings.COLLECTION_NAME, embedding_function=openai_ef
         )
         logger.info(
@@ -98,7 +119,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
     except (ValueError, InvalidCollectionException):
         # Only create collection if it doesn't exist
         logger.info(f"Creating new collection '{settings.COLLECTION_NAME}'")
-        _collection = client.create_collection(
+        _collection = _client.create_collection(
             name=settings.COLLECTION_NAME,
             embedding_function=openai_ef,
             metadata={"hnsw:space": "cosine"},

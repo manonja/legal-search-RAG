@@ -31,7 +31,6 @@ async def initialize_application():
         # Create necessary directories
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
         settings.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-        settings.CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
         logger.info("Created necessary directories")
 
         # Initialize ChromaDB collection
