@@ -132,10 +132,10 @@ def test_legacy_search_documents(
 ) -> None:
     """Test the legacy search documents endpoint."""
     response = test_client.post(
-        "/api/search",
+        "/api/search/api",
         json={
-            "query": TEST_QUERY,
-            "limit": 3,
+            "query_text": TEST_QUERY,
+            "n_results": 3,
             "min_similarity": 0.7,
             "metadata_filter": None,
         },
@@ -143,6 +143,13 @@ def test_legacy_search_documents(
     assert response.status_code == 200  # noqa: S101
     assert "results" in response.json()
     assert "total_found" in response.json()
+    assert len(response.json()["results"]) > 0
+    assert (
+        response.json()["results"][0]["text"]
+        == "This is a relevant document chunk about contracts."
+    )
+    assert response.json()["results"][0]["metadata"]["source"] == "test_doc.pdf"
+    assert response.json()["results"][0]["distance"] == 0.5
 
 
 def test_rag_search(
