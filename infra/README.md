@@ -64,4 +64,4 @@ You may need to grant these roles to service accounts or other users as needed.
 
 ## Troubleshooting
 
-If you encounter any errors related to APIs not being enabled, the code should automatically enable them for you. However, it may take a few minutes for the API activation to propagate through Google's systems. If you continue to see errors, you can try running `pulumi up` again after a few minutes. 
+If you encounter any errors related to APIs not being enabled, the code should automatically enable them for you. However, it may take a few minutes for the API activation to propagate through Google's systems. If you continue to see errors, you can try running `pulumi up` again after a few minutes.

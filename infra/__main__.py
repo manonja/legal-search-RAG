@@ -2,6 +2,7 @@
 
 import pulumi
 
+from api_cloud_run import create_api_service, get_api_url
 from apis import enable_required_apis
 from buckets import create_chroma_datastore_bucket
 from registry import create_docker_repository, get_repository_exports
@@ -20,6 +21,11 @@ docker_repository = create_docker_repository(stack, dependencies=enabled_apis)
 # Create the Chroma datastore bucket
 chroma_bucket = create_chroma_datastore_bucket(stack)
 
+# Create the Cloud Run service for the API
+cloud_run_service = create_api_service(
+    stack, docker_repository, chroma_bucket, dependencies=enabled_apis
+)
+
 # Get repository exports
 repo_exports = get_repository_exports(docker_repository)
 
@@ -29,6 +35,9 @@ for key, value in repo_exports.items():
 
 # Export the bucket name
 pulumi.export("chroma_bucket_name", chroma_bucket.name)
+
+# Export the API URL
+pulumi.export("api_url", get_api_url(cloud_run_service))
 
 # Export command examples for documentation
 pulumi.export(
