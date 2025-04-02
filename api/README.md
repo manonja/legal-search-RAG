@@ -55,10 +55,8 @@ docker build -t legal-search-api .
 
 # Run the container with proper volume mounting for data persistence
 docker run -p 8000:8000 \
-  -v $(pwd)/data:/data \
   -v $(pwd)/data/chroma:/data/chroma \
-  -v $(pwd)/data/input:/data/input \
-  -v $(pwd)/data/processed:/data/processed \
+  -v $(pwd)/data/data:/data/data \
   -e OPENAI_API_KEY=your_openai_key \
   -e GOOGLE_API_KEY=your_google_key \
   --env-file .env \

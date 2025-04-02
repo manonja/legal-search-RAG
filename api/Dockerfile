@@ -24,13 +24,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     # ChromaDB specific settings
     CHROMA_DATA_DIR=/data/chroma \
-    DATA_ROOT=/data \
-    INPUT_DIR=/data/input \
-    OUTPUT_DIR=/data/processed \
-    DOCS_ROOT=/data/docs \
+    DATA_DIR=/data/data \
     COLLECTION_NAME=legal_docs \
-    # Tenant settings
-    CACHE_DIR=/data/tenants/default/cache \
     LOG_LEVEL=INFO \
     # UV settings
     UV_SYSTEM_PYTHON=1 \
@@ -46,7 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -m -u 1000 appuser
 
 # Create required directories and set permissions
-RUN mkdir -p /data/chroma /data/input /data/processed /data/docs /data/chunks /data/tenants/default/cache && \
+RUN mkdir -p /data/chroma /data/data && \
     chown -R appuser:appuser /data && \
     chown -R appuser:appuser /app
 
@@ -63,7 +58,7 @@ USER appuser
 EXPOSE ${PORT}
 
 # Volume for persistent data (essential for ChromaDB)
-VOLUME ["/data/chroma", "/data/input", "/data/processed", "/data/docs", "/data/chunks", "/data/tenants"]
+VOLUME ["/data/chroma", "/data/data"]
 
 # Run the application
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

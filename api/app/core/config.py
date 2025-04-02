@@ -31,15 +31,9 @@ class Settings(BaseSettings):
     API_TOKEN: Optional[str] = None
 
     # File Storage Settings
-    DATA_DIR: Path = Path("data")
-    CHROMA_DIR: Path = Path("data/chroma")
     _temp_dir: str = tempfile.mkdtemp(prefix="legal-search-")
-    DATA_ROOT: str = os.path.join(_temp_dir, "data")
-    INPUT_DIR: str = os.path.join(_temp_dir, "input")
-    OUTPUT_DIR: str = os.path.join(_temp_dir, "processed")
-    CHROMA_DATA_DIR: str = os.path.join(_temp_dir, "chroma")
-    DOCS_ROOT: str = os.path.join(_temp_dir, "docs")
-    CHUNKS_ROOT: str = os.path.join(_temp_dir, "chunks")
+    DATA_DIR: Path = os.path.join(_temp_dir, "data")
+    CHROMA_DIR: Path = os.path.join(_temp_dir, "chroma")
 
     # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = None
@@ -48,8 +42,6 @@ class Settings(BaseSettings):
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     # ChromaDB Settings
     COLLECTION_NAME: str = "legal_docs"
-    CHROMA_HOST: str = "127.0.0.1"
-    CHROMA_PORT: int = 8000
 
     # Google Settings
     GOOGLE_API_KEY: Optional[str] = None
@@ -61,11 +53,8 @@ class Settings(BaseSettings):
     GCP_SECRET_VERSION: str = "1"  # noqa: S105
 
     # Other Settings
-    HOST: str = "127.0.0.1"
-    FRONTEND_PORT: int = 3000
     LOG_LEVEL: str = "INFO"
     DEBUG: bool = False
-    ADMIN_API_KEY: str = "your_admin_api_key_here"
     SENTRY_DSN: Optional[str] = None
 
     model_config = SettingsConfigDict(
@@ -89,69 +78,6 @@ class Settings(BaseSettings):
                 "Please copy .env.example to .env and set your API key."
             )
         return self.GOOGLE_API_KEY
-
-    # Path property methods
-    @property
-    def data_root_path(self) -> Path:
-        """Get the data root directory.
-
-        Returns:
-            Path: Path to the data root directory
-        """
-        return Path(self.DATA_ROOT)
-
-    @property
-    def input_dir_path(self) -> Path:
-        """Get the input directory.
-
-        Returns:
-            Path: Path to the input directory
-        """
-        return Path(self.INPUT_DIR)
-
-    @property
-    def output_dir_path(self) -> Path:
-        """Get the output directory.
-
-        Returns:
-            Path: Path to the output directory
-        """
-        return Path(self.OUTPUT_DIR)
-
-    @property
-    def chroma_dir_path(self) -> Path:
-        """Get the ChromaDB directory.
-
-        Returns:
-            Path: Path to the ChromaDB directory
-        """
-        return Path(self.CHROMA_DATA_DIR)
-
-    @property
-    def docs_root_path(self) -> Path:
-        """Get the path to the documents root directory.
-
-        Returns:
-            Path: The path to the documents root directory
-        """
-        return Path(self.DOCS_ROOT)
-
-    def ensure_directories(self) -> None:
-        """Ensure all required directories exist.
-
-        Creates any missing directories that are required for the application to function.
-        """
-        directories = [
-            self.data_root_path,
-            self.input_dir_path,
-            self.output_dir_path,
-            self.chroma_dir_path,
-            self.docs_root_path,
-        ]
-
-        for directory in directories:
-            directory.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Ensured directory exists: {directory}")
 
 
 # Singleton instance
