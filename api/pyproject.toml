@@ -20,6 +20,7 @@ dependencies = [
     "langchain>=0.0.235",
     "openai>=1.1.0",
     "google-cloud-storage>=3.1.0,<4",
+    "google-cloud-secret-manager>=2.16.0,<3",
     "fastapi>=0.104.0",
     "uvicorn>=0.23.2",
     "pydantic>=2.4.2",

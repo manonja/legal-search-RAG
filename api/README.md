@@ -126,6 +126,7 @@ The API provides the following endpoints:
 
 ### Health Check
 - `GET /api/health`: Extended health check with version information
+- `GET /api/health/auth-test`: Test endpoint for authentication (requires token)
 
 ### Document Management
 - `POST /api/documents/upload`: Upload and process documents (PDF, DOCX)
@@ -175,3 +176,68 @@ TEMPERATURE=0.0
 ```
 
 You can customize these variables in your `.env` file. See `.env.example` for a complete list of supported variables.
+
+## API Authentication
+
+All API endpoints (except `/api/health` and documentation endpoints) are protected by token-based authentication.
+
+### Token Storage
+
+Authentication tokens are securely stored in Google Cloud Secret Manager. The API is configured to use a specific secret:
+
+```
+Secret path: projects/952577461734/secrets/maja-legal-api-token/versions/1
+```
+
+This configuration is hardcoded in the application for security purposes. Environment variables for authentication are still available in the .env file, but they're primarily for development and testing:
+
+```bash
+# Authentication
+GCP_PROJECT_ID=952577461734
+GCP_SECRET_NAME=maja-legal-api-token
+GCP_SECRET_VERSION=1
+API_TOKEN=your-api-token  # Optional: Set token directly via env var (dev only)
+```
+
+### Reading the Token
+
+To view the current token stored in Secret Manager (requires appropriate permissions):
+
+```bash
+# Prerequisites: Install Google Cloud SDK and authenticate with gcloud
+# gcloud auth login
+
+# Access the specific secret version
+gcloud secrets versions access 1 --secret="maja-legal-api-token" --project="952577461734"
+```
+
+### Using the Token
+
+When making requests to protected endpoints, include the token in the Authorization header:
+
+```bash
+# Example: Uploading a document
+curl -X POST \
+  http://localhost:8000/api/documents/upload \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -F "file=@document.pdf"
+
+# Example: Accessing the auth test endpoint
+curl -X GET \
+  http://localhost:8000/api/health/auth-test \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+In Python:
+```python
+import requests
+
+headers = {"Authorization": f"Bearer {api_token}"}
+response = requests.post("http://localhost:8000/api/search",
+                         json={"query": "legal precedent"},
+                         headers=headers)
+```
+
+### Testing
+
+During testing, authentication is automatically disabled. The `TESTING=true` environment variable is set by pytest fixtures to bypass token validation in test environments.
