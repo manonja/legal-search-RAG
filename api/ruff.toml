@@ -6,5 +6,5 @@ select = [
 ]
 
 [lint.per-file-ignores]
-"api/tests/*" = ["S101"]
+"tests/*" = ["S101"]
 "api/api.py" = ["S104"]  # Allow binding to all interfaces in development

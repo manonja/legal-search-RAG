@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -21,18 +20,31 @@ wheels/
 .installed.cfg
 *.egg
 
-# Environments
-.env
-.env.local
-.venv
-env/
+# Virtual Environment
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data directories
+data/
+test_data/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# ChromaDB
+.chroma/
 
 # Cache
-cache/
 .cache/
 
 # Credentials
@@ -41,31 +53,14 @@ credentials/
 *.key
 *.crt
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
 # Logs
 logs/
-*.log
-
-# ChromaDB
-chroma/
-.chroma/
 
 # Project specific
 .pixi/
 
 # uv specific
 .uv/
-
-# Local data directories
-data/
-input/
-output/
-chunks/
 
 # Unit test / coverage reports
 htmlcov/

@@ -2,108 +2,137 @@
 
 # Import common utilities
 import logging
-
-# Conditionally import GCP storage utilities
-import os
-
-from app.utils.env import (
-    get_chroma_dir,
-    get_chunks_dir,
-    get_docs_root,
-    get_env_file_path,
-    get_google_api_key,
-    get_input_dir,
-    get_output_dir,
-    is_gcp_configured,
-    load_env,
-    validate_env_vars,
-)
-from app.utils.token_counter import count_tokens, estimate_tokens_and_cost, format_cost
-from app.utils.usage_db import (
-    check_quota_exceeded,
-    get_daily_usage,
-    get_monthly_usage,
-    get_quota_info,
-    init_usage_db,
-    record_usage,
-    reset_usage_data,
-    update_quota_settings,
-)
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
-GCP_AVAILABLE = False
 
-if os.getenv("USE_GCP_STORAGE", "false").lower() == "true":
-    try:
-        from utils.gcp_storage import (
-            download_file,
-            file_exists,
-            get_file_content,
-            init_storage_client,
-            list_files,
-            upload_file,
-        )
 
-        GCP_AVAILABLE = True
-        logger.info("GCP storage utilities imported successfully")
-    except ImportError as e:
-        logger.warning(f"Could not import GCP storage utilities: {e}")
+# Create aliased functions for backward compatibility
+def get_chroma_dir():
+    """Get the ChromaDB directory.
 
-        # Provide dummy implementations for GCP storage functions
-        def upload_file(*args, **kwargs):
-            return False, "GCP storage not available"
+    Returns:
+        Path to the ChromaDB directory
+    """
+    return get_settings().chroma_dir_path
 
-        def download_file(*args, **kwargs):
-            return False, "GCP storage not available"
 
-        def list_files(*args, **kwargs):
-            return []
+def get_chunks_dir():
+    """Get the chunks directory.
 
-        def file_exists(*args, **kwargs):
-            return False
+    Returns:
+        Path to the chunks directory
+    """
+    return get_settings().chunks_dir_path
 
-        def get_file_content(*args, **kwargs):
-            return False, None
 
-        def init_storage_client(*args, **kwargs):
-            return None
-else:
-    logger.info("GCP storage disabled in config - using local storage only")
+def get_data_root():
+    """Get the data root directory.
 
-    # Provide dummy implementations for GCP storage functions
-    def upload_file(*args, **kwargs):
-        return False, "GCP storage not available"
+    Returns:
+        Path to the data root directory
+    """
+    return get_settings().data_root_path
 
-    def download_file(*args, **kwargs):
-        return False, "GCP storage not available"
 
-    def list_files(*args, **kwargs):
-        return []
+def get_env_file_path():
+    """Get the path to the .env file.
 
-    def file_exists(*args, **kwargs):
-        return False
+    Returns:
+        Path: Path to the .env file.
+    """
+    return get_settings().get_env_file_path()
 
-    def get_file_content(*args, **kwargs):
-        return False, None
 
-    def init_storage_client(*args, **kwargs):
-        return None
+def get_google_api_key():
+    """Get the Google API key.
+
+    Returns:
+        str: The Google API key.
+    """
+    return get_settings().get_google_api_key()
+
+
+def get_input_dir():
+    """Get the input directory.
+
+    Returns:
+        Path to the input directory
+    """
+    return get_settings().input_dir_path
+
+
+def get_output_dir():
+    """Get the output directory.
+
+    Returns:
+        Path to the output directory
+    """
+    return get_settings().output_dir_path
+
+
+def get_docs_root():
+    """Get the path to the documents root directory.
+
+    Returns:
+        Path: The path to the documents root directory.
+    """
+    return get_settings().docs_root_path
+
+
+def get_cache_dir():
+    """Get the cache directory.
+
+    Returns:
+        Path to the cache directory
+    """
+    return get_settings().cache_dir_path
+
+
+def get_tenant_root():
+    """Get the tenant root directory.
+
+    Returns:
+        Path to the tenant root directory
+    """
+    return get_settings().tenant_root_path
+
+
+def load_env(validate=True):
+    """Load environment variables from .env file.
+
+    Args:
+        validate: Whether to validate required environment variables.
+    """
+    get_settings().load_env(validate)
+
+
+def validate_env_vars():
+    """Validate that all required environment variables are set.
+
+    Returns:
+        list[str]: List of missing environment variables.
+    """
+    return get_settings().validate_env_vars()
+
+
+def ensure_directories():
+    """Ensure all required directories exist."""
+    get_settings().ensure_directories()
 
 
 __all__ = [
-    "count_tokens",
-    "estimate_tokens_and_cost",
-    "format_cost",
-    "init_usage_db",
-    "record_usage",
-    "get_monthly_usage",
-    "get_quota_info",
-    # GCP Storage utilities
-    "upload_file",
-    "download_file",
-    "list_files",
-    "file_exists",
-    "get_file_content",
-    "init_storage_client",
-    "GCP_AVAILABLE",
+    "get_chroma_dir",
+    "get_chunks_dir",
+    "get_data_root",
+    "get_env_file_path",
+    "get_google_api_key",
+    "get_input_dir",
+    "get_output_dir",
+    "get_docs_root",
+    "get_cache_dir",
+    "get_tenant_root",
+    "load_env",
+    "validate_env_vars",
+    "ensure_directories",
 ]
