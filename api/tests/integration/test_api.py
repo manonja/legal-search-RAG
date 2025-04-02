@@ -306,6 +306,7 @@ def test_upload_document_docx(
     mock_extract_docx_text,
     mock_create_text_splitter,
     mock_process_chunks,
+    mock_chroma_client,
 ) -> None:
     """Test document upload endpoint with DOCX file."""
     # Create a test DOCX file
@@ -326,15 +327,30 @@ def test_upload_document_docx(
             response = test_client.post("/api/documents/upload", files=files)
 
         assert response.status_code == 200  # noqa: S101
-        assert response.json()["document_id"] == "test_document.docx"
-        assert response.json()["num_chunks"] == 3
-        assert response.json()["status"] == "success"
+        response_json = response.json()
+        assert response_json["document_id"] == "test_document.docx"
+        assert (
+            response_json["chunks"] == 3
+        )  # Should match the number of chunks from mock_create_text_splitter
+        assert response_json["status"] == "success"
+        assert response_json["message"] == "Document processed successfully"
 
         # Verify the processing pipeline
         mock_extract_pdf_text.assert_not_called()  # Should not be called for DOCX
         mock_extract_docx_text.assert_called_once()
+
+        # Verify text splitting
         mock_create_text_splitter.assert_called_once()
+        splitter_instance = mock_create_text_splitter.return_value
+        splitter_instance.split_text.assert_called_once_with(
+            "This is extracted text from the DOCX document."
+        )
+
+        # Verify that process_chunks was called with the correct arguments
         mock_process_chunks.assert_called_once()
+        args = mock_process_chunks.call_args[0]
+        assert args[0].name.endswith("chunked_test_document.docx.txt")
+
     finally:
         os.unlink(docx_path)
 
