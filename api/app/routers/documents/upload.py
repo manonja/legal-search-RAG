@@ -61,6 +61,9 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
             "status": "success",
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions without modifying them
+        raise
     except ValueError as e:
         logger.error(f"Error processing document: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e

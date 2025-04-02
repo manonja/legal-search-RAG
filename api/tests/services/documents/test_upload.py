@@ -95,8 +95,19 @@ def test_txt_file(test_dir, sample_txt_content):
 @pytest.fixture
 def mock_chroma_client(mocker):
     """Mock the ChromaDB client."""
+    # Create a mock collection
+    mock_collection = mocker.MagicMock()
+    mock_collection.add = mocker.MagicMock()
+
+    # Create a mock client
     mock_client = mocker.MagicMock()
-    mocker.patch("app.services.embeddings.get_chroma_client", return_value=mock_client)
+    mock_client.get_or_create_collection.return_value = mock_collection
+
+    # Patch the PersistentClient in the embeddings module
+    mocker.patch(
+        "app.services.embeddings.chromadb.PersistentClient", return_value=mock_client
+    )
+
     return mock_client
 
 
@@ -104,7 +115,14 @@ def mock_chroma_client(mocker):
 def mock_openai_client(mocker):
     """Mock the OpenAI client."""
     mock_client = mocker.MagicMock()
-    mocker.patch("app.services.embeddings.get_openai_client", return_value=mock_client)
+
+    # We need to patch the embedding_functions.OpenAIEmbeddingFunction
+    mock_embedding_function = mocker.MagicMock()
+    mocker.patch(
+        "app.services.embeddings.embedding_functions.OpenAIEmbeddingFunction",
+        return_value=mock_embedding_function,
+    )
+
     return mock_client
 
 
@@ -122,19 +140,16 @@ def mock_text_splitter(mocker):
 @pytest.fixture
 def mock_process_chunks(mocker):
     """Mock the process_chunks function."""
-    mock_process = mocker.MagicMock()
-    mocker.patch(
-        "app.services.documents.upload.process_chunks", return_value=mock_process
-    )
+    mock_process = mocker.patch("app.services.documents.upload.process_chunks")
     return mock_process
 
 
 @pytest.fixture
 def mock_extract_pdf(mocker):
     """Mock the extract_pdf_text function."""
-    mock_extract = mocker.MagicMock(return_value="Test PDF content")
-    mocker.patch(
-        "app.services.documents.upload.extract_pdf_text", return_value=mock_extract
+    mock_extract = mocker.patch(
+        "app.services.documents.upload.extract_pdf_text",
+        return_value="Test PDF content",
     )
     return mock_extract
 
@@ -142,9 +157,9 @@ def mock_extract_pdf(mocker):
 @pytest.fixture
 def mock_extract_docx(mocker):
     """Mock the extract_docx_text function."""
-    mock_extract = mocker.MagicMock(return_value="Test DOCX content")
-    mocker.patch(
-        "app.services.documents.upload.extract_docx_text", return_value=mock_extract
+    mock_extract = mocker.patch(
+        "app.services.documents.upload.extract_docx_text",
+        return_value="Test DOCX content",
     )
     return mock_extract
 
@@ -159,7 +174,16 @@ async def test_process_pdf_document(
     mock_extract_pdf,
 ):
     """Test processing a PDF document."""
-    result = await process_uploaded_document(test_pdf_file, settings)
+    # Create a mock UploadFile object
+    mock_file = Mock(spec=UploadFile)
+    mock_file.filename = test_pdf_file.name
+
+    # Mock the file.read method to return bytes
+    mock_file.read = AsyncMock()
+    # We need to set the return_value directly, not when creating the AsyncMock
+    mock_file.read.return_value = test_pdf_file.read_bytes()
+
+    result = await process_uploaded_document(mock_file, settings)
     assert result["status"] == "success"
     assert result["document_id"] == test_pdf_file.name
     assert result["num_chunks"] == 2
@@ -178,7 +202,15 @@ async def test_process_docx_document(
     mock_extract_docx,
 ):
     """Test processing a DOCX document."""
-    result = await process_uploaded_document(test_docx_file, settings)
+    # Create a mock UploadFile object
+    mock_file = Mock(spec=UploadFile)
+    mock_file.filename = test_docx_file.name
+
+    # Mock the file.read method to return bytes
+    mock_file.read = AsyncMock()
+    mock_file.read.return_value = test_docx_file.read_bytes()
+
+    result = await process_uploaded_document(mock_file, settings)
     assert result["status"] == "success"
     assert result["document_id"] == test_docx_file.name
     assert result["num_chunks"] == 2
@@ -196,8 +228,16 @@ async def test_process_unsupported_file(
     mock_process_chunks,
 ):
     """Test processing an unsupported file type."""
+    # Create a mock UploadFile object
+    mock_file = Mock(spec=UploadFile)
+    mock_file.filename = test_txt_file.name
+
+    # Mock the file.read method to return bytes
+    mock_file.read = AsyncMock()
+    mock_file.read.return_value = test_txt_file.read_bytes()
+
     with pytest.raises(ValueError) as exc_info:
-        await process_uploaded_document(test_txt_file, settings)
+        await process_uploaded_document(mock_file, settings)
     assert "Unsupported file type" in str(exc_info.value)
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
@@ -213,9 +253,17 @@ async def test_process_empty_document(
     mock_extract_pdf,
 ):
     """Test processing a document with no content."""
+    # Create a mock UploadFile object
+    mock_file = Mock(spec=UploadFile)
+    mock_file.filename = test_pdf_file.name
+
+    # Mock the file.read method to return bytes
+    mock_file.read = AsyncMock()
+    mock_file.read.return_value = test_pdf_file.read_bytes()
+
     mock_extract_pdf.return_value = ""
     with pytest.raises(ValueError) as exc_info:
-        await process_uploaded_document(test_pdf_file, settings)
+        await process_uploaded_document(mock_file, settings)
     assert "No text extracted from document" in str(exc_info.value)
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
@@ -231,9 +279,17 @@ async def test_process_document_with_error(
     mock_extract_pdf,
 ):
     """Test processing a document with an error."""
+    # Create a mock UploadFile object
+    mock_file = Mock(spec=UploadFile)
+    mock_file.filename = test_pdf_file.name
+
+    # Mock the file.read method to return bytes
+    mock_file.read = AsyncMock()
+    mock_file.read.return_value = test_pdf_file.read_bytes()
+
     mock_extract_pdf.side_effect = Exception("Test error")
     with pytest.raises(Exception) as exc_info:
-        await process_uploaded_document(test_pdf_file, settings)
+        await process_uploaded_document(mock_file, settings)
     assert "Test error" in str(exc_info.value)
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
