@@ -18,6 +18,7 @@ const nextConfig = {
   // This ensures Next.js allows the environment variables to be used in the client-side code
   publicRuntimeConfig: {
     apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
+    apiToken: process.env.NEXT_PUBLIC_API_TOKEN || "test",
   },
 };
 

@@ -56,7 +56,10 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Install sharp for image optimization in standalone mode
-RUN npm install --no-fund --no-audit sharp
+# Make sure to install it properly with all dependencies
+RUN apk add --no-cache vips-dev build-base && \
+    npm install --no-fund --no-audit sharp && \
+    apk del build-base
 
 # Copy necessary files
 COPY --from=builder /app/public ./public

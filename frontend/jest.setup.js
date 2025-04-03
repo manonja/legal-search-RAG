@@ -18,4 +18,19 @@ jest.mock("next/navigation", () => ({
 process.env = {
   ...process.env,
   NEXT_PUBLIC_API_URL: "http://localhost:8000",
+  NEXT_PUBLIC_API_TOKEN: "test-token",
 };
+
+// Mock window.__NEXT_DATA__ for testing the useApiToken hook
+global.window = Object.create(window);
+Object.defineProperty(window, "__NEXT_DATA__", {
+  value: {
+    props: {
+      pageProps: {},
+      __N_SSG: true,
+    },
+    runtimeConfig: {
+      apiToken: "runtime-test-token",
+    },
+  },
+});

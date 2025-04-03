@@ -70,17 +70,35 @@ const apiClient = axios.create({
 // Add request interceptor to include API token in all requests
 apiClient.interceptors.request.use(
   (config) => {
+    console.log("API Request interceptor: URL =", config.url);
+
     // Get API token from environment or local storage
-    const apiToken =
-      process.env.NEXT_PUBLIC_API_TOKEN || localStorage.getItem("api_token");
+    const apiTokenFromEnv = process.env.NEXT_PUBLIC_API_TOKEN;
+    const apiTokenFromLocalStorage =
+      typeof window !== "undefined" ? localStorage.getItem("api_token") : null;
+    const apiToken = apiTokenFromEnv || apiTokenFromLocalStorage;
+
+    console.log("API Request interceptor: Token from env?", !!apiTokenFromEnv);
+    console.log(
+      "API Request interceptor: Token from localStorage?",
+      !!apiTokenFromLocalStorage
+    );
 
     if (apiToken) {
       config.headers.Authorization = `Bearer ${apiToken}`;
+      console.log(
+        "API Request interceptor: Authorization header set successfully"
+      );
+    } else {
+      console.warn(
+        "API Request interceptor: No token available for request! Authentication will fail."
+      );
     }
 
     return config;
   },
   (error) => {
+    console.error("API Request interceptor: Error in request setup", error);
     return Promise.reject(error);
   }
 );

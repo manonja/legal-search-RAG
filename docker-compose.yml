@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  api:
+    image: legal-search-api:1.1.24
+    container_name: legal-search-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./data/chroma:/data/chroma
+    environment:
+      - API_TOKEN=test
+      # Add CORS configuration to allow requests from the frontend
+      - CORS_ALLOW_ORIGINS=http://localhost:3000
+    env_file:
+      - ./api/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - legal-search-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Build-time environment variables - these get embedded in the client JS
+        - VERSION_ARG=0.1.0
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_API_TOKEN=test
+        - API_TOKEN=test
+        - SENTRY_DSN=dummy
+        - ADMIN_PASSWORD=dummy
+        - USER_PASSWORD=dummy
+    container_name: legal-search-frontend
+    ports:
+      - "3000:10000"
+    environment:
+      # Runtime environment variables - only server-side code can access these
+      # For server-side API calls (internal Docker network)
+      - API_URL=http://api:8000
+      # For browser-side API calls - must match build args for client code
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # API token - must match the API container's token
+      - NEXT_PUBLIC_API_TOKEN=test
+      - API_TOKEN=test
+      - SENTRY_DSN=dummy
+      - ADMIN_PASSWORD=dummy
+      - USER_PASSWORD=dummy
+    depends_on:
+      - api
+    networks:
+      - legal-search-network
+
+networks:
+  legal-search-network:
+    driver: bridge
