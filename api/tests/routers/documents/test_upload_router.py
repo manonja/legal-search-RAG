@@ -1,23 +1,24 @@
 """Tests for document upload router."""
 
+import os
+import shutil
+import tempfile
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
-from pathlib import Path
-import tempfile
-import shutil
-import os
 
-from app.main import app
 from app.core.config import get_settings
+from app.main import app
 from app.services.documents.upload import process_uploaded_document
-from app.services.process_docs import extract_pdf_text, extract_docx_text
 from app.services.embeddings import process_chunks
+from app.services.process_docs import extract_docx_text, extract_pdf_text
 from tests.fixtures import (
-    test_pdf_file,
-    test_docx_file,
-    test_txt_file,
-    test_dir,
     mock_process_uploaded_document_router,
+    test_dir,
+    test_docx_file,
+    test_pdf_file,
+    test_txt_file,
 )
 
 # Get settings
@@ -129,6 +130,32 @@ def test_upload_docx_document(test_docx_file, mock_process_uploaded_document_rou
                     "test.docx",
                     f,
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert response.json()["message"] == "Document processed successfully"
+    assert "document_id" in response.json()
+    mock_process_uploaded_document_router.assert_called_once()
+
+
+def test_upload_docx_with_octet_stream(
+    test_docx_file, mock_process_uploaded_document_router
+):
+    """Test uploading a DOCX with application/octet-stream content type.
+
+    This simulates what happens when curl uploads a file without specifying
+    the correct content type, which is what's happening in the command line scenario.
+    """
+    with open(test_docx_file, "rb") as f:
+        response = client.post(
+            "/api/documents/upload",
+            files={
+                "file": (
+                    "test.docx",
+                    f,
+                    "application/octet-stream",  # Generic binary content type
                 )
             },
         )

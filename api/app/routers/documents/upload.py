@@ -43,15 +43,30 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
         HTTPException: If upload or processing fails
     """
     try:
+        # Get content type from file
+        content_type = file.content_type
+
+        # If generic content type is detected, determine based on file extension
+        if content_type == "application/octet-stream" and file.filename:
+            if file.filename.lower().endswith(".pdf"):
+                # Don't modify content_type directly, use an effective content type for validation
+                effective_content_type = "application/pdf"
+            elif file.filename.lower().endswith(".docx"):
+                effective_content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            else:
+                effective_content_type = content_type
+        else:
+            effective_content_type = content_type
+
         # Validate file content type
         allowed_mime_types = {
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         }
-        if file.content_type not in allowed_mime_types:
+        if effective_content_type not in allowed_mime_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type: {file.content_type}. Only PDF (application/pdf) and DOCX (application/vnd.openxmlformats-officedocument.wordprocessingml.document) files are supported.",
+                detail=f"Unsupported file type: {content_type}. Only PDF (application/pdf) and DOCX (application/vnd.openxmlformats-officedocument.wordprocessingml.document) files are supported.",
             )
 
         # Get settings

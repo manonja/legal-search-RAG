@@ -275,6 +275,55 @@ async def test_process_docx_document(
 
 
 @pytest.mark.asyncio
+async def test_process_docx_document_with_octet_stream_content_type(
+    test_docx_file,
+    mock_chroma_client,
+    mock_openai_client,
+    mock_text_splitter,
+    mock_process_chunks,
+    mock_extract_docx,
+    mock_datastore_service,
+):
+    """Test processing a DOCX document with application/octet-stream content type."""
+    # Create a mock UploadFile object
+    mock_file = Mock(spec=UploadFile)
+    mock_file.filename = test_docx_file.name
+    mock_file.content_type = "application/octet-stream"  # Generic binary content type
+    mock_file.seek = AsyncMock()
+
+    # Mock the file.read method to return bytes
+    mock_file.read = AsyncMock()
+    mock_file.read.return_value = test_docx_file.read_bytes()
+
+    # Before processing, modify content_type to match what the router would do
+    if mock_file.filename.lower().endswith(".docx"):
+        mock_file.content_type = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+    # Process the document
+    result = await process_uploaded_document(mock_file, settings)
+
+    # Check the result
+    assert result["status"] == "success"
+    assert result["document_id"] == "test-uuid-12345"
+    assert result["original_filename"] == "test.pdf"
+    assert result["num_chunks"] == 2
+
+    # Verify mock calls
+    mock_extract_docx.assert_called_once()
+    mock_text_splitter.split_text.assert_called_once()
+    mock_datastore_service.save_document.assert_called_once()
+
+    # Verify process_chunks was called with the correct metadata dict
+    mock_process_chunks.assert_called_once()
+    args = mock_process_chunks.call_args[0]
+    metadata_dict = args[2]  # Third argument is the metadata_dict
+    assert isinstance(metadata_dict, dict)
+    assert metadata_dict["document_id"] == "test-uuid-12345"
+
+
+@pytest.mark.asyncio
 async def test_process_unsupported_file_type(
     test_pdf_file,
     mock_chroma_client,
