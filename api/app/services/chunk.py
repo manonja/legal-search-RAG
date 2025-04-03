@@ -4,14 +4,10 @@ This script processes text files from an input directory and splits them into sm
 overlapping chunks suitable for embedding and retrieval.
 """
 
-import os
 from pathlib import Path
 from typing import List, Optional
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from tqdm import tqdm
-
-from app.core.config import get_settings
 
 
 def create_text_splitter(
@@ -66,47 +62,3 @@ def process_file(
             out.write("\n\n")
 
     return len(chunks)
-
-
-def main():
-    """Process all text files in the input directory.
-
-    Uses environment variables for input/output directories from env utils.
-    """
-    # Get input/output directories from environment utilities
-    settings = get_settings()
-    input_path = settings.output_dir_path  # Processed docs from previous step
-    output_path = settings.chunks_dir_path  # Where to save chunked docs
-
-    if not input_path.exists():
-        print(f"Error: Input directory not found: {input_path}")
-        return
-
-    print(f"\nInput directory: {input_path}")
-    print(f"Output directory: {output_path}\n")
-
-    text_splitter = create_text_splitter()
-
-    # Get list of all .txt files
-    txt_files = list(input_path.glob("*.txt"))
-
-    if not txt_files:
-        print(f"No .txt files found in {input_path}")
-        return
-
-    print(f"Found {len(txt_files)} text files to process")
-
-    total_chunks = 0
-    for file_path in tqdm(txt_files, desc="Processing files"):
-        output_file = output_path / f"chunked_{file_path.name}"
-        num_chunks = process_file(file_path, output_file, text_splitter)
-        total_chunks += num_chunks
-
-    print("\nProcessing complete!")
-    print(f"Total files processed: {len(txt_files)}")
-    print(f"Total chunks created: {total_chunks}")
-    print(f"Chunked files saved in: {output_path.absolute()}")
-
-
-if __name__ == "__main__":
-    main()
