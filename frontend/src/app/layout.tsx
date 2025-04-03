@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 // Metadata for the application
 export const metadata: Metadata = {
-  title: "Legal Search RAG",
+  title: "Prae8",
   description:
     "Search legal documents with semantic similarity and AI-powered answers",
 };

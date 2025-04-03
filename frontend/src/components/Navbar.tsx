@@ -13,7 +13,6 @@ export default function Navbar() {
     { name: "Ask Legal Questions", href: "/rag-search" },
     { name: "Book Demo", href: "/book-demo" },
     { name: "About", href: "/about" },
-    { name: "Admin", href: "/admin" },
   ];
 
   return (
