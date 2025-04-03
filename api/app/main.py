@@ -15,23 +15,20 @@ os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
 # Initialize Sentry as early as possible
 import logging
 import sys
+
 import sentry_sdk
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
 # Configure basic logging first
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get settings without importing app yet (to avoid circular imports)
-import importlib.util
+# Get settings directly
+from app.core.config import get_settings
 
-spec = importlib.util.find_spec("app.core.config")
-config_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(config_module)
-get_settings = config_module.get_settings
 settings = get_settings()
 
 # Initialize Sentry if DSN is available and not in test mode
@@ -87,28 +84,19 @@ else:
     sentry_sdk.init(dsn="")
 
 # Patch sys.modules to prevent OpenTelemetry imports from failing
+import types  # Add this import
 from contextlib import asynccontextmanager
 
 
-class DisabledModule:
+class DisabledModule(types.ModuleType):  # Inherit from types.ModuleType
     """A module that returns None for any attribute access."""
+
+    def __init__(self, name):
+        super().__init__(name)
 
     def __getattr__(self, name):
         return None
 
-
-# Create fake modules for problematic imports
-for module_name in [
-    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
-    "opentelemetry.exporter.otlp.proto.grpc.exporter",
-    "opentelemetry.sdk.resources",
-    "opentelemetry.sdk.trace",
-    "opentelemetry.sdk.trace.export",
-    "opentelemetry.trace",
-    "grpc",
-]:
-    if module_name not in sys.modules:
-        sys.modules[module_name] = DisabledModule()
 
 # Mock Google Cloud Secret Manager in test mode
 if os.getenv("TESTING") == "true" and "google.cloud.secretmanager" not in sys.modules:
@@ -119,19 +107,18 @@ if os.getenv("TESTING") == "true" and "google.cloud.secretmanager" not in sys.mo
     sys.modules["google.cloud.secretmanager_v1"] = MagicMock()
 
 import uvicorn
-
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings as app_get_settings
+from app.routers.documents.document import router as document_router
+from app.routers.documents.query import router as query_router
+from app.routers.documents.search import router as search_router
+from app.routers.documents.upload import router as documents_router
 
 # Import the dependency from the health router
 from app.routers.health import auth_dependency
 from app.routers.health import router as health_router
-from app.routers.documents.upload import router as documents_router
-from app.routers.documents.query import router as query_router
-from app.routers.documents.search import router as search_router
-from app.routers.documents.document import router as document_router
 from app.services.startup import initialize_application
 
 
