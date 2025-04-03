@@ -1,9 +1,9 @@
-import { SearchResult } from "@/lib/api";
+import { LegacySearchResult } from "@/lib/api";
 import { useState } from "react";
 import DocumentModal from "./DocumentModal";
 
 interface SearchResultCardProps {
-  result: SearchResult;
+  result: LegacySearchResult;
   query: string;
   index: number;
 }

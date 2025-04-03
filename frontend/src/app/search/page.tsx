@@ -1,14 +1,14 @@
 "use client";
 
 import SearchResultCard from "@/components/SearchResultCard";
-import { api, QueryRequest, SearchResult } from "@/lib/api";
+import { api, LegacyQueryRequest, LegacySearchResult } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<LegacySearchResult[]>([]);
   const [totalFound, setTotalFound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,13 +24,14 @@ export default function SearchPage() {
     setHasSearched(true);
 
     try {
-      const request: QueryRequest = {
+      // For compatibility with existing components, we still use the legacy search endpoint
+      const request: LegacyQueryRequest = {
         query_text: query,
         n_results: 10,
         min_similarity: 0.7,
       };
 
-      const response = await api.searchDocuments(request);
+      const response = await api.legacySearchDocuments(request);
 
       console.log(
         "Search results metadata:",

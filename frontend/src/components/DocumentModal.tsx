@@ -1,11 +1,11 @@
-import { api, DocumentResponse, SearchResult } from "@/lib/api";
+import { api, DocumentResponse, LegacySearchResult } from "@/lib/api";
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment, useEffect, useState } from "react";
 
 interface DocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  document: SearchResult | null;
+  document: LegacySearchResult | null;
 }
 
 export default function DocumentModal({
