@@ -10,20 +10,22 @@ from typing import Optional
 import chromadb
 from chromadb.config import Settings
 from chromadb.errors import InvalidCollectionException
-from chromadb.utils import embedding_functions
+from chromadb.utils.embedding_functions.openai_embedding_function import (
+    OpenAIEmbeddingFunction,
+)
 
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 # Global instances
-_client: Optional[chromadb.PersistentClient] = None
+_client: Optional[chromadb.ClientAPI] = None
 _collection: Optional[chromadb.Collection] = None
 
 MAX_CHROMA_CONNECTION_ATTEMPTS = 3
 
 
-def get_chroma_client() -> chromadb.PersistentClient:
+def get_chroma_client() -> chromadb.ClientAPI:
     """Get the shared ChromaDB client instance.
 
     Returns:
@@ -35,7 +37,7 @@ def get_chroma_client() -> chromadb.PersistentClient:
     return _client
 
 
-def initialize_chroma_client() -> chromadb.PersistentClient:
+def initialize_chroma_client() -> chromadb.ClientAPI:
     """Initialize ChromaDB client based on environment configuration.
 
     Returns:
@@ -84,7 +86,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
     settings = get_settings()
 
     # Initialize OpenAI embedding function
-    openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+    openai_ef = OpenAIEmbeddingFunction(
         api_key=settings.OPENAI_API_KEY,
         model_name=settings.EMBEDDING_MODEL,
     )
@@ -112,6 +114,8 @@ async def initialize_chroma_collection() -> chromadb.Collection:
 
     # Check if collection exists before creating it
     try:
+        if _client is None:
+            raise ValueError("Chroma client not initialized")
         _collection = _client.get_collection(
             settings.COLLECTION_NAME, embedding_function=openai_ef
         )
@@ -119,7 +123,9 @@ async def initialize_chroma_collection() -> chromadb.Collection:
             f"Collection '{settings.COLLECTION_NAME}' exists with "
             f"{_collection.count()} embeddings"
         )
-    except (ValueError, InvalidCollectionException):
+    except InvalidCollectionException as e:
+        if _client is None:
+            raise ValueError("Chroma client not initialized") from e
         # Only create collection if it doesn't exist
         logger.info(f"Creating new collection '{settings.COLLECTION_NAME}'")
         _collection = _client.create_collection(
@@ -132,7 +138,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
     return _collection
 
 
-async def get_collection() -> chromadb.Collection:
+async def get_collection() -> chromadb.Collection | None:
     """Get the ChromaDB collection instance.
 
     Returns:
