@@ -1,12 +1,12 @@
 "use client";
 
-import { api, RagRequest, RagResponse } from "@/lib/api";
+import { api, QueryRequest, QueryResponse } from "@/lib/api";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 export default function RagSearchPage() {
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState<RagResponse | null>(null);
+  const [response, setResponse] = useState<QueryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
@@ -49,31 +49,29 @@ export default function RagSearchPage() {
     setError(null);
 
     try {
-      const request: RagRequest = {
+      const request: QueryRequest = {
         query: query,
-        n_results: 5,
-        min_similarity: 0.7,
-        model: "gpt-4",
-        temperature: 0,
+        max_results: 5,
+        temperature: 0.7,
         max_tokens: 1000,
       };
-
-      // Add conversation ID if this is a follow-up question
-      if (conversationId) {
-        request.conversation_id = conversationId;
-        request.messages = conversationHistory;
-      }
 
       const result = await api.ragSearch(request);
       setResponse(result);
 
       // Update conversation history
-      setConversationId(result.conversation_id);
-      setConversationHistory([
-        ...conversationHistory,
-        { role: "user", content: query },
-        { role: "assistant", content: result.answer },
-      ]);
+      if (conversationId) {
+        setConversationHistory([
+          ...conversationHistory,
+          { role: "user", content: query },
+          { role: "assistant", content: result.answer },
+        ]);
+      } else {
+        setConversationHistory([
+          { role: "user", content: query },
+          { role: "assistant", content: result.answer },
+        ]);
+      }
 
       // Clear the query input for the next question
       setQuery("");
@@ -113,7 +111,7 @@ export default function RagSearchPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={
-                conversationId
+                conversationHistory.length > 0
                   ? "Ask a follow-up question..."
                   : "What would you like to know about legal matters?"
               }
@@ -183,97 +181,50 @@ export default function RagSearchPage() {
               <ReactMarkdown>{response.answer}</ReactMarkdown>
             </div>
 
-            {/* Usage Information */}
-            {response.usage && (
-              <div className="flex justify-between items-center text-sm text-gray-500 border-t border-gray-100 pt-4 mb-6">
-                <div>
-                  Tokens: {response.usage.input_tokens} input +{" "}
-                  {response.usage.output_tokens} output ={" "}
-                  {response.usage.total_tokens} total
-                </div>
-                <div className="font-medium">
-                  Cost: ${response.usage.cost.toFixed(4)}
+            {/* Sources */}
+            {response.sources && response.sources.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <h3 className="text-base font-medium text-gray-700 mb-4">
+                  Sources
+                </h3>
+                <div className="space-y-3">
+                  {response.sources.map((source, index) => (
+                    <div
+                      key={index}
+                      className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700"
+                    >
+                      {source}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Source Documents */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-800">
-                  Source Documents
-                </h3>
-                <span className="text-sm text-gray-500">
-                  {response.source_documents.length} source
-                  {response.source_documents.length !== 1 ? "s" : ""}
+            {/* Confidence */}
+            {response.confidence !== undefined && (
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <span className="text-gray-600">
+                  Confidence:{" "}
+                  {response.confidence > 0.8
+                    ? "High"
+                    : response.confidence > 0.5
+                      ? "Medium"
+                      : "Low"}
                 </span>
-              </div>
-              <div className="space-y-4">
-                {response.source_documents.map((source, index) => (
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
                   <div
-                    key={index}
-                    className="p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-gray-900">
-                        {source.metadata.filename || "Unknown Source"}
-                      </h4>
-                      <span className="text-sm text-gray-500">
-                        {(source.similarity * 100).toFixed(1)}% match
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {source.content}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Context Details */}
-            <div className="border-t border-gray-100 pt-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-800">
-                  Context Details
-                </h3>
-                <button
-                  onClick={() => setShowContext(!showContext)}
-                  className="bg-gray-100 px-4 py-2 rounded-full text-sm text-gray-700 hover:bg-gray-200 transition-colors"
-                >
-                  {showContext ? "Hide Context" : "Show Context"}
-                </button>
-              </div>
-
-              {showContext && (
-                <div className="space-y-6">
-                  {response.source_documents.map((result, index) => (
-                    <div
-                      key={index}
-                      className="pb-6 border-b border-gray-100 last:border-b-0 last:pb-0"
-                    >
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm text-gray-500">
-                          {result.metadata.filename || "Unknown Document"}
-                        </span>
-                      </div>
-                      <div className="flex gap-3 mb-4 flex-wrap">
-                        <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                          Similarity: {(result.similarity * 100).toFixed(1)}%
-                        </span>
-                        {result.metadata.page_number && (
-                          <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                            Page: {result.metadata.page_number}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-gray-700 leading-relaxed">
-                        {highlightText(result.content, query)}
-                      </p>
-                    </div>
-                  ))}
+                    className={`h-2 rounded-full ${
+                      response.confidence > 0.8
+                        ? "bg-green-500"
+                        : response.confidence > 0.5
+                          ? "bg-yellow-500"
+                          : "bg-red-500"
+                    }`}
+                    style={{ width: `${response.confidence * 100}%` }}
+                  ></div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </section>
       )}
