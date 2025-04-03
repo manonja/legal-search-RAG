@@ -36,9 +36,7 @@ dependencies = [
 packages = ["app"]
 
 [tool.hatch.build]
-include = [
-    "VERSION",
-]
+include = ["VERSION"]
 
 [project.optional-dependencies]
 dev = [
