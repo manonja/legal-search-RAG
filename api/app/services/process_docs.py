@@ -20,7 +20,7 @@ def extract_pdf_text(file_path):
     try:
         doc = fitz.open(file_path)
         for page in doc:
-            text += page.get_text("text")  # Extract text from each page
+            text += page.get_text("text")  # type: ignore # Extract text from each page
     except Exception as e:
         logger.error(f"Error extracting PDF {file_path}: {e}")
     return text

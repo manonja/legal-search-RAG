@@ -103,9 +103,10 @@ def mock_chroma_client(mocker):
     mock_client = mocker.MagicMock()
     mock_client.get_or_create_collection.return_value = mock_collection
 
-    # Patch the PersistentClient in the embeddings module
+    # Patch the PersistentClient in the correct location
     mocker.patch(
-        "app.services.embeddings.chromadb.PersistentClient", return_value=mock_client
+        "app.services.database.chroma.chromadb.PersistentClient",
+        return_value=mock_client,
     )
 
     return mock_client
@@ -116,10 +117,10 @@ def mock_openai_client(mocker):
     """Mock the OpenAI client."""
     mock_client = mocker.MagicMock()
 
-    # We need to patch the embedding_functions.OpenAIEmbeddingFunction
+    # We need to patch the OpenAIEmbeddingFunction
     mock_embedding_function = mocker.MagicMock()
     mocker.patch(
-        "app.services.embeddings.embedding_functions.OpenAIEmbeddingFunction",
+        "app.services.embeddings.OpenAIEmbeddingFunction",
         return_value=mock_embedding_function,
     )
 

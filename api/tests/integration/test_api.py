@@ -1,6 +1,5 @@
 """Integration tests for the FastAPI endpoints."""
 
-import asyncio
 import os
 import shutil
 import tempfile
@@ -14,9 +13,6 @@ from httpx import AsyncClient
 
 from app.core.config import get_settings
 from app.main import app
-from app.services.database.chroma import get_collection
-from app.services.documents.query import process_query
-from app.services.documents.search import search_documents
 
 # Set testing environment variable
 os.environ["TESTING"] = "true"
@@ -57,7 +53,7 @@ def test_client() -> Generator:
 @pytest.fixture
 async def async_client() -> AsyncGenerator:
     """Create an async test client for the FastAPI app."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(base_url="http://test") as client:
         yield client
 
 
@@ -181,10 +177,10 @@ def mock_chroma_client(mocker):
     mock_client = MagicMock()
     mock_client.get_or_create_collection.return_value = mock_collection
 
-    # Patch the PersistentClient in the embeddings module
-    # This is what process_chunks uses internally
+    # Patch the PersistentClient in the correct location
     mocker.patch(
-        "app.services.embeddings.chromadb.PersistentClient", return_value=mock_client
+        "app.services.database.chroma.chromadb.PersistentClient",
+        return_value=mock_client,
     )
 
     return mock_client
