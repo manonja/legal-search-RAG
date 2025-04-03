@@ -16,8 +16,11 @@ export function cn(...inputs: ClassValue[]) {
 export const constructApiUrl = (): string => {
   const apiUrlFromEnv = process.env.NEXT_PUBLIC_API_URL;
 
+  console.log("API URL from env:", apiUrlFromEnv);
+
   if (!apiUrlFromEnv) {
     // Fallback for local development
+    console.log("No API URL found, using fallback");
     return "http://localhost:8000";
   }
 
@@ -26,10 +29,13 @@ export const constructApiUrl = (): string => {
     apiUrlFromEnv.startsWith("http://") ||
     apiUrlFromEnv.startsWith("https://")
   ) {
+    console.log("Using API URL with protocol:", apiUrlFromEnv);
     return apiUrlFromEnv;
   }
 
   // For Render.com deployment where we get just the host
   // Use HTTPS for production environments
-  return `https://${apiUrlFromEnv}`;
+  const url = `https://${apiUrlFromEnv}`;
+  console.log("Using API URL with added HTTPS protocol:", url);
+  return url;
 };

@@ -1,6 +1,14 @@
 import { api } from "@/lib/api";
 import axios from "axios";
 
+// Mock localStorage
+const mockLocalStorage = {
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  clear: jest.fn(),
+};
+Object.defineProperty(window, "localStorage", { value: mockLocalStorage });
+
 // Mock the axios module directly
 jest.mock("axios", () => {
   return {
@@ -9,7 +17,11 @@ jest.mock("axios", () => {
       post: jest.fn().mockImplementation(() => Promise.resolve({ data: {} })),
       interceptors: {
         request: {
-          use: jest.fn((callback) => callback),
+          use: jest.fn((callback) => {
+            // Store the callback for testing
+            (jest as any).requestInterceptorCallback = callback;
+            return callback;
+          }),
         },
         response: {
           use: jest.fn(),
@@ -25,6 +37,38 @@ describe("API Client", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLocalStorage.getItem.mockReset();
+    mockLocalStorage.setItem.mockReset();
+    process.env.NEXT_PUBLIC_API_TOKEN = undefined;
+  });
+
+  // Test for the request interceptor that adds the Authorization header
+  it("should add the Authorization header with token from localStorage", () => {
+    // Set up the test
+    const mockToken = "test-token-123";
+    mockLocalStorage.getItem.mockReturnValue(mockToken);
+    const mockConfig = { headers: {} };
+
+    // Call the interceptor callback
+    const result = (jest as any).requestInterceptorCallback(mockConfig);
+
+    // Verify the Authorization header was added correctly
+    expect(result.headers.Authorization).toBe(`Bearer ${mockToken}`);
+    expect(mockLocalStorage.getItem).toHaveBeenCalledWith("api_token");
+  });
+
+  it("should add the Authorization header with token from environment variable", () => {
+    // Set up the test with no localStorage token
+    mockLocalStorage.getItem.mockReturnValue(null);
+    const mockEnvToken = "env-token-456";
+    process.env.NEXT_PUBLIC_API_TOKEN = mockEnvToken;
+    const mockConfig = { headers: {} };
+
+    // Call the interceptor callback
+    const result = (jest as any).requestInterceptorCallback(mockConfig);
+
+    // Verify the Authorization header was added correctly
+    expect(result.headers.Authorization).toBe(`Bearer ${mockEnvToken}`);
   });
 
   it("should call the correct endpoint for searchDocuments", async () => {
