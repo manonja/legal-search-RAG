@@ -2,8 +2,9 @@
 
 import os
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 
 # Mock the google.cloud modules early
 sys.modules["google.cloud"] = MagicMock()
@@ -11,14 +12,14 @@ sys.modules["google.cloud.secretmanager"] = MagicMock()
 sys.modules["google.cloud.secretmanager_v1"] = MagicMock()
 
 # Import after mocking
-from fastapi import FastAPI, Depends, Request, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
-from app.main import app
 from app.core.auth import TokenManager, security
 from app.core.config import get_settings
+from app.main import app
 
 
 @pytest.fixture
@@ -118,7 +119,7 @@ def test_auth_required_endpoint_with_valid_token():
         with TestClient(app) as client:
             # Send request with valid token
             response = client.get(
-                "/api/health/auth-test", headers={"Authorization": "Bearer test-token"}
+                "/api/health/auth-test", headers={"Authorization": "Bearer test"}
             )
             assert response.status_code == 200
             assert response.json()["status"] == "authenticated"

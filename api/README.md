@@ -132,7 +132,12 @@ The API provides the following endpoints:
 
 ### Search & Query
 - `POST /api/search`: Perform vector-based semantic search on documents
-- `POST /api/search/api`: Legacy search endpoint (backward compatibility)
+  - Takes a `SearchQuery` object with `query` and `limit` parameters
+  - Example: `{"query": "your search query", "limit": 10}`
+- `POST /api/search/api`: Legacy search endpoint with advanced filtering
+  - Takes a `QueryRequest` object with additional filtering capabilities
+  - Supports metadata filtering (e.g., by document_id)
+  - Example: `{"query_text": "your search query", "n_results": 10, "metadata_filter": {"document_id": "your-doc-id"}, "min_similarity": 0.7}`
 - `POST /api/query`: RAG-based question answering using documents
 
 ### API Documentation
@@ -190,6 +195,30 @@ GCP_PROJECT_ID=952577461734
 API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/versions/1
 API_TOKEN=your-api-token  # Optional: Set token directly for local development
 ```
+
+### Bulk Document Upload
+
+A utility script is provided for batch uploading documents to the API:
+
+```bash
+# Make the script executable
+chmod +x api/upload_docs.sh
+
+# Usage
+./api/upload_docs.sh -u URL -t TOKEN -f FILES
+
+# Example with real values
+./api/upload_docs.sh \
+  -u "https://maja-legal-api-dev-8aad8c9-y52ot74ira-uc.a.run.app/api/documents/upload" \
+  -t "3a57087a8ae7718065992975415fe119e1879f08e9cde4a39379f25f00a9f033" \
+  -f "/path/to/documents/*.docx"
+```
+
+Parameters:
+- `-u, --url`: API endpoint URL
+- `-t, --token`: Authorization token
+- `-f, --files`: Files to upload (supports wildcards in quotes)
+- `-h, --help`: Display help message
 
 ### Reading the Token
 

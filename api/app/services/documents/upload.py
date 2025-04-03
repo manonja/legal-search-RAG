@@ -64,8 +64,16 @@ async def process_uploaded_document(
         with open(file_path, "wb") as f:
             f.write(content)
 
-        # Extract text based on content type
+        # Get content type and determine file type based on content type or extension if needed
         content_type = file.content_type
+        if content_type == "application/octet-stream":
+            # Fallback to file extension
+            if file.filename.lower().endswith(".pdf"):
+                content_type = "application/pdf"
+            elif file.filename.lower().endswith(".docx"):
+                content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+        # Extract text based on content type
         if content_type == "application/pdf":
             extracted_text = extract_pdf_text(str(file_path))
         elif (
