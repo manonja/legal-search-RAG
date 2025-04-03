@@ -6,13 +6,13 @@ This module provides an easy API for saving and loading documents:
 - Manages extracted text and metadata
 """
 
+import json
+import logging
 import os
 import shutil
 import uuid
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, Union
-import logging
-import json
+from typing import Any, Dict, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from pydantic import BaseModel, Field
@@ -132,6 +132,10 @@ class DatastoreService:
 
         # Save original file with its original name
         original_filename = file.filename
+
+        if original_filename is None:
+            raise ValueError("Original filename is required")
+
         original_file_path = doc_dir / original_filename
 
         # Reset file position if needed
