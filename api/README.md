@@ -196,6 +196,30 @@ API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/version
 API_TOKEN=your-api-token  # Optional: Set token directly for local development
 ```
 
+### Bulk Document Upload
+
+A utility script is provided for batch uploading documents to the API:
+
+```bash
+# Make the script executable
+chmod +x api/upload_docs.sh
+
+# Usage
+./api/upload_docs.sh -u URL -t TOKEN -f FILES
+
+# Example with real values
+./api/upload_docs.sh \
+  -u "https://maja-legal-api-dev-8aad8c9-y52ot74ira-uc.a.run.app/api/documents/upload" \
+  -t "3a57087a8ae7718065992975415fe119e1879f08e9cde4a39379f25f00a9f033" \
+  -f "/path/to/documents/*.docx"
+```
+
+Parameters:
+- `-u, --url`: API endpoint URL
+- `-t, --token`: Authorization token
+- `-f, --files`: Files to upload (supports wildcards in quotes)
+- `-h, --help`: Display help message
+
 ### Reading the Token
 
 To view the current token stored in Secret Manager (requires appropriate permissions):
