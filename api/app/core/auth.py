@@ -35,59 +35,41 @@ class TokenManager:
     async def get_token(cls) -> str:
         """Get the API authentication token.
 
-        If the token is already loaded, return it.
-        Otherwise, try to load it from environment, settings, or Secret Manager.
-
         Returns:
             str: The API token
 
         Raises:
-            Exception: If token couldn't be retrieved
+            ValueError: If token is missing in production
         """
-        # If the token is already loaded, return it
+        # Return cached token if available
         if cls._token:
             return cls._token
 
-        # For tests, try to get token from environment
+        # Handle testing environment
         if os.getenv("TESTING") == "true":
-            token = os.getenv("API_TOKEN") or "test-token"
-            cls._token = token
-            return token
+            cls._token = os.getenv("API_TOKEN") or "test-token"
+            return cls._token
 
-        # Try to get token from settings or environment
+        # Try to get token from configured sources
         token = settings.API_TOKEN or os.getenv("API_TOKEN")
         if token:
             cls._token = token
             return token
 
-        # Otherwise, get the token from GCP Secret Manager
-        # Import here to avoid issues during testing
-        from google.cloud import secretmanager
-
-        if not settings.API_TOKEN_SECRET_NAME:
+        # No token found - decide what to do based on environment
+        if settings.DEBUG or not settings.is_production:
             warnings.warn(
-                "API_TOKEN_SECRET_NAME is not set, using default token",
+                "API_TOKEN environment variable is not set, using default token - NOT SECURE FOR PRODUCTION",
                 UserWarning,
                 stacklevel=2,
             )
             cls._token = "test-token"  # noqa: S105
-            return cls._token
+        else:
+            error_msg = "API_TOKEN environment variable is not set in production mode"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
-        # Use the full secret path directly
-        secret_path = settings.API_TOKEN_SECRET_NAME
-        logger.debug(f"Using secret path: {secret_path}")
-
-        # Create the Secret Manager client
-        client = secretmanager.SecretManagerServiceClient()
-
-        # Access the secret version
-        response = client.access_secret_version(request={"name": secret_path})
-
-        # Extract the payload as a string
-        token = response.payload.data.decode("UTF-8")
-        cls._token = token
-
-        return token
+        return cls._token
 
     @classmethod
     async def verify_token(cls, token: str) -> bool:
@@ -111,79 +93,20 @@ class TokenManager:
 
 
 async def generate_and_store_token() -> str:
-    """Generate a new API token and store it in Secret Manager.
+    """Generate a new API token.
 
     Returns:
         str: The generated token
-
-    Raises:
-        Exception: If token couldn't be stored
     """
     import secrets
 
     # Generate a secure random token
     token = secrets.token_hex(32)
 
-    # Don't try to store the token in Secret Manager in test mode
-    if os.getenv("TESTING") == "true":
-        return token
+    # Log the token generation (don't log the token itself)
+    logger.info("Generated new API token")
 
-    # Store the token in Secret Manager
-    try:
-        # Import here to avoid issues during testing
-        from google.cloud import secretmanager
-
-        # For token generation, we expect a simpler secret name
-        # (not the full path with version)
-        secret_path = settings.API_TOKEN_SECRET_NAME
-        logger.debug(f"Using secret path for storage: {secret_path}")
-
-        # Create the Secret Manager client
-        client = secretmanager.SecretManagerServiceClient()
-
-        # If secret_path is a full path, we need to extract the parent and secret name
-        if secret_path.startswith("projects/") and "/secrets/" in secret_path:
-            # Extract the parent part (everything up to /secrets/)
-            parent = secret_path.split("/secrets/")[0]
-
-            # Extract the secret name (between /secrets/ and /versions/ if present)
-            secret_parts = secret_path.split("/secrets/")[1].split("/versions/")
-            secret_name = secret_parts[0]
-        else:
-            # Default case: use GCP project ID and the whole path as secret name
-            parent = f"projects/{settings.GCP_PROJECT_ID}"
-            secret_name = secret_path
-
-        # Check if the secret already exists
-        full_secret_path = f"{parent}/secrets/{secret_name}"
-        try:
-            client.get_secret(request={"name": full_secret_path})
-            secret_exists = True
-        except Exception:
-            secret_exists = False
-
-        # Create the secret if it doesn't exist
-        if not secret_exists:
-            client.create_secret(
-                request={
-                    "parent": parent,
-                    "secret_id": secret_name,
-                    "secret": {"replication": {"automatic": {}}},
-                }
-            )
-
-        # Add the new secret version
-        client.add_secret_version(
-            request={
-                "parent": full_secret_path,
-                "payload": {"data": token.encode("UTF-8")},
-            }
-        )
-
-        return token
-    except Exception as e:
-        logger.error(f"Error storing token in Secret Manager: {e}")
-        raise Exception("Failed to store authentication token") from e
+    return token
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

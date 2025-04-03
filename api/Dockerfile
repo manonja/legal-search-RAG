@@ -4,13 +4,13 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 WORKDIR /app
 
 # Copy all necessary files for installation
-COPY pyproject.toml README.md VERSION ./
+COPY pyproject.toml README.md VERSION uv.lock ./
 
 # Set UV to use system Python
 ENV UV_SYSTEM_PYTHON=1
 
-# Install dependencies from pyproject.toml
-RUN uv pip install --no-cache -e .
+# Install dependencies using frozen lockfile
+RUN uv sync --frozen
 
 # Second stage
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
@@ -43,8 +43,7 @@ ENV PYTHONUNBUFFERED=1 \
     UV_SYSTEM_PYTHON=1 \
     SENTRY_DSN=https://sentry.io/api/1234567890/store/ \
     PORT=8000 \
-    # Authentication settings
-    API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/versions/1
+    API_TOKEN=your_api_token_here
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

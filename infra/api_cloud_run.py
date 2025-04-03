@@ -108,6 +108,15 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                                 )
                             ),
                         ),
+                        # API Token for authentication
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="API_TOKEN",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="maja-legal-api-token", version="latest"
+                                )
+                            ),
+                        ),
                         # Data directories
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="DATA_DIR", value="/data/data"
@@ -132,10 +141,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="GCP_PROJECT_ID", value="952577461734"
                         ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="API_TOKEN_SECRET_NAME",
-                            value="projects/952577461734/secrets/maja-legal-api-token/versions/1",
-                        ),
+                        # Removed: API_TOKEN_SECRET_NAME as we now directly use API_TOKEN env var
                     ],
                     volume_mounts=[
                         cloudrunv2.ServiceTemplateContainerVolumeMountArgs(

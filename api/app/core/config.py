@@ -35,12 +35,11 @@ class Settings(BaseSettings):
     API_VERSION: str = VERSION
     API_PREFIX: str = "/api"
     API_TOKEN: Optional[str] = None
-    API_TOKEN_SECRET_NAME: Optional[str] = None
 
     # File Storage Settings
     _temp_dir: str = tempfile.mkdtemp(prefix="legal-search-")
-    DATA_DIR: Path = os.path.join(_temp_dir, "data")
-    CHROMA_DIR: Path = os.path.join(_temp_dir, "chroma")
+    DATA_DIR: Path = Path(os.getenv("DATA_DIR", os.path.join(_temp_dir, "data")))
+    CHROMA_DIR: Path = Path(os.getenv("CHROMA_DIR", os.path.join(_temp_dir, "chroma")))
 
     # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = None
