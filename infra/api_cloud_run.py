@@ -40,7 +40,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
         template=cloudrunv2.ServiceTemplateArgs(
             scaling=cloudrunv2.ServiceTemplateScalingArgs(
                 min_instance_count=0,
-                max_instance_count=10,
+                max_instance_count=4,
             ),
             session_affinity=False,
             timeout="300s",
@@ -58,7 +58,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         version,
                     ),
                     resources=cloudrunv2.ServiceTemplateContainerResourcesArgs(
-                        limits={"memory": "2Gi", "cpu": "1"},
+                        limits={"memory": "2Gi", "cpu": "2"},
+                        startup_cpu_boost=True,
                     ),
                     # Health check via probes
                     liveness_probe=cloudrunv2.ServiceTemplateContainerLivenessProbeArgs(
