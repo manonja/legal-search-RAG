@@ -5,14 +5,14 @@ and generate responses using OpenAI's API.
 """
 
 import logging
-import json
-from typing import List, Optional, Dict, Any
+from typing import Optional
+
 import openai
 
 from app.core.config import get_settings
+from app.models.query import QueryResponse
+from app.models.search import SearchQuery
 from app.services.documents.search import search_documents
-from app.models.search import SearchQuery, SearchResult
-from app.models.query import QueryRequest, QueryResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,8 +47,11 @@ async def process_query(
 
     try:
         # First, search for relevant documents
+        search_limit = (
+            max_results if max_results is not None else 5
+        )  # Use default if None
         search_results = await search_documents(
-            SearchQuery(query=query, limit=max_results)
+            SearchQuery(query=query, limit=search_limit)
         )
 
         if not search_results:
@@ -105,8 +108,9 @@ Answer concisely and accurately, citing the relevant document sources when possi
             max_tokens=max_tokens,
         )
 
-        # Extract answer
-        answer = response.choices[0].message.content.strip()
+        # Extract answer, handling potential None
+        raw_answer = response.choices[0].message.content
+        answer = raw_answer.strip() if raw_answer else ""
 
         # Calculate confidence based on similarity scores
         # Higher similarity (lower distance) = higher confidence

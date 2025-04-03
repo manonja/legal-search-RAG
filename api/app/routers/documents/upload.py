@@ -3,14 +3,15 @@
 This module provides endpoints for uploading and processing legal documents.
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from typing import Dict, Any, Union
 import logging
 from pathlib import Path
+from typing import Any, Dict, Union
 
-from app.services.documents.upload import process_uploaded_document
-from app.services.datastore import DocumentMetadata
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
 from app.core.config import get_settings
+from app.services.datastore import DocumentMetadata
+from app.services.documents.upload import process_uploaded_document
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,11 +43,15 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
         HTTPException: If upload or processing fails
     """
     try:
-        # Validate file type
-        if not file.filename.lower().endswith((".pdf", ".docx")):
+        # Validate file content type
+        allowed_mime_types = {
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+        if file.content_type not in allowed_mime_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type: {file.filename}. Only PDF and DOCX files are supported.",
+                detail=f"Unsupported file type: {file.content_type}. Only PDF (application/pdf) and DOCX (application/vnd.openxmlformats-officedocument.wordprocessingml.document) files are supported.",
             )
 
         # Get settings

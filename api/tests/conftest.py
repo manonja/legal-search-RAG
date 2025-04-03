@@ -1,27 +1,27 @@
 """Configure pytest environment and provide common fixtures."""
 
 import os
-import sys
 import shutil
+import sys
 from pathlib import Path
 from typing import AsyncGenerator, Generator
-
-# Import auth testing fixtures
-from tests.conftest_auth import testing_env, mock_api_token
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from unittest.mock import MagicMock
 
-from app.main import app
 from app.core.config import get_settings
+from app.main import app
+
+# Import auth testing fixtures
+from tests.conftest_auth import mock_api_token, testing_env
 from tests.constants import (
-    TEST_DOCUMENT_ID,
-    TEST_DOCUMENT_CONTENT,
-    MOCK_SEARCH_RESULT_TEXT,
     MOCK_OPENAI_RESPONSE,
+    MOCK_SEARCH_RESULT_TEXT,
     PDF_SAMPLE_PATH,
+    TEST_DOCUMENT_CONTENT,
+    TEST_DOCUMENT_ID,
 )
 
 # Add the project root directory to the Python path
@@ -76,7 +76,7 @@ def test_client() -> Generator:
 @pytest.fixture
 async def async_client() -> AsyncGenerator:
     """Create an async test client for the FastAPI app."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(base_url="http://test") as client:
         yield client
 
 
@@ -135,10 +135,10 @@ def mock_chroma_client(mocker):
     mock_client = MagicMock()
     mock_client.get_or_create_collection.return_value = mock_collection
 
-    # Patch the PersistentClient in the embeddings module
-    # This is what process_chunks uses internally
+    # Patch the PersistentClient in the correct location
     mocker.patch(
-        "app.services.embeddings.chromadb.PersistentClient", return_value=mock_client
+        "app.services.database.chroma.chromadb.PersistentClient",
+        return_value=mock_client,
     )
 
     return mock_client
@@ -146,12 +146,12 @@ def mock_chroma_client(mocker):
 
 # Import document fixtures for global availability
 from tests.fixtures.document_fixtures import (
-    mock_extract_pdf_text,
-    mock_extract_docx_text,
     mock_create_text_splitter,
-    mock_process_chunks,
-    mock_document_service,
     mock_document_not_found,
+    mock_document_service,
+    mock_extract_docx_text,
+    mock_extract_pdf_text,
+    mock_process_chunks,
     mock_process_uploaded_document,
 )
 

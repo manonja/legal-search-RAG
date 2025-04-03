@@ -1,18 +1,20 @@
 """Tests for document upload functionality."""
 
-import pytest
-from pathlib import Path
-from fastapi import UploadFile
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
-import shutil
 import os
-import aiofiles
+import shutil
 import tempfile
-from app.services.documents.upload import process_uploaded_document
-from app.services.process_docs import extract_pdf_text, extract_docx_text
-from app.services.embeddings import process_chunks
-from app.services.datastore import DocumentMetadata
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import aiofiles
+import pytest
+from fastapi import UploadFile
+
 from app.core.config import get_settings
+from app.services.datastore import DocumentMetadata
+from app.services.documents.upload import process_uploaded_document
+from app.services.embeddings import process_chunks
+from app.services.process_docs import extract_docx_text, extract_pdf_text
 
 # Get settings
 settings = get_settings()
@@ -101,9 +103,10 @@ def mock_chroma_client(mocker):
     mock_client = mocker.MagicMock()
     mock_client.get_or_create_collection.return_value = mock_collection
 
-    # Patch the PersistentClient in the embeddings module
+    # Patch the PersistentClient in the correct location
     mocker.patch(
-        "app.services.embeddings.chromadb.PersistentClient", return_value=mock_client
+        "app.services.database.chroma.chromadb.PersistentClient",
+        return_value=mock_client,
     )
 
     return mock_client
@@ -114,10 +117,10 @@ def mock_openai_client(mocker):
     """Mock the OpenAI client."""
     mock_client = mocker.MagicMock()
 
-    # We need to patch the embedding_functions.OpenAIEmbeddingFunction
+    # We need to patch the OpenAIEmbeddingFunction
     mock_embedding_function = mocker.MagicMock()
     mocker.patch(
-        "app.services.embeddings.embedding_functions.OpenAIEmbeddingFunction",
+        "app.services.embeddings.OpenAIEmbeddingFunction",
         return_value=mock_embedding_function,
     )
 
@@ -198,6 +201,7 @@ async def test_process_pdf_document(
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_pdf_file.name
+    mock_file.content_type = "application/pdf"  # Add MIME type for PDF
     mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
@@ -241,6 +245,7 @@ async def test_process_docx_document(
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_docx_file.name
+    mock_file.content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"  # Add MIME type for DOCX
     mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
@@ -283,6 +288,7 @@ async def test_process_unsupported_file_type(
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = "test.xyz"  # Unsupported file type
+    mock_file.content_type = "application/octet-stream"  # Generic binary file type
     mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
@@ -291,7 +297,7 @@ async def test_process_unsupported_file_type(
 
     with pytest.raises(ValueError) as exc_info:
         await process_uploaded_document(mock_file, settings)
-    assert "Unsupported file type" in str(exc_info.value)
+    assert "Unsupported file content type" in str(exc_info.value)
     mock_extract_pdf.assert_not_called()
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
@@ -312,6 +318,7 @@ async def test_process_empty_document(
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_pdf_file.name
+    mock_file.content_type = "application/pdf"  # Add MIME type for PDF
     mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes
@@ -341,6 +348,7 @@ async def test_process_document_with_error(
     # Create a mock UploadFile object
     mock_file = Mock(spec=UploadFile)
     mock_file.filename = test_pdf_file.name
+    mock_file.content_type = "application/pdf"  # Add MIME type for PDF
     mock_file.seek = AsyncMock()
 
     # Mock the file.read method to return bytes

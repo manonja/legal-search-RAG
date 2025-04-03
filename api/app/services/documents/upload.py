@@ -8,19 +8,20 @@ This module provides functionality to process uploaded documents through the RAG
 5. Store in ChromaDB
 """
 
+import logging
 import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, Any, Union
-import logging
+from typing import Any, Dict, Union
+
 from fastapi import UploadFile
 
-from app.services.process_docs import extract_pdf_text, extract_docx_text
-from app.services.chunk import create_text_splitter
-from app.services.embeddings import process_chunks
-from app.services.datastore import get_datastore_service, DocumentMetadata
 from app.core.config import Settings
+from app.services.chunk import create_text_splitter
+from app.services.datastore import DocumentMetadata, get_datastore_service
+from app.services.embeddings import process_chunks
+from app.services.process_docs import extract_docx_text, extract_pdf_text
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -50,21 +51,32 @@ async def process_uploaded_document(
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        # Save uploaded file temporarily for processing
+        # Ensure filename exists
+        if not file.filename:
+            raise ValueError("Uploaded file must have a filename")
+
+        # Construct the full path for the temporary file
         file_path = temp_path / file.filename
+
+        # Save uploaded file temporarily for processing
         await file.seek(0)  # Reset file position
         content = await file.read()
         with open(file_path, "wb") as f:
             f.write(content)
 
-        # Detect file type and extract text
-        extracted_text = ""
-        if file.filename.lower().endswith(".pdf"):
+        # Extract text based on content type
+        content_type = file.content_type
+        if content_type == "application/pdf":
             extracted_text = extract_pdf_text(str(file_path))
-        elif file.filename.lower().endswith(".docx"):
+        elif (
+            content_type
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ):
             extracted_text = extract_docx_text(str(file_path))
         else:
-            raise ValueError(f"Unsupported file type: {file.filename}")
+            raise ValueError(
+                f"Unsupported file content type: {content_type}. Could not determine how to extract text."
+            )
 
         if not extracted_text.strip():
             raise ValueError("No text extracted from document")

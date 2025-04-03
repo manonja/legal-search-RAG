@@ -8,11 +8,11 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, Optional
 
-import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
+from chromadb.utils.embedding_functions.openai_embedding_function import (
+    OpenAIEmbeddingFunction,
+)
 from tqdm import tqdm
 
 from app.core.config import get_settings
@@ -27,7 +27,7 @@ settings = get_settings()
 BATCH_SIZE = 100
 
 # Initialize OpenAI embedding function
-openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+openai_ef = OpenAIEmbeddingFunction(
     api_key=settings.OPENAI_API_KEY,
     model_name=settings.EMBEDDING_MODEL,
 )
@@ -53,7 +53,7 @@ def process_chunks(
     collection = chroma_client.get_or_create_collection(
         name=settings.COLLECTION_NAME,
         metadata={"description": "Legal document embeddings"},
-        embedding_function=openai_ef,
+        embedding_function=openai_ef,  # type: ignore
     )
 
     doc_id = (
