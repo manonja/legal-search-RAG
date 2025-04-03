@@ -82,3 +82,11 @@ endif
 # Push Docker image to repository
 docker-push: docker-build
 	docker push $(REPO)/legal-search-api:$(VERSION)
+
+# Build Docker image without cache
+docker-build-no-cache:
+ifeq ($(ENV),dev)
+	$(MAKE) patch
+endif
+	docker build --no-cache -t legal-search-api:$(VERSION) --build-arg VERSION_ARG=$(VERSION) .
+	docker tag legal-search-api:$(VERSION) $(REPO)/legal-search-api:$(VERSION)

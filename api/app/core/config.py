@@ -38,8 +38,8 @@ class Settings(BaseSettings):
 
     # File Storage Settings
     _temp_dir: str = tempfile.mkdtemp(prefix="legal-search-")
-    DATA_DIR: Path = os.path.join(_temp_dir, "data")
-    CHROMA_DIR: Path = os.path.join(_temp_dir, "chroma")
+    DATA_DIR: Path = Path(os.getenv("DATA_DIR", os.path.join(_temp_dir, "data")))
+    CHROMA_DIR: Path = Path(os.getenv("CHROMA_DIR", os.path.join(_temp_dir, "chroma")))
 
     # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = None
@@ -55,8 +55,6 @@ class Settings(BaseSettings):
     USE_GCP_STORAGE: bool = False
     GCP_PROJECT_ID: str = "952577461734"
     GCS_BUCKET_NAME: str = "justice-legal-docs"
-    GCP_SECRET_NAME: str = "maja-legal-api-token"  # noqa: S105
-    GCP_SECRET_VERSION: str = "1"  # noqa: S105
 
     # Other Settings
     LOG_LEVEL: str = "INFO"

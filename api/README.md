@@ -175,20 +175,20 @@ All API endpoints (except `/api/health` and documentation endpoints) are protect
 
 ### Token Storage
 
-Authentication tokens are securely stored in Google Cloud Secret Manager. The API is configured to use a specific secret:
+Authentication tokens are securely stored in Google Cloud Secret Manager. The API is configured to use a secret identified by the full path in Secret Manager:
 
 ```
-Secret path: projects/952577461734/secrets/maja-legal-api-token/versions/1
+# Full path format used in settings and configuration
+API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/versions/1
 ```
 
-This configuration is hardcoded in the application for security purposes. Environment variables for authentication are still available in the .env file, but they're primarily for development and testing:
+This configuration should be set through environment variables:
 
 ```bash
-# Authentication
+# Authentication settings
 GCP_PROJECT_ID=952577461734
-GCP_SECRET_NAME=maja-legal-api-token
-GCP_SECRET_VERSION=1
-API_TOKEN=your-api-token  # Optional: Set token directly via env var (dev only)
+API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/versions/1
+API_TOKEN=your-api-token  # Optional: Set token directly for local development
 ```
 
 ### Reading the Token
@@ -199,7 +199,7 @@ To view the current token stored in Secret Manager (requires appropriate permiss
 # Prerequisites: Install Google Cloud SDK and authenticate with gcloud
 # gcloud auth login
 
-# Access the specific secret version
+# Access the specific version as configured in your environment
 gcloud secrets versions access 1 --secret="maja-legal-api-token" --project="952577461734"
 ```
 

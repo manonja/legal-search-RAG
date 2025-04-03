@@ -9,21 +9,18 @@ description = "Legal search RAG project"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
-authors = [
-    { name = "Legal Search Team" }
-]
+authors = [{ name = "Legal Search Team" }]
 dependencies = [
     "numpy>=1.0.0,<2.0.0",
     "python-docx>=0.8.11",
     "google-generativeai",
     "chromadb>=0.6.3,<0.7.0",
-    "langchain>=0.0.235",
-    "openai>=1.1.0",
+    "langchain>=0.3.22,<0.4.0",
+    "openai>=1.70.0,<1.80.0",
     "google-cloud-storage>=3.1.0,<4",
-    "google-cloud-secret-manager>=2.16.0,<3",
-    "fastapi>=0.104.0",
-    "uvicorn>=0.23.2",
-    "pydantic>=2.4.2",
+    "fastapi>=0.115.12,<0.116.0",
+    "uvicorn>=0.34.0,<0.35.0",
+    "pydantic>=2.11.1,<2.12.0",
     "onnxruntime>=1.21.0",
     "onnx",
     "chroma-hnswlib>=0.7.1",
@@ -35,9 +32,13 @@ dependencies = [
 ]
 
 
-
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.hatch.build]
+include = [
+    "VERSION",
+]
 
 [project.optional-dependencies]
 dev = [

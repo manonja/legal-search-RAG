@@ -1,15 +1,16 @@
 """Authentication module for API security.
 
-This module provides authentication middleware and secret management
-functions for securing the API endpoints.
+This module provides authentication middleware and security functions
+for securing the API endpoints.
 """
 
 import logging
 import os
-from typing import Optional, Callable, Awaitable
+import warnings
+from typing import Awaitable, Callable, Optional
 
-from fastapi import Request, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -34,61 +35,41 @@ class TokenManager:
     async def get_token(cls) -> str:
         """Get the API authentication token.
 
-        If the token is already loaded, return it.
-        Otherwise, try to load it from environment or Secret Manager.
-
         Returns:
             str: The API token
 
         Raises:
-            Exception: If token couldn't be retrieved
+            ValueError: If token is missing in production
         """
-        # If the token is already loaded, return it
+        # Return cached token if available
         if cls._token:
             return cls._token
 
-        # For tests, try to get token from environment
+        # Handle testing environment
         if os.getenv("TESTING") == "true":
-            token = os.getenv("API_TOKEN") or "test-token"
-            cls._token = token
-            return token
+            cls._token = os.getenv("API_TOKEN") or "test-token"
+            return cls._token
 
-        # Try to get token from environment first
-        token = os.getenv("API_TOKEN")
+        # Try to get token from configured sources
+        token = settings.API_TOKEN or os.getenv("API_TOKEN")
         if token:
             cls._token = token
             return token
 
-        # Otherwise, get the token from GCP Secret Manager
-        try:
-            # Import here to avoid issues during testing
-            from google.cloud import secretmanager
-
-            # Get configuration from settings
-            project_id = settings.GCP_PROJECT_ID
-            secret_name = settings.GCP_SECRET_NAME
-            secret_version = settings.GCP_SECRET_VERSION
-
-            # Build the secret path from configuration
-            secret_path = (
-                f"projects/{project_id}/secrets/{secret_name}/versions/{secret_version}"
+        # No token found - decide what to do based on environment
+        if settings.DEBUG or not settings.is_production:
+            warnings.warn(
+                "API_TOKEN environment variable is not set, using default token - NOT SECURE FOR PRODUCTION",
+                UserWarning,
+                stacklevel=2,
             )
-            logger.debug(f"Using secret path: {secret_path}")
+            cls._token = "test-token"  # noqa: S105
+        else:
+            error_msg = "API_TOKEN environment variable is not set in production mode"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
-            # Create the Secret Manager client
-            client = secretmanager.SecretManagerServiceClient()
-
-            # Access the secret version
-            response = client.access_secret_version(request={"name": secret_path})
-
-            # Extract the payload as a string
-            token = response.payload.data.decode("UTF-8")
-            cls._token = token
-
-            return token
-        except Exception as e:
-            logger.error(f"Error retrieving token from Secret Manager: {e}")
-            raise Exception("Failed to retrieve authentication token") from e
+        return cls._token
 
     @classmethod
     async def verify_token(cls, token: str) -> bool:
@@ -112,64 +93,77 @@ class TokenManager:
 
 
 async def generate_and_store_token() -> str:
-    """Generate a new API token and store it in Secret Manager.
+    """Generate a new API token.
 
     Returns:
         str: The generated token
-
-    Raises:
-        Exception: If token couldn't be stored
     """
     import secrets
 
     # Generate a secure random token
     token = secrets.token_hex(32)
 
-    # Don't try to store the token in Secret Manager in test mode
-    if os.getenv("TESTING") == "true":
-        return token
+    # Log the token generation (don't log the token itself)
+    logger.info("Generated new API token")
 
-    # Store the token in Secret Manager
-    try:
-        # Import here to avoid issues during testing
-        from google.cloud import secretmanager
+    return token
 
-        project_id = settings.GCP_PROJECT_ID
-        secret_name = settings.GCP_SECRET_NAME
 
-        # Create the Secret Manager client
-        client = secretmanager.SecretManagerServiceClient()
+class AuthMiddleware(BaseHTTPMiddleware):
+    """Middleware for authentication handling."""
 
-        # Build the parent resource name
-        parent = f"projects/{project_id}"
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """Process the request through the middleware.
 
-        # Check if the secret already exists
-        secret_path = f"{parent}/secrets/{secret_name}"
-        try:
-            client.get_secret(request={"name": secret_path})
-            secret_exists = True
-        except Exception:
-            secret_exists = False
+        Args:
+            request: The incoming request
+            call_next: The next middleware or route handler
 
-        # Create the secret if it doesn't exist
-        if not secret_exists:
-            client.create_secret(
-                request={
-                    "parent": parent,
-                    "secret_id": secret_name,
-                    "secret": {"replication": {"automatic": {}}},
-                }
+        Returns:
+            The response from the next handler
+        """
+        # Skip authentication for health check and docs endpoints
+        path = request.url.path
+        if (
+            path.startswith(f"{settings.API_PREFIX}/health")
+            and not path.endswith("/auth-test")
+            or path.startswith(f"{settings.API_PREFIX}/docs")
+            or path.startswith(f"{settings.API_PREFIX}/redoc")
+            or path.startswith(f"{settings.API_PREFIX}/openapi.json")
+        ):
+            return await call_next(request)
+
+        # Skip authentication in testing mode
+        if os.getenv("TESTING") == "true":
+            return await call_next(request)
+
+        # Get authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header is missing",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Add the new secret version
-        client.add_secret_version(
-            request={
-                "parent": secret_path,
-                "payload": {"data": token.encode("UTF-8")},
-            }
-        )
+        # Check if it's a Bearer token
+        scheme, _, token = auth_header.partition(" ")
+        if scheme.lower() != "bearer":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization scheme must be Bearer",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
-        return token
-    except Exception as e:
-        logger.error(f"Error storing token in Secret Manager: {e}")
-        raise Exception("Failed to store authentication token") from e
+        # Verify token
+        if not await TokenManager.verify_token(token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Continue with the request
+        return await call_next(request)
