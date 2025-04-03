@@ -132,7 +132,12 @@ The API provides the following endpoints:
 
 ### Search & Query
 - `POST /api/search`: Perform vector-based semantic search on documents
-- `POST /api/search/api`: Legacy search endpoint (backward compatibility)
+  - Takes a `SearchQuery` object with `query` and `limit` parameters
+  - Example: `{"query": "your search query", "limit": 10}`
+- `POST /api/search/api`: Legacy search endpoint with advanced filtering
+  - Takes a `QueryRequest` object with additional filtering capabilities
+  - Supports metadata filtering (e.g., by document_id)
+  - Example: `{"query_text": "your search query", "n_results": 10, "metadata_filter": {"document_id": "your-doc-id"}, "min_similarity": 0.7}`
 - `POST /api/query`: RAG-based question answering using documents
 
 ### API Documentation
