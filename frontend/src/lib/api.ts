@@ -67,6 +67,24 @@ const apiClient = axios.create({
   timeout: 30000, // 30 seconds timeout
 });
 
+// Add request interceptor to include API token in all requests
+apiClient.interceptors.request.use(
+  (config) => {
+    // Get API token from environment or local storage
+    const apiToken =
+      process.env.NEXT_PUBLIC_API_TOKEN || localStorage.getItem("api_token");
+
+    if (apiToken) {
+      config.headers.Authorization = `Bearer ${apiToken}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // API functions
 export const api = {
   // Search documents - new endpoint

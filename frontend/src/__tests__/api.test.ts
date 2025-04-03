@@ -7,6 +7,14 @@ jest.mock("axios", () => {
     create: jest.fn().mockReturnValue({
       get: jest.fn().mockImplementation(() => Promise.resolve({ data: {} })),
       post: jest.fn().mockImplementation(() => Promise.resolve({ data: {} })),
+      interceptors: {
+        request: {
+          use: jest.fn((callback) => callback),
+        },
+        response: {
+          use: jest.fn(),
+        },
+      },
     }),
   };
 });
