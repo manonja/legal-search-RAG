@@ -2,7 +2,7 @@
 
 # App configuration
 APP_NAME := legal-search-frontend
-VERSION := $(shell cat VERSION)
+VERSION = $$(cat VERSION)
 
 # Docker repository paths
 DEV_REPO := us-central1-docker.pkg.dev/maja-dev/maja-dev

@@ -30,6 +30,29 @@ const nextConfig = {
 
   // Specify the output mode
   output: "standalone",
+
+  // Setting a proper production assetPrefix
+  assetPrefix: undefined, // Let Next.js decide based on the deployment environment
+
+  // Configure server to listen on all network interfaces
+  experimental: {
+    serverComponentsExternalPackages: [],
+  },
+
+  // Add proper handling for trailing slash and path resolution
+  trailingSlash: false,
+
+  // Configure image optimization and domains
+  images: {
+    unoptimized: process.env.NODE_ENV === "development",
+    domains: ["*"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;

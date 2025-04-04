@@ -1,43 +1,55 @@
-# Build stage
-FROM node:18-alpine AS build
+# syntax=docker/dockerfile:1
 
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Copy source code
+# Build the application
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Next.js collects anonymous telemetry data
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the application
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine AS runner
-
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=10000
+ENV HOSTNAME="0.0.0.0"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files from build stage
-COPY --from=build /app/next.config.js ./
-COPY --from=build /app/public ./public
-COPY --from=build /app/.next ./.next
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.js ./
+COPY --from=builder /app/package.json ./package.json
 
-# Create a health check endpoint for Cloud Run
-RUN mkdir -p ./pages/api
-RUN echo 'export default function handler(req, res) { res.status(200).json({ status: "ok" }) }' > ./pages/api/health.js
+# Automatically leverage output traces to reduce image size
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# User for running the application
-USER node
+USER nextjs
 
 # Expose the port
-EXPOSE 3000
+EXPOSE 10000
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application with proper environment variables
+CMD ["node", "server.js"]
