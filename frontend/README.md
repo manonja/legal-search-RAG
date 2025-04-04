@@ -59,6 +59,8 @@ The following environment variables can be passed to the Docker container:
 - `ADMIN_PASSWORD`: Password for admin access
 - `USER_PASSWORD`: Password for user access
 - `API_TOKEN`: Token for API authentication
+- `HEALTH_CHECK_VERSION_OVERRIDE`: Manually override version reported by health check
+- `HEALTH_CHECK_DISABLE_DIAGNOSTICS`: Disable diagnostic info in health check
 
 ### Building and Pushing Docker Images
 
@@ -125,6 +127,39 @@ The Docker image versioning is controlled by the `VERSION` file in the project r
 - `/search`: Document search interface
 - `/rag-search`: AI-powered legal Q&A
 - `/admin`: Admin dashboard (if enabled)
+
+## Health Check Endpoint
+
+The application provides a health check endpoint at `/api/health` that returns application status information.
+
+### Purpose
+- Monitors application operational status
+- Works with container orchestration systems like Kubernetes
+- Provides diagnostic information in non-production environments
+
+### Usage
+```bash
+# Basic health check
+curl http://localhost:3000/api/health
+
+# Response format
+{
+  "status": "ok",
+  "timestamp": "2023-04-01T12:34:56.789Z",
+  "version": "1.0.0",
+  "environment": "production"
+}
+```
+
+### Configuration
+- `HEALTH_CHECK_VERSION_OVERRIDE`: Manually override the reported version
+- `HEALTH_CHECK_DISABLE_DIAGNOSTICS`: Set to 'true' to disable diagnostics in non-production
+
+### Features
+- Returns HTTP 200 when application is running properly
+- Includes diagnostic information in development/staging environments
+- Reports degraded status if application is in a compromised state
+- Lightweight with no external dependencies
 
 ## Project Structure
 

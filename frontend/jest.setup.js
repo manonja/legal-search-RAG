@@ -22,15 +22,30 @@ process.env = {
 };
 
 // Mock window.__NEXT_DATA__ for testing the useApiToken hook
-global.window = Object.create(window);
-Object.defineProperty(window, "__NEXT_DATA__", {
-  value: {
-    props: {
-      pageProps: {},
-      __N_SSG: true,
+// Create a mock window if it doesn't exist (Node.js environment)
+if (typeof window === "undefined") {
+  global.window = {
+    __NEXT_DATA__: {
+      props: {
+        pageProps: {},
+        __N_SSG: true,
+      },
+      runtimeConfig: {
+        apiToken: "runtime-test-token",
+      },
     },
-    runtimeConfig: {
-      apiToken: "runtime-test-token",
+  };
+} else {
+  // If window exists (jsdom environment), extend it
+  Object.defineProperty(window, "__NEXT_DATA__", {
+    value: {
+      props: {
+        pageProps: {},
+        __N_SSG: true,
+      },
+      runtimeConfig: {
+        apiToken: "runtime-test-token",
+      },
     },
-  },
-});
+  });
+}
