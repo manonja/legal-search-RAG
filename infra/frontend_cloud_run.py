@@ -1,49 +1,49 @@
-"""Module for setting up Cloud Run service for the Legal Search RAG API"""
+"""Module for setting up Cloud Run service for the Legal Search RAG Frontend"""
 
 import os
 
 import pulumi
-from pulumi_gcp import cloudrunv2, secretmanager, serviceaccount, storage
+from pulumi_gcp import cloudrunv2, secretmanager, serviceaccount
 
 
-def create_api_service(stack: str, docker_repository, chroma_bucket, dependencies=None):
+def create_frontend_service(stack: str, docker_repository, api_service, dependencies=None):
     """
-    Creates a Cloud Run service for the Legal Search RAG API.
+    Creates a Cloud Run service for the Legal Search RAG Frontend.
 
     Args:
         stack (str): The stack/environment name (e.g., dev, staging, prod)
         docker_repository: The Artifact Registry repository for Docker images
-        chroma_bucket: The GCS bucket for ChromaDB data
+        api_service: The Cloud Run service for the API
         dependencies: Resources this service depends on
 
     Returns:
         The created Cloud Run service
     """
     # Read version from file
-    version_file = f"VERSION-api_cloud_run-{stack}"
+    version_file = f"VERSION-frontend_cloud_run-{stack}"
     version = "latest"
     if os.path.exists(version_file):
         with open(version_file, "r") as f:
             version = f.read().strip()
 
     # Create service account for the Cloud Run service
-    service_account = create_service_account(stack, chroma_bucket)
+    service_account = create_service_account(stack)
 
-    # Grant access to Secret Manager
+    # Grant access to secrets
     grant_secret_access(service_account)
 
     # Create Cloud Run service
     service = cloudrunv2.Service(
-        f"maja-legal-api-{stack}",
+        f"maja-legal-frontend-{stack}",
         location="us-central1",
         ingress="INGRESS_TRAFFIC_ALL",
         template=cloudrunv2.ServiceTemplateArgs(
             scaling=cloudrunv2.ServiceTemplateScalingArgs(
                 min_instance_count=0,
-                max_instance_count=4,
+                max_instance_count=2,
             ),
-            session_affinity=True,
-            timeout="300s",
+            session_affinity=True,  # Important for NextJS apps to maintain session state
+            timeout="60s",
             service_account=service_account.email,
             execution_environment="EXECUTION_ENVIRONMENT_GEN2",
             containers=[
@@ -54,17 +54,17 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         docker_repository.project,
                         "/",
                         docker_repository.repository_id,
-                        "/legal-search-api:",
+                        "/legal-search-frontend:",
                         version,
                     ),
                     resources=cloudrunv2.ServiceTemplateContainerResourcesArgs(
-                        limits={"memory": "2Gi", "cpu": "2"},
+                        limits={"memory": "1Gi", "cpu": "1"},
                         startup_cpu_boost=True,
                     ),
                     # Health check via probes
                     liveness_probe=cloudrunv2.ServiceTemplateContainerLivenessProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerLivenessProbeHttpGetArgs(
-                            path="/api/health",
+                            path="/api/health",  # NextJS app should have a health endpoint
                             port=8080,
                         ),
                         initial_delay_seconds=10,
@@ -72,7 +72,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         period_seconds=30,
                         failure_threshold=3,
                     ),
-                    # Startup probe helps during app initialization
+                    # Startup probe
                     startup_probe=cloudrunv2.ServiceTemplateContainerStartupProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerStartupProbeHttpGetArgs(
                             path="/api/health",
@@ -84,115 +84,85 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         failure_threshold=10,
                     ),
                     envs=[
-                        # Core settings
+                        # Set API URL environment variable
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="GOOGLE_API_KEY",
-                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
-                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="google-gemini-api-key", version="latest"
-                                )
-                            ),
+                            name="NEXT_PUBLIC_API_URL",
+                            value=api_service.uri,
+                        ),
+                        # Base env vars
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="NODE_ENV",
+                            value="production",
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="OPENAI_API_KEY",
-                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
-                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="openai-api-key", version="latest"
-                                )
-                            ),
+                            name="NEXT_TELEMETRY_DISABLED",
+                            value="1",
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="SENTRY_DSN",
+                            name="NEXT_PUBLIC_ENVIRONMENT",
+                            value=stack,
+                        ),
+                        # Secret environment variables
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="NEXT_PUBLIC_SENTRY_DSN",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
                                     secret="sentry-dsn", version="latest"
                                 )
                             ),
                         ),
-                        # API Token for authentication
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="API_TOKEN",
+                            name="NEXT_PUBLIC_API_TOKEN",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
                                     secret="maja-legal-api-token", version="latest"
                                 )
                             ),
                         ),
-                        # Data directories
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="DATA_DIR", value="/data/data"
+                            name="NEXT_PUBLIC_ADMIN_PASSWORD",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="frontend-admin-password", version="latest"
+                                )
+                            ),
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="CHROMA_DIR", value="/data/chroma"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="COLLECTION_NAME", value="legal_docs"
-                        ),
-                        # Model settings
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="OPENAI_MODEL", value="gpt-4-turbo"
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="OPENAI_EMBEDDING_MODEL", value="text-embedding-3-small"
-                        ),
-                        # Application settings
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(name="LOG_LEVEL", value="INFO"),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(name="DEBUG", value="false"),
-                        # Authentication settings
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="GCP_PROJECT_ID", value="952577461734"
-                        ),
-                        # Removed: API_TOKEN_SECRET_NAME as we now directly use API_TOKEN env var
-                    ],
-                    volume_mounts=[
-                        cloudrunv2.ServiceTemplateContainerVolumeMountArgs(
-                            name="legal-data-bucket", mount_path="/data"
+                            name="NEXT_PUBLIC_USER_PASSWORD",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="frontend-user-password", version="latest"
+                                )
+                            ),
                         ),
                     ],
                 )
-            ],
-            volumes=[
-                cloudrunv2.ServiceTemplateVolumeArgs(
-                    name="legal-data-bucket",
-                    gcs=cloudrunv2.ServiceTemplateVolumeGcsArgs(
-                        bucket=chroma_bucket.name,
-                        read_only=False,
-                    ),
-                ),
             ],
         ),
         opts=pulumi.ResourceOptions(depends_on=dependencies if dependencies else None),
     )
 
-    # Set up IAM policy for the service
+    # Set up IAM policy for the service to be publicly accessible
     cloudrunv2.ServiceIamMember(
-        f"maja-legal-api-{stack}-invoker",
+        f"maja-legal-frontend-{stack}-invoker",
         location=service.location,
         name=service.name,
         role="roles/run.invoker",
-        member="allUsers",  # Public access - could be restricted if needed
+        member="allUsers",  # Public access
     )
 
     return service
 
 
-def create_service_account(stack: str, chroma_bucket):
-    """Create a service account for the Cloud Run service"""
+def create_service_account(stack: str):
+    """Create a service account for the Frontend Cloud Run service"""
 
     # Create service account
-    service_account_id = f"maja-legal-api-{stack}"
+    service_account_id = f"maja-legal-frontend-{stack}"
     sa = serviceaccount.Account(
         service_account_id,
         account_id=service_account_id,
-        display_name=f"Maja Legal API Service Account - {stack}",
-    )
-
-    # Grant bucket access permissions
-    storage.BucketIAMMember(
-        f"maja-legal-api-{stack}-bucket-access",
-        bucket=chroma_bucket.name,
-        role="roles/storage.objectAdmin",
-        member=pulumi.Output.concat("serviceAccount:", sa.email),
+        display_name=f"Maja Legal Frontend Service Account - {stack}",
     )
 
     return sa
@@ -203,37 +173,37 @@ def grant_secret_access(sa):
 
     # Grant access to API token secret
     secretmanager.SecretIamMember(
-        "maja-legal-api-token-access",
+        "frontend-api-token-access",
         secret_id="projects/952577461734/secrets/maja-legal-api-token",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
-    # Grant access to OpenAI API key secret
+    # Grant access for admin password secret
     secretmanager.SecretIamMember(
-        "openai-api-key-access",
-        secret_id="projects/952577461734/secrets/openai-api-key",
+        "frontend-admin-password-access",
+        secret_id="projects/952577461734/secrets/frontend-admin-password",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
-    # Grant access to Google Gemini API key secret
+    # Grant access for user password secret
     secretmanager.SecretIamMember(
-        "google-gemini-api-key-access",
-        secret_id="projects/952577461734/secrets/google-gemini-api-key",
+        "frontend-user-password-access",
+        secret_id="projects/952577461734/secrets/frontend-user-password",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
     # Grant access to Sentry DSN secret
     secretmanager.SecretIamMember(
-        "sentry-dsn-access",
+        "frontend-sentry-dsn-access",
         secret_id="projects/952577461734/secrets/sentry-dsn",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
 
-def get_api_url(service):
+def get_frontend_url(service):
     """Get the URL of the Cloud Run service"""
     return service.uri

@@ -1,8 +1,8 @@
-.PHONY: help build push run clean minor patch get-version docker-build docker-push docker-build-no-cache
+.PHONY: help build push run clean major minor patch get-version docker-build docker-push docker-build-no-cache lock format check-format lint serve
 
 # App configuration
 APP_NAME := legal-search-frontend
-VERSION := $(shell cat VERSION)
+VERSION = $$(cat VERSION)
 
 # Docker repository paths
 DEV_REPO := us-central1-docker.pkg.dev/maja-dev/maja-dev
@@ -27,9 +27,15 @@ help:
 	@echo "  make ENV=dev|prod push         - Push image to registry"
 	@echo "  make ENV=local run             - Run local container"
 	@echo "  make clean                     - Remove local images"
+	@echo "  make major                     - Bump major version (X.0.0)"
 	@echo "  make minor                     - Bump minor version (x.Y.0)"
 	@echo "  make patch                     - Bump patch version (x.y.Z)"
 	@echo "  make get-version               - Display current version"
+	@echo "  make lint                      - Run linting"
+	@echo "  make format                    - Format code"
+	@echo "  make check-format              - Check formatting"
+	@echo "  make lock                      - Lock dependencies"
+	@echo "  make serve                     - Run development server"
 	@echo ""
 	@echo "Default ENV is 'dev' if not specified"
 
@@ -37,17 +43,33 @@ help:
 get-version:
 	@cat VERSION
 
-# Bump minor version (x.Y.0): increments minor and resets patch to 0
-minor:
-	@v=$$(cat VERSION | awk -F. '{print $$1"."($$2+1)".0"}'); \
-	echo $$v > VERSION; \
-	echo "Version updated to $$v"
+# Bump major version (X.0.0)
+major:
+	@./scripts/bump_version.sh major
 
-# Bump patch version (x.y.Z): increments patch
+# Bump minor version (x.Y.0)
+minor:
+	@./scripts/bump_version.sh minor
+
+# Bump patch version (x.y.Z)
 patch:
-	@v=$$(cat VERSION | awk -F. '{print $$1"."$$2"."($$3+1)}'); \
-	echo $$v > VERSION; \
-	echo "Version updated to $$v"
+	@./scripts/bump_version.sh patch
+
+# Development targets
+lint:
+	npm run lint
+
+format:
+	npx prettier --write .
+
+check-format:
+	npx prettier --check .
+
+lock:
+	npm ci
+
+serve:
+	npm run dev
 
 # Build Docker image
 docker-build:
@@ -57,10 +79,10 @@ endif
 	docker build -t $(APP_NAME):$(VERSION) \
 		--build-arg VERSION_ARG=$(VERSION) \
 		--build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		--build-arg SENTRY_DSN=${SENTRY_DSN} \
-		--build-arg ADMIN_PASSWORD=${ADMIN_PASSWORD} \
-		--build-arg USER_PASSWORD=${USER_PASSWORD} \
-		--build-arg API_TOKEN=${API_TOKEN} \
+		--build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
+		--build-arg NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
+		--build-arg NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
+		--build-arg NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
 		.
 ifeq ($(ENV),local)
 	@echo "Built local image $(APP_NAME):$(VERSION)"
@@ -86,10 +108,10 @@ endif
 	docker build --no-cache -t $(APP_NAME):$(VERSION) \
 		--build-arg VERSION_ARG=$(VERSION) \
 		--build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		--build-arg SENTRY_DSN=${SENTRY_DSN} \
-		--build-arg ADMIN_PASSWORD=${ADMIN_PASSWORD} \
-		--build-arg USER_PASSWORD=${USER_PASSWORD} \
-		--build-arg API_TOKEN=${API_TOKEN} \
+		--build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
+		--build-arg NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
+		--build-arg NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
+		--build-arg NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
 		.
 ifeq ($(ENV),local)
 	@echo "Built local image $(APP_NAME):$(VERSION)"
@@ -108,12 +130,12 @@ push: docker-push
 run:
 ifeq ($(ENV),local)
 	@echo "Running local container on port 3000..."
-	docker run -p 3000:10000 \
+	docker run -p 3000:8080 \
 		-e NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		-e SENTRY_DSN=${SENTRY_DSN} \
-		-e ADMIN_PASSWORD=${ADMIN_PASSWORD} \
-		-e USER_PASSWORD=${USER_PASSWORD} \
-		-e API_TOKEN=${API_TOKEN} \
+		-e NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
+		-e NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
+		-e NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
+		-e NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
 		$(APP_NAME):$(VERSION)
 else
 	@echo "Run is only available for ENV=local"
