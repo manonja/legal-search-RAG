@@ -20,6 +20,20 @@ const nextConfig = {
     apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
     apiToken: process.env.NEXT_PUBLIC_API_TOKEN || "test",
   },
+  experimental: {
+    // Enable the instrumentation hook for Sentry
+    instrumentationHook: true,
+  },
 };
 
-module.exports = nextConfig;
+// Import Sentry config wrapper
+const { withSentryConfig } = require("@sentry/nextjs");
+
+// Sentry webpack plugin options
+const sentryWebpackPluginOptions = {
+  // Silent to reduce noise in the console during builds
+  silent: true,
+};
+
+// Export the config with Sentry integration
+module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
