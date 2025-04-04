@@ -3,19 +3,15 @@
 This module provides endpoints for uploading and processing legal documents.
 """
 
-import logging
 from pathlib import Path
 from typing import Any, Dict, Union
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from struct_logger import log
 
 from app.core.config import get_settings
 from app.services.datastore import DocumentMetadata
 from app.services.documents.upload import process_uploaded_document
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -110,10 +106,10 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
         # Re-raise HTTP exceptions without modifying them
         raise
     except ValueError as e:
-        logger.error(f"Error processing document: {e}")
+        log.error("Error processing document", error=str(e))
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"Error processing document: {e}")
+        log.error("Error processing document", error=str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to process document: {str(e)}"
         ) from e

@@ -4,15 +4,13 @@ This module provides functionality for initializing application components
 on startup.
 """
 
-import logging
 import os
 import sentry_sdk
 from pathlib import Path
+from struct_logger import log
 
 from app.core.config import get_settings
 from app.services.database.chroma import initialize_chroma_collection
-
-logger = logging.getLogger(__name__)
 
 
 async def initialize_application():
@@ -33,15 +31,19 @@ async def initialize_application():
         # Create necessary directories
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
         settings.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info("Created necessary directories")
+        log.info(
+            "Created necessary directories",
+            data_dir=str(settings.DATA_DIR),
+            chroma_dir=str(settings.CHROMA_DIR),
+        )
 
         # Initialize ChromaDB collection
         await initialize_chroma_collection()
 
-        logger.info("Application initialization completed successfully")
+        log.info("Application initialization completed successfully")
 
     except Exception as e:
-        logger.error(f"Error during application initialization: {e}")
+        log.error("Error during application initialization", error=str(e))
         # Capture startup errors in Sentry
         sentry_sdk.capture_exception(e)
         raise

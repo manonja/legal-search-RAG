@@ -7,7 +7,6 @@ This module provides an easy API for saving and loading documents:
 """
 
 import json
-import logging
 import os
 import shutil
 import uuid
@@ -16,10 +15,9 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from pydantic import BaseModel, Field
+from struct_logger import log
 
 from app.core.config import Settings
-
-logger = logging.getLogger(__name__)
 
 
 class DocumentMetadata(BaseModel):
@@ -97,7 +95,7 @@ class DatastoreService:
     def _ensure_data_directory_exists(self) -> None:
         """Ensure the data directory structure exists."""
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Datastore initialized at {self.data_dir}")
+        log.info("Datastore initialized", data_dir=str(self.data_dir))
 
     def _create_document_directory(self, document_id: str) -> Path:
         """Create a directory for the document.
@@ -165,7 +163,7 @@ class DatastoreService:
         with open(doc_dir / "metadata.json", "w", encoding="utf-8") as f:
             f.write(metadata.model_dump_json(indent=2))
 
-        logger.info(f"Document saved: {original_filename} -> {document_id}")
+        log.info("Document saved", filename=original_filename, document_id=document_id)
         return metadata
 
     def get_document(self, document_id: str) -> Optional[DocumentMetadata]:

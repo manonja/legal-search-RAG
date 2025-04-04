@@ -4,7 +4,6 @@ This module provides authentication middleware and security functions
 for securing the API endpoints.
 """
 
-import logging
 import os
 import warnings
 from typing import Awaitable, Callable, Optional
@@ -13,11 +12,9 @@ from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from struct_logger import log
 
 from app.core.config import get_settings
-
-# Configure logging
-logger = logging.getLogger(__name__)
 
 # Initialize settings
 settings = get_settings()
@@ -66,7 +63,7 @@ class TokenManager:
             cls._token = "test-token"  # noqa: S105
         else:
             error_msg = "API_TOKEN environment variable is not set in production mode"
-            logger.error(error_msg)
+            log.error(error_msg)
             raise ValueError(error_msg)
 
         return cls._token
@@ -104,7 +101,7 @@ async def generate_and_store_token() -> str:
     token = secrets.token_hex(32)
 
     # Log the token generation (don't log the token itself)
-    logger.info("Generated new API token")
+    log.info("Generated new API token")
 
     return token
 

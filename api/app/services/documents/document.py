@@ -3,15 +3,14 @@
 This module provides functionality for retrieving and managing documents.
 """
 
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from struct_logger import log
+
 from app.core.config import get_settings
 from app.services.datastore import get_datastore_service, DocumentMetadata
-
-logger = logging.getLogger(__name__)
 
 
 async def get_document_content(document_id: str) -> Tuple[str, Dict[str, Any]]:
@@ -28,7 +27,7 @@ async def get_document_content(document_id: str) -> Tuple[str, Dict[str, Any]]:
         IOError: If document cannot be read
     """
     # Remove any URL encoding
-    logger.info(f"Getting content for document: {document_id}")
+    log.info("Getting document content", document_id=document_id)
 
     # Get datastore service
     settings = get_settings()
@@ -38,14 +37,14 @@ async def get_document_content(document_id: str) -> Tuple[str, Dict[str, Any]]:
     doc_metadata = datastore.get_document(document_id)
 
     if not doc_metadata:
-        logger.info(f"Document not found in datastore: {document_id}")
+        log.info("Document not found in datastore", document_id=document_id)
         raise FileNotFoundError(f"Document not found: {document_id}")
 
     # Get document text content from the extracted text
     text_content = datastore.get_text_content(document_id)
 
     if text_content:
-        logger.info(f"Retrieved text content for document: {document_id}")
+        log.info("Retrieved text content", document_id=document_id)
         # Return document content and metadata from extracted text
         metadata = {
             "document_id": doc_metadata.document_id,
@@ -58,7 +57,8 @@ async def get_document_content(document_id: str) -> Tuple[str, Dict[str, Any]]:
         }
         return text_content, metadata
     else:
-        logger.info(
-            f"No extracted text found, trying to read original file for document: {document_id}"
+        log.info(
+            "No extracted text found, trying to read original file",
+            document_id=document_id,
         )
         raise FileNotFoundError(f"No extracted text found for document: {document_id}")

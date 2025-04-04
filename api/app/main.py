@@ -12,6 +12,9 @@ os.environ["ANONYMIZED_TELEMETRY"] = "FALSE"
 os.environ["CHROMADB_TELEMETRY_ENABLED"] = "FALSE"
 os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
 
+# Import structured logger early
+from struct_logger import log
+
 # Initialize Sentry as early as possible
 import logging
 import sys
@@ -22,9 +25,9 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
-# Configure basic logging first
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Basic logging is now configured via struct_logger.py
+# Legacy logger for compatibility
+legacy_logger = logging.getLogger(__name__)
 
 # Get settings directly
 from app.core.config import get_settings
@@ -33,7 +36,9 @@ settings = get_settings()
 
 # Initialize Sentry if DSN is available and not in test mode
 if not os.getenv("TESTING") == "true" and settings.SENTRY_DSN:
-    logger.info("Initializing Sentry for environment: %s", settings.SENTRY_ENVIRONMENT)
+    log.info(
+        "Initializing Sentry for environment", sentry_env=settings.SENTRY_ENVIRONMENT
+    )
 
     # Setup integrations
     integrations = [
@@ -77,9 +82,9 @@ if not os.getenv("TESTING") == "true" and settings.SENTRY_DSN:
             "Sentry initialized at application startup", level="info"
         )
 
-    logger.info("Sentry initialized successfully")
+    log.info("Sentry initialized successfully")
 else:
-    logger.info("Sentry disabled (testing or no DSN configured)")
+    log.info("Sentry disabled", reason="testing or no DSN configured")
     # Disable Sentry explicitly
     sentry_sdk.init(dsn="")
 
@@ -208,5 +213,5 @@ if __name__ == "__main__":
     port = int(os.getenv("API_PORT", 8000))
     host = os.getenv("HOST", "127.0.0.1")  # Default to localhost instead of 0.0.0.0
 
-    logger.info(f"Starting API server on {host}:{port}")
+    log.info("Starting API server", host=host, port=port)
     uvicorn.run("app.main:app", host=host, port=port, reload=True)
