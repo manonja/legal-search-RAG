@@ -95,14 +95,6 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                             value="production",
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="PORT",
-                            value="8080",
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="HOSTNAME",
-                            value="0.0.0.0",
-                        ),
-                        cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="NEXT_TELEMETRY_DISABLED",
                             value="1",
                         ),
@@ -142,12 +134,6 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                                     secret="frontend-user-password", version="latest"
                                 )
                             ),
-                        ),
-                    ],
-                    # Port configuration for the container
-                    ports=[
-                        cloudrunv2.ServiceTemplateContainerPortArgs(
-                            container_port=8080,
                         ),
                     ],
                 )
