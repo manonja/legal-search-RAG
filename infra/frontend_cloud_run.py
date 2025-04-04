@@ -98,11 +98,6 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                         ),
                     ],
                     # NextJS apps typically run on port 3000
-                    ports=[
-                        cloudrunv2.ServiceTemplateContainerPortsArgs(
-                            container_port=3000,
-                        ),
-                    ],
                 )
             ],
         ),
