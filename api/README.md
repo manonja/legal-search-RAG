@@ -174,6 +174,33 @@ TEMPERATURE=0.0
 
 You can customize these variables in your `.env` file. See `.env.example` for a complete list of supported variables.
 
+## Structured Logging
+
+This project uses structlog for JSON-formatted logging:
+
+```python
+from struct_logger import log
+
+# Basic usage
+log.info("Operation completed")
+log.error("Operation failed")
+
+# With structured context
+log.info("Document processed", document_id="doc-123", size_kb=1024)
+
+# Log exceptions
+try:
+    result = process_document()
+except Exception as e:
+    log.error("Processing failed", error=str(e), exc_info=True)
+
+# Create component-specific logger
+db_log = log.bind(component="database")
+db_log.info("Query executed", query_time_ms=42)
+```
+
+Set `LOG_LEVEL` environment variable to control verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`).
+
 ## API Authentication
 
 All API endpoints (except `/api/health` and documentation endpoints) are protected by token-based authentication.
