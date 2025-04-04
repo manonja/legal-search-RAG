@@ -5,6 +5,7 @@ import pulumi
 from api_cloud_run import create_api_service, get_api_url
 from apis import enable_required_apis
 from buckets import create_chroma_datastore_bucket
+from frontend_cloud_run import create_frontend_service, get_frontend_url
 from registry import create_docker_repository, get_repository_exports
 
 # Get the current stack name to use as the environment name (e.g., dev, staging, prod)
@@ -26,6 +27,11 @@ cloud_run_service = create_api_service(
     stack, docker_repository, chroma_bucket, dependencies=enabled_apis
 )
 
+# Create the Cloud Run service for the Frontend
+frontend_service = create_frontend_service(
+    stack, docker_repository, cloud_run_service, dependencies=enabled_apis
+)
+
 # Get repository exports
 repo_exports = get_repository_exports(docker_repository)
 
@@ -38,6 +44,9 @@ pulumi.export("chroma_bucket_name", chroma_bucket.name)
 
 # Export the API URL
 pulumi.export("api_url", get_api_url(cloud_run_service))
+
+# Export the Frontend URL
+pulumi.export("frontend_url", get_frontend_url(frontend_service))
 
 # Export command examples for documentation
 pulumi.export(
