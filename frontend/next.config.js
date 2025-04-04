@@ -1,39 +1,35 @@
-/** @type {import('next').Config} */
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // Enable React strict mode for better development experience
   reactStrictMode: true,
-  swcMinify: true,
+
+  // Disable image optimization during development
+  // In production, consider using a CDN or configure with GCP Cloud Storage
   images: {
-    domains: [],
+    unoptimized: process.env.NODE_ENV === "development",
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+    ],
   },
-  // Make sure environment variables are available
+
+  // Configure environment variables
   env: {
-    // Pass through the API URL as-is, without modification
-    // The client-side code will handle the proper formatting
-    NEXT_PUBLIC_API_URL:
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
-    // Ensure PORT is a string
-    PORT: process.env.PORT ? String(process.env.PORT) : "3000",
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_ENVIRONMENT:
+      process.env.NEXT_PUBLIC_ENVIRONMENT || "development",
   },
-  // This ensures Next.js allows the environment variables to be used in the client-side code
-  publicRuntimeConfig: {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
-    apiToken: process.env.NEXT_PUBLIC_API_TOKEN || "test",
+
+  // Enable faster refresh during development
+  webpack: (config, { dev, isServer }) => {
+    // Additional webpack configurations if needed
+    return config;
   },
-  experimental: {
-    // Enable the instrumentation hook for Sentry
-    instrumentationHook: true,
-  },
+
+  // Specify the output mode
+  output: "standalone",
 };
 
-// Import Sentry config wrapper
-const { withSentryConfig } = require("@sentry/nextjs");
-
-// Sentry webpack plugin options
-const sentryWebpackPluginOptions = {
-  // Silent to reduce noise in the console during builds
-  silent: true,
-};
-
-// Export the config with Sentry integration
-module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+module.exports = nextConfig;

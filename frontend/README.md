@@ -1,70 +1,49 @@
 # Legal Search RAG Frontend
 
-The Next.js frontend for the Legal Document Search RAG system, providing a modern interface for document search and AI-powered legal Q&A.
+A Next.js frontend for the Legal Search RAG application, deployed on Google Cloud Run.
 
-## Features
-
-- **Modern UI**: Built with Next.js, React, and Tailwind CSS
-- **Semantic Search**: Find relevant legal document sections
-- **RAG-Powered Q&A**: Ask questions about legal documents and get AI-generated answers
-- **Responsive Design**: Works on desktop and mobile devices
-- **TypeScript**: Type-safe codebase
-
-## Quick Start
-
-### Local Development
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Configure environment:
-   ```bash
-   # Create .env.local file from example
-   cp .env.example .env.local
-   # Edit .env.local with your configuration
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-4. Access the application at http://localhost:3000
-
-### Production Build
-
-```bash
-npm run build
-npm run start
-```
-
-## Docker Build & Deployment
-
-The project includes a Makefile to simplify Docker image building and deployment to GCP Cloud Run.
+## Development
 
 ### Prerequisites
 
-- Docker installed locally
-- GCP CLI configured for your project
-- Access to the specified artifact registries
+- Node.js 18 or later
+- npm 9 or later
 
-### Environment Variables
+### Setup
 
-The following environment variables can be passed to the Docker container:
+1. Install dependencies:
 
-- `NEXT_PUBLIC_API_URL`: URL of the backend API (required)
-- `SENTRY_DSN`: Sentry DSN for error tracking
-- `ADMIN_PASSWORD`: Password for admin access
-- `USER_PASSWORD`: Password for user access
-- `API_TOKEN`: Token for API authentication
-- `HEALTH_CHECK_VERSION_OVERRIDE`: Manually override version reported by health check
-- `HEALTH_CHECK_DISABLE_DIAGNOSTICS`: Disable diagnostic info in health check
+```bash
+npm install
+```
 
-### Building and Pushing Docker Images
+2. Create a `.env.local` file with the following variables:
 
-You can build and push Docker images to different environments using Make:
+```
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
+
+3. Start the development server:
+
+```bash
+npm run dev
+```
+
+The app will be available at [http://localhost:3000](http://localhost:3000).
+
+## Building and deploying
+
+### Local build
+
+To build the app locally:
+
+```bash
+npm run build
+```
+
+### Using Makefile (Recommended)
+
+The project includes a Makefile to simplify Docker image building and deployment:
 
 ```bash
 # Show all available commands
@@ -85,41 +64,88 @@ make patch  # Increments patch version (x.y.Z)
 make get-version  # Display current version
 ```
 
-### Running the Docker Container Locally
+### Manual Docker build
+
+Alternatively, you can build the Docker image manually:
 
 ```bash
-# Run with environment variables
-make ENV=local run NEXT_PUBLIC_API_URL=http://localhost:8000 SENTRY_DSN=your_sentry_dsn ADMIN_PASSWORD=admin_password USER_PASSWORD=user_password API_TOKEN=your_api_token
-
-# Alternatively, you can run the Docker container directly:
-docker run -p 3000:10000 \
-  -e NEXT_PUBLIC_API_URL=http://localhost:8000 \
-  -e SENTRY_DSN=your_sentry_dsn \
-  -e ADMIN_PASSWORD=admin_password \
-  -e USER_PASSWORD=user_password \
-  -e API_TOKEN=your_api_token \
-  legal-search-frontend:0.1.0
+docker build -t legal-search-frontend:latest .
 ```
 
-The Docker container runs on port 10000 internally but is mapped to port 3000 on your local machine for development. This means you should access the application at http://localhost:3000 in your browser.
+### Testing the Docker image locally
 
-For dummy values during development, you can use:
 ```bash
-make ENV=local build NEXT_PUBLIC_API_URL=http://localhost:8000 ADMIN_PASSWORD=dummy USER_PASSWORD=dummy API_TOKEN=dummy SENTRY_DSN=dummy
-make ENV=local run NEXT_PUBLIC_API_URL=http://localhost:8000 ADMIN_PASSWORD=dummy USER_PASSWORD=dummy API_TOKEN=dummy SENTRY_DSN=dummy
+# Using make
+make ENV=local run NEXT_PUBLIC_API_URL=http://localhost:8080
+
+# Or directly with Docker
+docker run -p 3000:3000 -e NEXT_PUBLIC_API_URL=http://localhost:8080 legal-search-frontend:latest
 ```
 
-### Repositories and Environments
+### Deploying to Cloud Run
 
-- **Local**: Builds the image locally without pushing to any registry
-- **Development**: Pushes to `us-central1-docker.pkg.dev/maja-dev/maja-dev/legal-search-frontend:[VERSION]`
-- **Production**: Pushes to `us-central1-docker.pkg.dev/maja-dev/maja-prod/legal-search-frontend:[VERSION]`
+The frontend is automatically deployed to Google Cloud Run using Pulumi. The deployment process is as follows:
 
-### Version Management
+1. Update the version in `infra/VERSION-frontend_cloud_run-dev` (for development) or `infra/VERSION-frontend_cloud_run-prod` (for production)
 
-The Docker image versioning is controlled by the `VERSION` file in the project root.
-- In development builds, the patch version is automatically incremented
-- For production builds, you should manually set the version using `make minor` or `make patch`
+2. Build and push the Docker image using the Makefile:
+   ```bash
+   make ENV=dev docker-push  # For development
+   make ENV=prod docker-push  # For production
+   ```
+
+   Or manually:
+   ```bash
+   # Authenticate with Google Cloud
+   gcloud auth configure-docker us-central1-docker.pkg.dev
+
+   # Tag the image with the correct repository
+   docker tag legal-search-frontend:latest us-central1-docker.pkg.dev/[PROJECT_ID]/[REPOSITORY]/legal-search-frontend:latest
+
+   # Push the image
+   docker push us-central1-docker.pkg.dev/[PROJECT_ID]/[REPOSITORY]/legal-search-frontend:latest
+   ```
+
+3. Deploy using Pulumi:
+   ```bash
+   cd infra
+   pulumi up
+   ```
+
+## Health Checks
+
+The app includes a health check endpoint at `/api/health` which returns a 200 OK response with a JSON payload `{ "status": "ok" }`. This endpoint is used by Cloud Run to determine if the app is healthy.
+
+## Environment Variables
+
+- `NEXT_PUBLIC_API_URL`: URL of the backend API
+- `NEXT_PUBLIC_ENVIRONMENT`: Environment name (dev, staging, prod)
+
+## Project Structure
+
+```
+frontend/
+├── app/                  # Next.js App Router
+│   ├── api/              # API routes
+│   │   └── health/       # Health check endpoint
+│   │   └── search/       # Search routes
+│   │   └── admin/        # Admin routes
+│   ├── components/       # Reusable components
+│   ├── layout.js         # Root layout
+│   └── page.js           # Home page
+├── public/               # Static assets
+├── Dockerfile            # Docker configuration
+├── next.config.js        # Next.js configuration
+└── package.json          # Dependencies and scripts
+```
+
+## Features
+
+- **Modern UI**: Built with Next.js, React, and Tailwind CSS
+- **Semantic Search**: Find relevant legal document sections
+- **RAG-Powered Q&A**: Ask questions about legal documents and get AI-generated answers
+- **Responsive Design**: Works on desktop and mobile devices
+- **TypeScript**: Type-safe codebase
 
 ## Pages
 
@@ -127,46 +153,6 @@ The Docker image versioning is controlled by the `VERSION` file in the project r
 - `/search`: Document search interface
 - `/rag-search`: AI-powered legal Q&A
 - `/admin`: Admin dashboard (if enabled)
-
-## Health Check Endpoint
-
-The application provides a health check endpoint at `/api/health` that returns application status information.
-
-### Purpose
-- Monitors application operational status
-- Works with container orchestration systems like Kubernetes
-- Provides diagnostic information in non-production environments
-
-### Usage
-```bash
-# Basic health check
-curl http://localhost:3000/api/health
-
-# Response format
-{
-  "status": "ok",
-  "timestamp": "2023-04-01T12:34:56.789Z",
-  "version": "1.0.0",
-  "environment": "production"
-}
-```
-
-### Configuration
-- `HEALTH_CHECK_VERSION_OVERRIDE`: Manually override the reported version
-- `HEALTH_CHECK_DISABLE_DIAGNOSTICS`: Set to 'true' to disable diagnostics in non-production
-
-### Features
-- Returns HTTP 200 when application is running properly
-- Includes diagnostic information in development/staging environments
-- Reports degraded status if application is in a compromised state
-- Lightweight with no external dependencies
-
-## Project Structure
-
-- `src/app`: Next.js App Router pages
-- `src/components`: Reusable React components
-- `src/lib`: Utility functions and API clients
-- `public`: Static assets
 
 ## License
 

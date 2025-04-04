@@ -1,81 +1,43 @@
-# Use Node.js 18 as the base image
-FROM node:18-alpine AS base
+# Build stage
+FROM node:18-alpine AS build
 
-# Build arguments that can be set during build
-ARG VERSION_ARG=0.1.0
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
-ARG NEXT_PUBLIC_SENTRY_DSN
-ARG ADMIN_PASSWORD
-ARG USER_PASSWORD
-ARG API_TOKEN
-
-# Install dependencies only when needed
-FROM base AS deps
 WORKDIR /app
 
-# Copy package.json (and package-lock.json if it exists)
-COPY package.json ./
+# Copy package files
+COPY package.json package-lock.json* ./
+RUN npm ci
 
-# Install dependencies with better error handling
-RUN npm install --no-fund --no-audit || (echo "npm install failed, retrying..." && npm install --no-fund --no-audit)
-
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source code
 COPY . .
-
-# Set environment variables for build time
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_PUBLIC_VERSION=${VERSION_ARG}
-ENV NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
-ENV NEXT_PUBLIC_API_TOKEN=${API_TOKEN}
 
 # Build the application
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# Production stage
+FROM node:18-alpine AS runner
+
 WORKDIR /app
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_PUBLIC_VERSION=${VERSION_ARG}
-ENV NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
-ENV ADMIN_PASSWORD=${ADMIN_PASSWORD}
-ENV USER_PASSWORD=${USER_PASSWORD}
-ENV API_TOKEN=${API_TOKEN}
-ENV NEXT_PUBLIC_API_TOKEN=${API_TOKEN}
+ENV PORT=3000
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Copy necessary files from build stage
+COPY --from=build /app/next.config.js ./
+COPY --from=build /app/public ./public
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
 
-# Install sharp for image optimization in standalone mode
-# Make sure to install it properly with all dependencies
-RUN apk add --no-cache vips-dev build-base && \
-    npm install --no-fund --no-audit sharp && \
-    apk del build-base
+# Create a health check endpoint for Cloud Run
+RUN mkdir -p ./pages/api
+RUN echo 'export default function handler(req, res) { res.status(200).json({ status: "ok" }) }' > ./pages/api/health.js
 
-# Copy necessary files
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# User for running the application
+USER node
 
-# Set the correct permissions
-USER nextjs
-
-# Use port 10000 to match Render's default expectation
-ENV PORT=10000
-EXPOSE 10000
-
-# Health check to ensure container is responding
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:10000/ || exit 1
+# Expose the port
+EXPOSE 3000
 
 # Start the application
-CMD ["sh", "-c", "node server.js"]
+CMD ["npm", "start"]
