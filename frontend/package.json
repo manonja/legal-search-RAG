@@ -13,6 +13,7 @@
     "dependencies": {
         "@calcom/embed-react": "^1.5.2",
         "@headlessui/react": "^2.2.0",
+        "@sentry/nextjs": "^9.11.0",
         "@tailwindcss/typography": "^0.5.10",
         "autoprefixer": "^10.4.16",
         "axios": "^1.6.5",
