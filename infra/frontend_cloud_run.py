@@ -61,7 +61,7 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                         limits={"memory": "1Gi", "cpu": "1"},
                         startup_cpu_boost=True,
                     ),
-                    # Health check via probes - Updated to use port 8080
+                    # Health check via probes
                     liveness_probe=cloudrunv2.ServiceTemplateContainerLivenessProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerLivenessProbeHttpGetArgs(
                             path="/api/health",  # NextJS app should have a health endpoint
@@ -72,7 +72,7 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                         period_seconds=30,
                         failure_threshold=3,
                     ),
-                    # Startup probe - Updated to use port 8080
+                    # Startup probe
                     startup_probe=cloudrunv2.ServiceTemplateContainerStartupProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerStartupProbeHttpGetArgs(
                             path="/api/health",
