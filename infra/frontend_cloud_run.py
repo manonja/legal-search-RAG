@@ -187,7 +187,7 @@ def grant_secret_access(sa):
 
     # Grant access to API token secret
     secretmanager.SecretIamMember(
-        "maja-legal-api-token-access",
+        "frontend-api-token-access",
         secret_id="projects/952577461734/secrets/maja-legal-api-token",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
@@ -211,7 +211,7 @@ def grant_secret_access(sa):
 
     # Grant access to Sentry DSN secret
     secretmanager.SecretIamMember(
-        "sentry-dsn-access",
+        "frontend-sentry-dsn-access",
         secret_id="projects/952577461734/secrets/sentry-dsn",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),

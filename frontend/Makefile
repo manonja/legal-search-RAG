@@ -79,10 +79,10 @@ endif
 	docker build -t $(APP_NAME):$(VERSION) \
 		--build-arg VERSION_ARG=$(VERSION) \
 		--build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		--build-arg SENTRY_DSN=${SENTRY_DSN} \
-		--build-arg ADMIN_PASSWORD=${ADMIN_PASSWORD} \
-		--build-arg USER_PASSWORD=${USER_PASSWORD} \
-		--build-arg API_TOKEN=${API_TOKEN} \
+		--build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
+		--build-arg NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
+		--build-arg NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
+		--build-arg NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
 		.
 ifeq ($(ENV),local)
 	@echo "Built local image $(APP_NAME):$(VERSION)"
@@ -108,10 +108,10 @@ endif
 	docker build --no-cache -t $(APP_NAME):$(VERSION) \
 		--build-arg VERSION_ARG=$(VERSION) \
 		--build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		--build-arg SENTRY_DSN=${SENTRY_DSN} \
-		--build-arg ADMIN_PASSWORD=${ADMIN_PASSWORD} \
-		--build-arg USER_PASSWORD=${USER_PASSWORD} \
-		--build-arg API_TOKEN=${API_TOKEN} \
+		--build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
+		--build-arg NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
+		--build-arg NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
+		--build-arg NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
 		.
 ifeq ($(ENV),local)
 	@echo "Built local image $(APP_NAME):$(VERSION)"
@@ -130,12 +130,12 @@ push: docker-push
 run:
 ifeq ($(ENV),local)
 	@echo "Running local container on port 3000..."
-	docker run -p 3000:10000 \
+	docker run -p 3000:8080 \
 		-e NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		-e SENTRY_DSN=${SENTRY_DSN} \
-		-e ADMIN_PASSWORD=${ADMIN_PASSWORD} \
-		-e USER_PASSWORD=${USER_PASSWORD} \
-		-e API_TOKEN=${API_TOKEN} \
+		-e NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
+		-e NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
+		-e NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
+		-e NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
 		$(APP_NAME):$(VERSION)
 else
 	@echo "Run is only available for ENV=local"
