@@ -42,7 +42,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                 min_instance_count=0,
                 max_instance_count=4,
             ),
-            session_affinity=False,
+            session_affinity=True,
             timeout="300s",
             service_account=service_account.email,
             execution_environment="EXECUTION_ENVIRONMENT_GEN2",

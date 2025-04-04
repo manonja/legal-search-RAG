@@ -29,13 +29,22 @@ WORKDIR /app
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=10000
+ENV PORT=8000
 ENV HOSTNAME="0.0.0.0"
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_SENTRY_DSN=""
+ENV NEXT_PUBLIC_API_URL=""
+ENV NEXT_PUBLIC_API_TOKEN=""
+ENV NEXT_PUBLIC_ADMIN_PASSWORD=""
+ENV NEXT_PUBLIC_USER_PASSWORD=""
+
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+# Install Sharp for image optimization in standalone mode
+RUN npm install --platform=linux --arch=x64 sharp
 
 # Copy necessary files from build stage
 COPY --from=builder /app/public ./public
@@ -49,7 +58,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 
 # Expose the port
-EXPOSE 10000
+EXPOSE 8000
 
 # Start the application with proper environment variables
 CMD ["node", "server.js"]

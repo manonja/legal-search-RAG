@@ -45,7 +45,7 @@ const nextConfig = {
   // Configure image optimization and domains
   images: {
     unoptimized: process.env.NODE_ENV === "development",
-    domains: ["*"],
+    domains: ["*"], // Deprecated but keeping for backward compatibility
     remotePatterns: [
       {
         protocol: "https",

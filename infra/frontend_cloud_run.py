@@ -3,7 +3,7 @@
 import os
 
 import pulumi
-from pulumi_gcp import cloudrunv2, serviceaccount
+from pulumi_gcp import cloudrunv2, secretmanager, serviceaccount
 
 
 def create_frontend_service(stack: str, docker_repository, api_service, dependencies=None):
@@ -28,6 +28,9 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
 
     # Create service account for the Cloud Run service
     service_account = create_service_account(stack)
+
+    # Grant access to secrets
+    grant_secret_access(service_account)
 
     # Create Cloud Run service
     service = cloudrunv2.Service(
@@ -58,22 +61,22 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                         limits={"memory": "1Gi", "cpu": "1"},
                         startup_cpu_boost=True,
                     ),
-                    # Health check via probes
+                    # Health check via probes - Updated to use port 8080
                     liveness_probe=cloudrunv2.ServiceTemplateContainerLivenessProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerLivenessProbeHttpGetArgs(
                             path="/api/health",  # NextJS app should have a health endpoint
-                            port=3000,
+                            port=8080,
                         ),
                         initial_delay_seconds=10,
                         timeout_seconds=5,
                         period_seconds=30,
                         failure_threshold=3,
                     ),
-                    # Startup probe helps during app initialization
+                    # Startup probe - Updated to use port 8080
                     startup_probe=cloudrunv2.ServiceTemplateContainerStartupProbeArgs(
                         http_get=cloudrunv2.ServiceTemplateContainerStartupProbeHttpGetArgs(
                             path="/api/health",
-                            port=3000,
+                            port=8080,
                         ),
                         initial_delay_seconds=0,
                         timeout_seconds=5,
@@ -86,18 +89,67 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                             name="NEXT_PUBLIC_API_URL",
                             value=api_service.uri,
                         ),
-                        # Optional: Add environment variable for analytics, etc.
+                        # Base env vars
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="NODE_ENV",
                             value="production",
                         ),
-                        # Optional: Add environment variable for the stack
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="PORT",
+                            value="8080",
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="HOSTNAME",
+                            value="0.0.0.0",
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="NEXT_TELEMETRY_DISABLED",
+                            value="1",
+                        ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="NEXT_PUBLIC_ENVIRONMENT",
                             value=stack,
                         ),
+                        # Secret environment variables
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="NEXT_PUBLIC_SENTRY_DSN",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="sentry-dsn", version="latest"
+                                )
+                            ),
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="NEXT_PUBLIC_API_TOKEN",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="maja-legal-api-token", version="latest"
+                                )
+                            ),
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="NEXT_PUBLIC_ADMIN_PASSWORD",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="frontend-admin-password", version="latest"
+                                )
+                            ),
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="NEXT_PUBLIC_USER_PASSWORD",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret="frontend-user-password", version="latest"
+                                )
+                            ),
+                        ),
                     ],
-                    # NextJS apps typically run on port 3000
+                    # Port configuration for the container
+                    ports=[
+                        cloudrunv2.ServiceTemplateContainerPortArgs(
+                            container_port=8080,
+                        ),
+                    ],
                 )
             ],
         ),
@@ -128,6 +180,42 @@ def create_service_account(stack: str):
     )
 
     return sa
+
+
+def grant_secret_access(sa):
+    """Grant access to the Secret Manager secrets for the API token and API keys"""
+
+    # Grant access to API token secret
+    secretmanager.SecretIamMember(
+        "maja-legal-api-token-access",
+        secret_id="projects/952577461734/secrets/maja-legal-api-token",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access for admin password secret
+    secretmanager.SecretIamMember(
+        "frontend-admin-password-access",
+        secret_id="projects/952577461734/secrets/frontend-admin-password",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access for user password secret
+    secretmanager.SecretIamMember(
+        "frontend-user-password-access",
+        secret_id="projects/952577461734/secrets/frontend-user-password",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access to Sentry DSN secret
+    secretmanager.SecretIamMember(
+        "sentry-dsn-access",
+        secret_id="projects/952577461734/secrets/sentry-dsn",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
 
 
 def get_frontend_url(service):
