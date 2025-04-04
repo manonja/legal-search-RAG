@@ -3,15 +3,13 @@
 This module provides settings and configuration management for the application.
 """
 
-import logging
 import os
 import tempfile
 from pathlib import Path
 from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-logger = logging.getLogger(__name__)
+from struct_logger import log
 
 # Required environment variables
 REQUIRED_ENV_VARS = ["GOOGLE_API_KEY", "OPENAI_API_KEY"]

@@ -5,13 +5,9 @@ for processing in the legal document search RAG system.
 It handles document parsing and text extraction.
 """
 
-import logging
-from typing import List, Tuple
-
 import docx  # python-docx package
 import fitz  # PyMuPDF
-
-logger = logging.getLogger(__name__)
+from struct_logger import log
 
 
 def extract_pdf_text(file_path):
@@ -22,7 +18,7 @@ def extract_pdf_text(file_path):
         for page in doc:
             text += page.get_text("text")  # type: ignore # Extract text from each page
     except Exception as e:
-        logger.error(f"Error extracting PDF {file_path}: {e}")
+        log.error("Error extracting PDF", file_path=file_path, error=str(e))
     return text
 
 
@@ -33,5 +29,5 @@ def extract_docx_text(file_path):
         doc = docx.Document(file_path)
         text = "\n".join(para.text for para in doc.paragraphs)
     except Exception as e:
-        logger.error(f"Error extracting DOCX {file_path}: {e}")
+        log.error("Error extracting DOCX", file_path=file_path, error=str(e))
     return text

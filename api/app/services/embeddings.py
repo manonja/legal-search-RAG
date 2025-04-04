@@ -5,7 +5,6 @@ and store them in a Chroma vector database for efficient retrieval.
 """
 
 import json
-import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -13,13 +12,11 @@ from typing import Any, Dict, Optional
 from chromadb.utils.embedding_functions.openai_embedding_function import (
     OpenAIEmbeddingFunction,
 )
+from struct_logger import log
 from tqdm import tqdm
 
 from app.core.config import get_settings
 from app.services.database.chroma import get_chroma_client
-
-# Configure logging
-logger = logging.getLogger(__name__)
 
 # Get application settings
 settings = get_settings()
@@ -89,6 +86,11 @@ def process_chunks(
             documents=batch,
             metadatas=metadatas,
         )
-        logger.info(f"Successfully added batch of {len(batch)} chunks")
+        log.info("Added batch of chunks", batch_size=len(batch))
 
-    logger.info(f"Processing complete! Documents stored in Chroma at {chroma_dir}")
+    log.info(
+        "Processing complete",
+        document_id=doc_id,
+        total_chunks=len(chunks),
+        chroma_dir=str(chroma_dir),
+    )

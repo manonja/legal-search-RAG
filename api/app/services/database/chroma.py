@@ -3,7 +3,6 @@
 This module provides functionality for initializing and managing the ChromaDB connection.
 """
 
-import logging
 import time
 from typing import Optional
 
@@ -13,10 +12,9 @@ from chromadb.errors import InvalidCollectionException
 from chromadb.utils.embedding_functions.openai_embedding_function import (
     OpenAIEmbeddingFunction,
 )
+from struct_logger import log
 
 from app.core.config import get_settings
-
-logger = logging.getLogger(__name__)
 
 # Global instances
 _client: Optional[chromadb.ClientAPI] = None
@@ -49,12 +47,12 @@ def initialize_chroma_client() -> chromadb.ClientAPI:
     if _client is not None:
         return _client
 
-    logger.info("Initializing Chroma client")
+    log.info("Initializing Chroma client")
 
     # Get ChromaDB directory
     settings = get_settings()
     chroma_dir = settings.CHROMA_DIR
-    logger.info(f"Using local ChromaDB storage: {chroma_dir}")
+    log.info("Using local ChromaDB storage", path=str(chroma_dir))
 
     # Create client with telemetry disabled
     _client = chromadb.PersistentClient(
@@ -92,14 +90,16 @@ async def initialize_chroma_collection() -> chromadb.Collection:
     )
 
     # Initialize Chroma client and collection with a retry mechanism
-    logger.info("Initializing Chroma client and collection")
+    log.info("Initializing Chroma client and collection")
     attempt = 0
 
     while attempt < MAX_CHROMA_CONNECTION_ATTEMPTS:
         try:
             attempt += 1
-            logger.info(
-                f"ChromaDB initialization attempt {attempt}/{MAX_CHROMA_CONNECTION_ATTEMPTS}"
+            log.info(
+                "ChromaDB initialization attempt",
+                attempt=attempt,
+                max_attempts=MAX_CHROMA_CONNECTION_ATTEMPTS,
             )
             if _client is None:
                 _client = initialize_chroma_client()
@@ -107,7 +107,9 @@ async def initialize_chroma_collection() -> chromadb.Collection:
             _client.list_collections()
             break
         except Exception as e:
-            logger.warning(f"ChromaDB initialization attempt {attempt} failed: {e}")
+            log.warning(
+                "ChromaDB initialization attempt failed", attempt=attempt, error=str(e)
+            )
             if attempt >= MAX_CHROMA_CONNECTION_ATTEMPTS:
                 raise
             time.sleep(1)  # Wait before retrying
@@ -119,22 +121,23 @@ async def initialize_chroma_collection() -> chromadb.Collection:
         _collection = _client.get_collection(
             settings.COLLECTION_NAME, embedding_function=openai_ef
         )
-        logger.info(
-            f"Collection '{settings.COLLECTION_NAME}' exists with "
-            f"{_collection.count()} embeddings"
+        log.info(
+            "Collection exists",
+            name=settings.COLLECTION_NAME,
+            embedding_count=_collection.count(),
         )
     except InvalidCollectionException as e:
         if _client is None:
             raise ValueError("Chroma client not initialized") from e
         # Only create collection if it doesn't exist
-        logger.info(f"Creating new collection '{settings.COLLECTION_NAME}'")
+        log.info("Creating new collection", name=settings.COLLECTION_NAME)
         _collection = _client.create_collection(
             name=settings.COLLECTION_NAME,
             embedding_function=openai_ef,
             metadata={"hnsw:space": "cosine"},
         )
 
-    logger.info("Successfully initialized Chroma client and collection")
+    log.info("Successfully initialized Chroma client and collection")
     return _collection
 
 

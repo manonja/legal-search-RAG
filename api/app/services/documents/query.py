@@ -4,19 +4,15 @@ This module provides functionality to query documents using vector similarity se
 and generate responses using OpenAI's API.
 """
 
-import logging
 from typing import Optional
 
 import openai
+from struct_logger import log
 
 from app.core.config import get_settings
 from app.models.query import QueryResponse
 from app.models.search import SearchQuery
 from app.services.documents.search import search_documents
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def get_openai_client():
@@ -43,7 +39,7 @@ async def process_query(
         QueryResponse containing the answer, sources, and confidence
     """
     settings = get_settings()
-    logger.info(f"Processing query: {query}")
+    log.info("Processing query", query=query)
 
     try:
         # First, search for relevant documents
@@ -55,7 +51,7 @@ async def process_query(
         )
 
         if not search_results:
-            logger.warning("No search results found for query")
+            log.warning("No search results found for query")
             return QueryResponse(
                 answer="I couldn't find any relevant information to answer your question.",
                 sources=[],
@@ -120,7 +116,7 @@ Answer concisely and accurately, citing the relevant document sources when possi
         # Convert to confidence (1.0 - normalized distance)
         confidence = max(0.0, min(1.0, 1.0 - (avg_distance / 2.0)))
 
-        logger.info(f"Query processed successfully. Confidence: {confidence:.2f}")
+        log.info("Query processed successfully", confidence=round(confidence, 2))
 
         return QueryResponse(
             answer=answer,
@@ -129,5 +125,5 @@ Answer concisely and accurately, citing the relevant document sources when possi
         )
 
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
+        log.error("Error processing query", error=str(e))
         raise

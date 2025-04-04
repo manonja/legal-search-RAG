@@ -3,18 +3,16 @@
 This module provides functionality for searching documents using vector similarity.
 """
 
-import logging
 from typing import Any, Dict, List, cast
 
 import chromadb
 from chromadb.api.models.Collection import Collection
 from chromadb.api.types import IncludeEnum
+from struct_logger import log
 
 from app.core.config import get_settings
 from app.models.search import QueryRequest, QueryResponse, SearchQuery, SearchResult
 from app.services.database.chroma import get_collection
-
-logger = logging.getLogger(__name__)
 
 
 async def search_documents(request: SearchQuery) -> List[SearchResult]:
@@ -28,14 +26,14 @@ async def search_documents(request: SearchQuery) -> List[SearchResult]:
     """
     try:
         # Log the request
-        logger.info(f"Search query: {request.query}")
+        log.info("Search query", query=request.query)
 
         # Get collection
         collection = await get_collection()
 
         # Check if collection exists
         if collection is None:
-            logger.error("Failed to get Chroma collection - collection is None")
+            log.error("Failed to get Chroma collection - collection is None")
             raise ValueError("Document collection not available")
 
         # Query the collection
@@ -70,7 +68,7 @@ async def search_documents(request: SearchQuery) -> List[SearchResult]:
         return search_results
 
     except Exception as e:
-        logger.error(f"Error during search: {e}")
+        log.error("Error during search", error=str(e))
         raise
 
 
@@ -87,14 +85,14 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         if not request:
             raise ValueError("Missing request body")
 
-        logger.info(f"Processing search request: {request.query_text}")
+        log.info("Processing search request", query=request.query_text)
 
         # Get collection
         collection = await get_collection()
 
         # Check if collection exists
         if collection is None:
-            logger.error("Failed to get Chroma collection - collection is None")
+            log.error("Failed to get Chroma collection - collection is None")
             raise ValueError("Document collection not available")
 
         # Query Chroma
@@ -110,7 +108,7 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         )
 
         if not results or not results.get("documents"):
-            logger.warning("No results found for query")
+            log.warning("No results found for query")
             return QueryResponse(results=[], total_found=0)
 
         if (
@@ -125,7 +123,7 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         distances = results["distances"][0]
 
         if not documents:
-            logger.warning("No documents found in results")
+            log.warning("No documents found in results")
             return QueryResponse(results=[], total_found=0)
 
         # Process results
@@ -148,8 +146,10 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
                 )
             )
 
-        logger.info(
-            f"Found {len(formatted_results)} results above similarity threshold"
+        log.info(
+            "Search results found",
+            count=len(formatted_results),
+            threshold="above similarity threshold",
         )
         return QueryResponse(
             results=formatted_results,
@@ -157,5 +157,5 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         )
 
     except Exception as e:
-        logger.error(f"Search failed: {str(e)}")
+        log.error("Search failed", error=str(e))
         raise
