@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from pydantic import BaseModel, Field
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import Settings
 

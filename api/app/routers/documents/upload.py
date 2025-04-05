@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Union
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 from app.services.datastore import DocumentMetadata

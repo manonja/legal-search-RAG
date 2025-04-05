@@ -7,7 +7,7 @@ It handles document parsing and text extraction.
 
 import docx  # python-docx package
 import fitz  # PyMuPDF
-from struct_logger import log
+from app.core.struct_logger import log
 
 
 def extract_pdf_text(file_path):

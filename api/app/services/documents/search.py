@@ -8,7 +8,7 @@ from typing import Any, Dict, List, cast
 import chromadb
 from chromadb.api.models.Collection import Collection
 from chromadb.api.types import IncludeEnum
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 from app.models.search import QueryRequest, QueryResponse, SearchQuery, SearchResult

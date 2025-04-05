@@ -7,7 +7,7 @@ and generate responses using OpenAI's API.
 from typing import Optional
 
 import openai
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 from app.models.query import QueryResponse

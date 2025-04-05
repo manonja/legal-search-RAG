@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from struct_logger import log
+from app.core.struct_logger import log
 
 # Required environment variables
 REQUIRED_ENV_VARS = ["GOOGLE_API_KEY", "OPENAI_API_KEY"]
