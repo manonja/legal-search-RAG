@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const { withSentryConfig } = require("@sentry/nextjs");
+
 const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
@@ -37,6 +39,10 @@ const nextConfig = {
   // Configure server to listen on all network interfaces
   experimental: {
     serverComponentsExternalPackages: [],
+    // Enable instrumentation hook for Sentry
+    instrumentationHook: true,
+    // Configure custom path for client-side instrumentation
+    clientInstrumentationHook: "src/instrumentation-client.ts",
   },
 
   // Add proper handling for trailing slash and path resolution
@@ -55,4 +61,24 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// Sentry webpack plugin options
+const sentryWebpackPluginOptions = {
+  // Additional options for the Sentry webpack plugin
+  org: process.env.SENTRY_ORG || "unknown",
+  project: process.env.SENTRY_PROJECT || "legal-search-rag",
+  silent: true, // Suppresses all logs
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+  // Hide source maps from generated client builds
+  hideSourceMaps: process.env.NODE_ENV === "production",
+  // Automatically instrument SDK with Next.js routing and performance monitoring
+  autoInstrumentServerFunctions: true,
+  autoInstrumentMiddleware: true,
+  tunnelRoute: "/monitoring",
+};
+
+// Export the Next.js config wrapped with Sentry
+module.exports = withSentryConfig(
+  nextConfig,
+  sentryWebpackPluginOptions
+);

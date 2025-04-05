@@ -2,6 +2,7 @@
 
 import SearchResultCard from "@/components/SearchResultCard";
 import { api, LegacyQueryRequest, LegacySearchResult } from "@/lib/api";
+import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -43,8 +44,31 @@ export default function SearchPage() {
 
       // Emit search event
       window.dispatchEvent(new Event("search-performed"));
-    } catch (err) {
-      console.error("Search error:", err);
+    } catch (error: any) {
+      console.error("Search error:", error);
+
+      // Report error to Sentry with more context
+      Sentry.captureException(error, {
+        tags: {
+          component: "SearchPage",
+          action: "legacySearchDocuments",
+          errorType: error.name || "UnknownError",
+          errorCode: error.code || "UNKNOWN_CODE"
+        },
+        extra: {
+          query,
+          message: error.message || "No error message",
+          stack: error.stack || "No stack trace"
+        }
+      });
+
+      // Log for debugging in Docker
+      console.error("Search error details for Sentry:", {
+        message: error.message || "No message",
+        code: error.code || "No code",
+        type: error.name || "Unknown type"
+      });
+
       setError("An error occurred while searching. Please try again.");
       setResults([]);
       setTotalFound(0);

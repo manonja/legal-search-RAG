@@ -11,8 +11,29 @@ export async function register() {
       // Adjust in production as needed
       tracesSampleRate: 1.0,
 
+      // Setting this option to true will print useful information to the console while you're setting up Sentry.
+      debug: process.env.NODE_ENV === "development" || process.env.DEBUG_SENTRY === "true",
+
       // Environment will be derived from NODE_ENV
-      environment: process.env.NODE_ENV,
+      environment: process.env.NODE_ENV || "development",
+
+      // Version taken from environment variable
+      release: process.env.NEXT_PUBLIC_VERSION || "0.1.0",
+    });
+  } else if (process.env.NEXT_RUNTIME === "edge") {
+    const Sentry = await import("@sentry/nextjs");
+
+    Sentry.init({
+      dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+
+      // Adjust this value in production, or use tracesSampler for greater control
+      tracesSampleRate: 1.0,
+
+      // Setting this option to true will print useful information to the console while you're setting up Sentry.
+      debug: process.env.NODE_ENV === "development" || process.env.DEBUG_SENTRY === "true",
+
+      // Environment will be derived from NODE_ENV
+      environment: process.env.NODE_ENV || "development",
 
       // Version taken from environment variable
       release: process.env.NEXT_PUBLIC_VERSION || "0.1.0",

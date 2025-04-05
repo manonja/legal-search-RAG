@@ -76,14 +76,7 @@ docker-build:
 ifeq ($(ENV),dev)
 	$(MAKE) patch
 endif
-	docker build -t $(APP_NAME):$(VERSION) \
-		--build-arg VERSION_ARG=$(VERSION) \
-		--build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		--build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
-		--build-arg NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
-		--build-arg NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
-		--build-arg NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
-		.
+	docker build -t $(APP_NAME):$(VERSION) .
 ifeq ($(ENV),local)
 	@echo "Built local image $(APP_NAME):$(VERSION)"
 else
@@ -105,14 +98,7 @@ docker-build-no-cache:
 ifeq ($(ENV),dev)
 	$(MAKE) patch
 endif
-	docker build --no-cache -t $(APP_NAME):$(VERSION) \
-		--build-arg VERSION_ARG=$(VERSION) \
-		--build-arg NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
-		--build-arg NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN} \
-		--build-arg NEXT_PUBLIC_ADMIN_PASSWORD=${NEXT_PUBLIC_ADMIN_PASSWORD} \
-		--build-arg NEXT_PUBLIC_USER_PASSWORD=${NEXT_PUBLIC_USER_PASSWORD} \
-		--build-arg NEXT_PUBLIC_API_TOKEN=${NEXT_PUBLIC_API_TOKEN} \
-		.
+	docker build --no-cache -t $(APP_NAME):$(VERSION) .
 ifeq ($(ENV),local)
 	@echo "Built local image $(APP_NAME):$(VERSION)"
 else
@@ -143,6 +129,7 @@ ifeq ($(ENV),local)
 		-e NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET} \
 		-e NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID} \
 		-e NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID} \
+		-e DEBUG_SENTRY=true \
 		$(APP_NAME):$(VERSION)
 else
 	@echo "Run is only available for ENV=local"
