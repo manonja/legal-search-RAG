@@ -49,3 +49,78 @@ if (typeof window === "undefined") {
     },
   });
 }
+
+// Mock global objects that might not exist in Node environment
+global.Request = class Request {};
+global.Headers = class Headers {
+  constructor(init) {
+    this.headers = new Map();
+    if (init) {
+      Object.entries(init).forEach(([key, value]) => {
+        this.set(key, value);
+      });
+    }
+  }
+
+  get(name) {
+    return this.headers.get(name);
+  }
+
+  set(name, value) {
+    this.headers.set(name, value);
+  }
+
+  has(name) {
+    return this.headers.has(name);
+  }
+};
+
+// Mock URL if needed
+if (typeof URL === 'undefined') {
+  global.URL = require('url').URL;
+}
+
+// Mock localStorage
+class LocalStorageMock {
+  constructor() {
+    this.store = {};
+  }
+
+  getItem(key) {
+    return this.store[key] || null;
+  }
+
+  setItem(key, value) {
+    this.store[key] = String(value);
+  }
+
+  removeItem(key) {
+    delete this.store[key];
+  }
+
+  clear() {
+    this.store = {};
+  }
+
+  key(index) {
+    return Object.keys(this.store)[index] || null;
+  }
+
+  get length() {
+    return Object.keys(this.store).length;
+  }
+}
+
+if (typeof localStorage === 'undefined') {
+  global.localStorage = new LocalStorageMock();
+}
+
+// Mock FormData
+if (typeof FormData === 'undefined') {
+  global.FormData = require('form-data');
+}
+
+// Set up fetch mock
+if (typeof fetch === 'undefined') {
+  global.fetch = jest.fn();
+}

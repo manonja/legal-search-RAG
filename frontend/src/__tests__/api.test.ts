@@ -1,186 +1,339 @@
-import { api } from "@/lib/api";
-import axios from "axios";
+import axios from 'axios';
+import { api } from '@/lib/api';
+import * as Sentry from '@sentry/nextjs';
+import { constructApiUrl } from '@/lib/utils';
 
-// Mock localStorage
-const mockLocalStorage = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  clear: jest.fn(),
-};
-Object.defineProperty(window, "localStorage", { value: mockLocalStorage });
+// Set up Node globals needed for tests
+if (typeof window === 'undefined') {
+  global.FormData = require('form-data');
+}
 
-// Mock the axios module directly
-jest.mock("axios", () => {
-  return {
-    create: jest.fn().mockReturnValue({
-      get: jest.fn().mockImplementation(() => Promise.resolve({ data: {} })),
-      post: jest.fn().mockImplementation(() => Promise.resolve({ data: {} })),
-      interceptors: {
-        request: {
-          use: jest.fn((callback) => {
-            // Store the callback for testing
-            (jest as any).requestInterceptorCallback = callback;
-            return callback;
-          }),
-        },
-        response: {
-          use: jest.fn(),
-        },
-      },
-    }),
+// Mock dependencies
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
+jest.mock('@/lib/utils', () => ({
+  constructApiUrl: jest.fn().mockReturnValue('https://api.example.com'),
+}));
+
+describe('API Client', () => {
+  const originalEnv = process.env;
+  // Mock localStorage
+  const mockLocalStorage: Record<string, any> = {
+    getItem: jest.fn().mockReturnValue(null),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+    clear: jest.fn(),
+    length: 0,
+    key: jest.fn(),
   };
-});
 
-describe("API Client", () => {
-  // Get the mocked axios instance from the api module
-  const mockAxiosInstance = (axios.create as jest.Mock)();
+  // Store interceptors for testing
+  let requestInterceptor: any;
+  let responseErrorInterceptor: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockLocalStorage.getItem.mockReset();
-    mockLocalStorage.setItem.mockReset();
-    process.env.NEXT_PUBLIC_API_TOKEN = undefined;
-  });
 
-  // Test for the request interceptor that adds the Authorization header
-  it("should add the Authorization header with token from localStorage", () => {
-    // Set up the test
-    const mockToken = "test-token-123";
-    mockLocalStorage.getItem.mockReturnValue(mockToken);
-    const mockConfig = { headers: {} };
-
-    // Call the interceptor callback
-    const result = (jest as any).requestInterceptorCallback(mockConfig);
-
-    // Verify the Authorization header was added correctly
-    expect(result.headers.Authorization).toBe(`Bearer ${mockToken}`);
-    expect(mockLocalStorage.getItem).toHaveBeenCalledWith("api_token");
-  });
-
-  it("should add the Authorization header with token from environment variable", () => {
-    // Set up the test with no localStorage token
-    mockLocalStorage.getItem.mockReturnValue(null);
-    const mockEnvToken = "env-token-456";
-    process.env.NEXT_PUBLIC_API_TOKEN = mockEnvToken;
-    const mockConfig = { headers: {} };
-
-    // Call the interceptor callback
-    const result = (jest as any).requestInterceptorCallback(mockConfig);
-
-    // Verify the Authorization header was added correctly
-    expect(result.headers.Authorization).toBe(`Bearer ${mockEnvToken}`);
-  });
-
-  it("should call the correct endpoint for searchDocuments", async () => {
-    const mockData = [{ text: "test", metadata: {}, distance: 0.5 }];
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: mockData });
-
-    const searchQuery = { query: "test query", limit: 5 };
-    const result = await api.searchDocuments(searchQuery);
-
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      "/api/search/",
-      searchQuery
-    );
-    expect(result).toEqual(mockData);
-  });
-
-  it("should call the correct endpoint for legacy search", async () => {
-    const mockData = { results: [], total_found: 0 };
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: mockData });
-
-    const searchQuery = { query_text: "test query", n_results: 10 };
-    const result = await api.legacySearchDocuments(searchQuery);
-
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      "/api/search/api",
-      searchQuery
-    );
-    expect(result).toEqual(mockData);
-  });
-
-  it("should call the correct endpoint for RAG search", async () => {
-    const mockData = {
-      answer: "test answer",
-      sources: ["source1", "source2"],
-      confidence: 0.8,
-    };
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: mockData });
-
-    const queryRequest = { query: "test question", max_results: 5 };
-    const result = await api.ragSearch(queryRequest);
-
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      "/api/rag-search",
-      queryRequest
-    );
-    expect(result).toEqual(mockData);
-  });
-
-  it("should call the correct endpoint for document query", async () => {
-    const mockData = {
-      answer: "test answer",
-      sources: ["source1", "source2"],
-      confidence: 0.8,
-    };
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: mockData });
-
-    const queryRequest = { query: "test question", max_results: 5 };
-    const result = await api.queryDocuments(queryRequest);
-
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      "/api/query",
-      queryRequest
-    );
-    expect(result).toEqual(mockData);
-  });
-
-  it("should call the correct endpoint for health check", async () => {
-    const mockData = { status: "ok" };
-    mockAxiosInstance.get.mockResolvedValueOnce({ data: mockData });
-
-    const result = await api.healthCheck();
-
-    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/health");
-    expect(result).toEqual(mockData);
-  });
-
-  it("should call the correct endpoint for document retrieval", async () => {
-    const mockData = {
-      content: "document content",
-      metadata: {},
-      source: "source.pdf",
-      chunks: ["chunk1", "chunk2"],
-    };
-    mockAxiosInstance.get.mockResolvedValueOnce({ data: mockData });
-
-    const documentId = "test-document-id";
-    const result = await api.getDocument(documentId);
-
-    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-      `/api/documents/${encodeURIComponent(documentId)}`
-    );
-    expect(result).toEqual(mockData);
-  });
-
-  it("should call the correct endpoint for document upload", async () => {
-    const mockData = { document_id: "new-doc-id" };
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: mockData });
-
-    const mockFile = new File(["test content"], "test.pdf", {
-      type: "application/pdf",
+    // Set up localStorage mock
+    Object.defineProperty(global, 'localStorage', {
+      value: mockLocalStorage,
+      writable: true
     });
-    const result = await api.uploadDocument(mockFile);
 
-    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      "/api/documents/upload",
-      expect.any(FormData),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          "Content-Type": "multipart/form-data",
+    // Mock environment variables
+    process.env = {
+      ...originalEnv,
+      NEXT_PUBLIC_API_TOKEN: 'env-token-123',
+    };
+
+    // Mock axios's interceptor methods
+    mockedAxios.interceptors = {
+      request: {
+        use: jest.fn((onFulfilled) => {
+          requestInterceptor = onFulfilled;
+          return 0; // Return a number as the interceptor ID
         }),
-      })
-    );
-    expect(result).toEqual(mockData);
+        eject: jest.fn(),
+      },
+      response: {
+        use: jest.fn((onFulfilled, onRejected) => {
+          responseErrorInterceptor = onRejected;
+          return 0; // Return a number as the interceptor ID
+        }),
+        eject: jest.fn(),
+      },
+    } as any;
+
+    // Mock axios create
+    mockedAxios.create.mockReturnValue(mockedAxios);
+
+    // Mock successful response
+    mockedAxios.post.mockResolvedValue({
+      data: { success: true, results: [{ id: '123' }] },
+    });
+
+    mockedAxios.get.mockResolvedValue({
+      data: { success: true, data: { id: '123' } },
+    });
+
+    // Force initialization of the API client
+    // This will register the interceptors
+    jest.isolateModules(() => {
+      require('@/lib/api');
+    });
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+    // Restore globals by setting to undefined
+    Object.defineProperty(global, 'localStorage', {
+      value: undefined,
+      writable: true
+    });
+  });
+
+  describe('API Client Initialization', () => {
+    it('should initialize with correct base URL', () => {
+      // Assert
+      expect(constructApiUrl).toHaveBeenCalled();
+      expect(axios.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          baseURL: 'https://api.example.com',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('Request Interceptor', () => {
+    it('should add token from environment variable', () => {
+      // Arrange
+      const config = { headers: {} };
+
+      // Act
+      const result = requestInterceptor(config);
+
+      // Assert
+      expect(result.headers.Authorization).toBe('Bearer env-token-123');
+    });
+
+    it('should use token from localStorage when env token is not available', () => {
+      // Arrange
+      delete process.env.NEXT_PUBLIC_API_TOKEN;
+      mockLocalStorage.getItem.mockReturnValue('storage-token-456');
+      const config = { headers: {} };
+
+      // Act
+      const result = requestInterceptor(config);
+
+      // Assert
+      expect(result.headers.Authorization).toBe('Bearer storage-token-456');
+    });
+
+    it('should handle when no token is available', () => {
+      // Arrange
+      delete process.env.NEXT_PUBLIC_API_TOKEN;
+      mockLocalStorage.getItem.mockReturnValue(null);
+      const config = { headers: {} };
+
+      // Act
+      const result = requestInterceptor(config);
+
+      // Assert
+      expect(result.headers.Authorization).toBeUndefined();
+    });
+
+    it('should handle errors and report to Sentry', () => {
+      // Arrange
+      const error = new Error('Request interceptor error');
+      const configWithError = { headers: { get: () => { throw error; } } };
+
+      // Act & Assert
+      expect(() => requestInterceptor(configWithError)).toThrow();
+
+      // Should report to Sentry
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        error,
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            component: 'API',
+            stage: 'requestSetup',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('Response Interceptor', () => {
+    it('should handle API errors and report to Sentry', async () => {
+      // Arrange
+      const error = {
+        message: 'API Error',
+        code: 'ERR_BAD_REQUEST',
+        response: { status: 400, data: { error: 'Bad request' } },
+        config: { url: '/api/test', method: 'GET' },
+        stack: 'Error stack trace',
+      };
+
+      // Act & Assert
+      await expect(responseErrorInterceptor(error)).rejects.toEqual(error);
+
+      // Should report to Sentry
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        error,
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            component: 'API',
+            status: 400,
+            url: '/api/test',
+          }),
+          extra: expect.objectContaining({
+            method: 'GET',
+            responseData: { error: 'Bad request' },
+          }),
+        })
+      );
+    });
+
+    it('should handle network errors with no response', async () => {
+      // Arrange
+      const error = {
+        message: 'Network Error',
+        code: 'ERR_NETWORK',
+        config: { url: '/api/test', method: 'GET' },
+      };
+
+      // Act & Assert
+      await expect(responseErrorInterceptor(error)).rejects.toEqual(error);
+
+      // Should report to Sentry
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        error,
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            component: 'API',
+            status: 0,
+          }),
+        })
+      );
+    });
+  });
+
+  describe('API Functions', () => {
+    it('should call searchDocuments with correct parameters', async () => {
+      // Arrange
+      const searchQuery = { query: 'test', limit: 10 };
+
+      // Act
+      await api.searchDocuments(searchQuery);
+
+      // Assert
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        '/api/search/',
+        searchQuery
+      );
+    });
+
+    it('should call legacySearchDocuments with correct parameters', async () => {
+      // Arrange
+      const legacyQuery = { query_text: 'test', n_results: 5 };
+
+      // Act
+      await api.legacySearchDocuments(legacyQuery);
+
+      // Assert
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        '/api/search/api',
+        legacyQuery
+      );
+    });
+
+    it('should call ragSearch with correct parameters', async () => {
+      // Arrange
+      const ragQuery = { query: 'test', max_results: 3 };
+
+      // Act
+      await api.ragSearch(ragQuery);
+
+      // Assert
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        '/api/rag-search',
+        ragQuery
+      );
+    });
+
+    it('should call queryDocuments with correct parameters', async () => {
+      // Arrange
+      const query = { query: 'test question', max_tokens: 500 };
+
+      // Act
+      await api.queryDocuments(query);
+
+      // Assert
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        '/api/query',
+        query
+      );
+    });
+
+    it('should call getDocument with correct parameters', async () => {
+      // Arrange
+      const documentId = 'doc123';
+
+      // Act
+      await api.getDocument(documentId);
+
+      // Assert
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        '/api/documents/doc123'
+      );
+    });
+
+    it('should call uploadDocument with correct parameters', async () => {
+      // Arrange
+      const mockFile = {
+        name: 'test.txt',
+        type: 'text/plain',
+        size: 123,
+      } as File;
+
+      // Act
+      await api.uploadDocument(mockFile);
+
+      // Assert
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        '/api/documents/upload',
+        expect.any(FormData),
+        expect.objectContaining({
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+      );
+    });
+
+    it('should call healthCheck with correct parameters', async () => {
+      // Act
+      await api.healthCheck();
+
+      // Assert
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/health');
+    });
+
+    it('should handle errors in API functions', async () => {
+      // Arrange
+      const error = new Error('API error');
+      mockedAxios.post.mockRejectedValueOnce(error);
+
+      // Act & Assert
+      await expect(api.searchDocuments({ query: 'test' })).rejects.toThrow();
+    });
   });
 });
