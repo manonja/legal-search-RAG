@@ -65,7 +65,7 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000, // 30 seconds timeout
+  timeout: 120000, // 120 seconds timeout (increased from 30s to handle Cloud Run cold starts)
 });
 
 // Add request interceptor to include API token in all requests

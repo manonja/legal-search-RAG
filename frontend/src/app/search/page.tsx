@@ -34,13 +34,26 @@ export default function SearchPage() {
 
       const response = await api.legacySearchDocuments(request);
 
+      // Validate response data before processing
+      if (!response || !response.results) {
+        throw new Error("Invalid response format from API");
+      }
+
+      // Log for debugging - safely access metadata with optional chaining
       console.log(
         "Search results metadata:",
-        response.results.map((r) => r.metadata)
+        response.results.map((r) => r?.metadata || {})
       );
 
-      setResults(response.results);
-      setTotalFound(response.total_found);
+      // Ensure each result has at least an empty object for metadata and a chunk string
+      const safeResults = response.results.map(result => ({
+        ...result,
+        chunk: result.chunk || "",
+        metadata: result.metadata || {},
+      }));
+
+      setResults(safeResults);
+      setTotalFound(response.total_found || 0);
 
       // Emit search event
       window.dispatchEvent(new Event("search-performed"));
