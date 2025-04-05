@@ -12,7 +12,7 @@ from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 

@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 from chromadb.utils.embedding_functions.openai_embedding_function import (
     OpenAIEmbeddingFunction,
 )
-from struct_logger import log
+from app.core.struct_logger import log
 from tqdm import tqdm
 
 from app.core.config import get_settings

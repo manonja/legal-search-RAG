@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 from app.core.auth import security, TokenManager

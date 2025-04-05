@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 from app.services.datastore import get_datastore_service, DocumentMetadata

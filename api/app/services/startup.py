@@ -7,7 +7,7 @@ on startup.
 import os
 import sentry_sdk
 from pathlib import Path
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 from app.services.database.chroma import initialize_chroma_collection

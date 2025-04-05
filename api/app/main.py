@@ -13,7 +13,7 @@ os.environ["CHROMADB_TELEMETRY_ENABLED"] = "FALSE"
 os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
 
 # Import structured logger early
-from struct_logger import log
+from app.core.struct_logger import log
 
 # Initialize Sentry as early as possible
 import logging

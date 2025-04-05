@@ -12,7 +12,7 @@ from chromadb.errors import InvalidCollectionException
 from chromadb.utils.embedding_functions.openai_embedding_function import (
     OpenAIEmbeddingFunction,
 )
-from struct_logger import log
+from app.core.struct_logger import log
 
 from app.core.config import get_settings
 
