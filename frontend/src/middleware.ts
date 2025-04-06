@@ -4,10 +4,10 @@ import * as Sentry from '@sentry/nextjs';
 
 // This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const isApiRoute = requestUrl.pathname.startsWith('/api/');
-
   try {
+    const requestUrl = new URL(request.url);
+    const isApiRoute = requestUrl.pathname.startsWith('/api/');
+
     // Only apply to API routes
     if (isApiRoute) {
       // Allow health checks from any source
@@ -20,15 +20,20 @@ export function middleware(request: NextRequest) {
       const host = request.headers.get('host');
 
       // Check if the request has a valid referer from our own domain or localhost
-      const isValidReferer = referer &&
+      const isValidReferer =
+        referer &&
         (referer.includes(host || '') ||
-         referer.includes('localhost:') ||
-         // Add any additional trusted origins here
-         process.env.NODE_ENV === 'development'); // Allow any referer in development
+          referer.includes('localhost:') ||
+          // Add any additional trusted origins here
+          process.env.NODE_ENV === 'development'); // Allow any referer in development
 
       // If external request but not health check, block it
       if (!isValidReferer && !request.headers.has('x-api-internal-req')) {
-        console.warn(`Blocked API access: ${requestUrl.pathname} - Invalid referer: ${referer}`);
+        console.warn(
+          `Blocked API access: ${requestUrl.pathname} - Invalid referer: ${
+            referer || 'undefined'
+          }`
+        );
 
         return new NextResponse(
           JSON.stringify({ error: 'Unauthorized access' }),
@@ -46,25 +51,29 @@ export function middleware(request: NextRequest) {
       response.headers.set('x-api-internal-req', '1');
       return response;
     }
+
+    // Continue for non-API routes that didn't throw an error
+    return NextResponse.next();
+
   } catch (error: any) {
     // Log middleware errors to Sentry
+    console.error('Middleware error caught:', error);
+
+    // Capture the error without trying to access potentially faulty request properties
     Sentry.captureException(error, {
       tags: {
         component: 'Middleware',
-        path: requestUrl.pathname,
+        path: '(error during request processing)',
       },
       extra: {
-        url: request.url,
-        method: request.method,
-        referer: request.headers.get('referer') || 'none',
-      }
+        // Only include safe-to-access properties like referer
+        referer: request?.headers?.get('referer') || 'none',
+      },
     });
 
-    console.error('Middleware error:', error);
+    // Return a response even in case of error, as expected by the test
+    return NextResponse.next();
   }
-
-  // Continue for non-API routes
-  return NextResponse.next();
 }
 
 // Only run middleware on API routes

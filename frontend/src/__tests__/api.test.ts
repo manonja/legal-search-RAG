@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { api } from '@/lib/api';
+// import { api } from '@/lib/api'; // Remove this line
 import * as Sentry from '@sentry/nextjs';
 import { constructApiUrl } from '@/lib/utils';
 
@@ -35,6 +35,7 @@ describe('API Client', () => {
   // Store interceptors for testing
   let requestInterceptor: any;
   let responseErrorInterceptor: any;
+  let api: any; // Declare api variable here
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -84,7 +85,8 @@ describe('API Client', () => {
     // Force initialization of the API client
     // This will register the interceptors
     jest.isolateModules(() => {
-      require('@/lib/api');
+      // Require and assign api here
+      api = require('@/lib/api').api;
     });
   });
 

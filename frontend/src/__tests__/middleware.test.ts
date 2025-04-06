@@ -7,19 +7,48 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 // Mock Next.js modules completely instead of using requireActual
-jest.mock('next/server', () => ({
-  NextResponse: {
-    next: jest.fn().mockReturnValue({
-      headers: {
-        set: jest.fn(),
-      },
-    }),
-    json: jest.fn((body, init) => ({
-      body,
-      init,
-    })),
-  },
-}));
+jest.mock('next/server', () => {
+  const originalModule = jest.requireActual('next/server');
+
+  // Mock the constructor - this function will be called with 'new NextResponse(...)'
+  const mockConstructor = jest.fn((body, init) => ({
+    body,
+    init,
+    headers: new Map([['Content-Type', 'application/json']]), // Mock instance properties
+    // Add other instance methods/properties if needed by the code under test, e.g., status
+    status: init?.status || 200,
+  }));
+
+  // Attach static methods mocks directly to the mock constructor function
+  (mockConstructor as any).next = jest.fn().mockReturnValue({
+    headers: { // Mock the returned object from next()
+      set: jest.fn(),
+      get: jest.fn(),
+      has: jest.fn(),
+      // Ensure it's iterable or provide necessary methods if tests need them
+      [Symbol.iterator]: jest.fn(),
+      entries: jest.fn(() => [['x-api-internal-req', '1']]),
+      keys: jest.fn(),
+      values: jest.fn(),
+    },
+    // Add other properties of the object returned by next() if needed
+    ok: true,
+    status: 200,
+  });
+
+  (mockConstructor as any).json = jest.fn((body, init) => ({ // Mock the returned object from json()
+    body,
+    init,
+    headers: new Map([['Content-Type', 'application/json']]),
+    ok: init?.status ? init.status >= 200 && init.status < 300 : true,
+    status: init?.status || 200,
+  }));
+
+  return {
+    ...originalModule,
+    NextResponse: mockConstructor, // Use the function with attached static methods as the mock
+  };
+});
 
 // Import after mocking
 import { NextResponse } from 'next/server';
@@ -152,10 +181,14 @@ describe('Middleware', () => {
     middleware(request as any);
 
     // Assert
-    expect(NextResponse.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'Unauthorized access' }),
-      expect.objectContaining({ status: 403 })
+    expect(NextResponse).toHaveBeenCalledWith(
+      JSON.stringify({ error: 'Unauthorized access' }),
+      expect.objectContaining({
+        status: 403,
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      })
     );
+    expect(NextResponse.next).not.toHaveBeenCalled();
   });
 
   it('should allow any referer in development environment', () => {
@@ -201,9 +234,13 @@ describe('Middleware', () => {
     middleware(request as any);
 
     // Assert
-    expect(NextResponse.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'Unauthorized access' }),
-      expect.objectContaining({ status: 403 })
+    expect(NextResponse).toHaveBeenCalledWith(
+      JSON.stringify({ error: 'Unauthorized access' }),
+      expect.objectContaining({
+        status: 403,
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      })
     );
+    expect(NextResponse.next).not.toHaveBeenCalled();
   });
 });
