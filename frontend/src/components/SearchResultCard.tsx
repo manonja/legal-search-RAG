@@ -1,9 +1,9 @@
-import { LegacySearchResult } from "@/lib/api";
+import { SearchResult } from "@/lib/api";
 import { useState } from "react";
 import DocumentModal from "./DocumentModal";
 
 interface SearchResultCardProps {
-  result: LegacySearchResult;
+  result: SearchResult;
   query: string;
   index: number;
 }
@@ -16,8 +16,23 @@ export default function SearchResultCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Log the received result object for debugging
+  // console.log(`SearchResultCard[${index}] received result:`, result);
+  // console.log(`SearchResultCard[${index}] result.text:`, result?.text); // Log text instead of chunk
+
   // Function to extract a meaningful title from the content
-  const extractTitle = (content: string): string => {
+  const extractTitle = (content: string | undefined): string => {
+    // Handle case where content is undefined
+    if (!content) {
+      // Fallback to document source if available
+      if (result.metadata?.source) {
+        const filename = result.metadata.source.split("/").pop();
+        return filename || `Result ${index + 1}`;
+      }
+      // Last resort fallback
+      return `Result ${index + 1}`;
+    }
+
     // Try to get the first sentence or first N characters
     const firstSentence = content
       .split(/[.!?]/)
@@ -32,7 +47,7 @@ export default function SearchResultCard({
     }
 
     // Fallback to document source if available
-    if (result.metadata.source) {
+    if (result.metadata?.source) {
       const filename = result.metadata.source.split("/").pop();
       return filename || `Result ${index + 1}`;
     }
@@ -42,8 +57,8 @@ export default function SearchResultCard({
   };
 
   // Function to highlight matching text
-  const highlightText = (text: string, searchQuery: string) => {
-    if (!searchQuery.trim()) return text;
+  const highlightText = (text: string | undefined, searchQuery: string) => {
+    if (!text || !searchQuery.trim()) return text || '';
 
     // Create regex pattern from search terms
     const terms = searchQuery
@@ -67,13 +82,18 @@ export default function SearchResultCard({
   };
 
   // Get the display title using our hierarchy of fallbacks
-  const displayTitle = extractTitle(result.chunk);
+  const displayTitle = extractTitle(result.text);
+
+  // Calculate similarity percentage from distance
+  const similarityPercentage = typeof result.distance === 'number'
+    ? ((1 - result.distance) * 100).toFixed(1)
+    : '--';
 
   return (
     <>
       <div className="mb-8 pb-5 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0 transition-all duration-200 ease-in-out hover:bg-gray-50 rounded-lg p-4">
         <div className="flex gap-3 text-sm text-gray-500 mb-3">
-          <span>{result.metadata.source || "Unknown Document"}</span>
+          <span>{result.metadata?.source || "Unknown Document"}</span>
         </div>
 
         <h3 className="text-xl font-semibold mb-3 text-gray-900">
@@ -82,9 +102,9 @@ export default function SearchResultCard({
 
         <div className="flex gap-3 mb-4 flex-wrap">
           <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-            Similarity: {(result.similarity * 100).toFixed(1)}%
+            Similarity: {similarityPercentage}%
           </span>
-          {result.metadata.page_number && (
+          {result.metadata?.page_number && (
             <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
               Page: {result.metadata.page_number}
             </span>
@@ -98,11 +118,11 @@ export default function SearchResultCard({
             relative
           `}
         >
-          {highlightText(result.chunk, query)}
+          {highlightText(result.text, query)}
         </div>
 
         <div className="mt-4 flex gap-4">
-          {!isExpanded && result.chunk.length > 250 && (
+          {!isExpanded && result.text && result.text.length > 250 && (
             <button
               className="text-gray-500 hover:text-gray-700 text-sm font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-gray-200 rounded px-2 py-1"
               onClick={() => setIsExpanded(true)}
@@ -132,7 +152,12 @@ export default function SearchResultCard({
       <DocumentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        document={result}
+        document={{
+          chunk: result.text,
+          metadata: result.metadata,
+          similarity: typeof result.distance === 'number' ? 1 - result.distance : 0,
+          rank: 0
+        }}
       />
     </>
   );

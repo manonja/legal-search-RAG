@@ -1,4 +1,5 @@
 import axios from "axios";
+import * as Sentry from "@sentry/nextjs";
 import { constructApiUrl } from "./utils";
 
 // Types based on the current OpenAPI specification
@@ -64,7 +65,7 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000, // 30 seconds timeout
+  timeout: 120000, // 120 seconds timeout (increased from 30s to handle Cloud Run cold starts)
 });
 
 // Add request interceptor to include API token in all requests
@@ -99,63 +100,148 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     console.error("API Request interceptor: Error in request setup", error);
+    // Report request setup errors to Sentry
+    Sentry.captureException(error, {
+      tags: {
+        component: "API",
+        stage: "requestSetup"
+      }
+    });
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to catch and report API errors
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error("API Error:", error);
+
+    // Make sure we have a proper message
+    const errorMessage = error.message || "Unknown API error";
+    const errorCode = error.code || "UNKNOWN_ERROR";
+    const status = error.response?.status || 0;
+
+    // Capture network errors in Sentry with more context
+    Sentry.captureException(error, {
+      tags: {
+        component: "API",
+        stage: "response",
+        status: status,
+        url: error.config?.url,
+        errorCode: errorCode,
+      },
+      extra: {
+        method: error.config?.method,
+        params: error.config?.params,
+        requestData: error.config?.data,
+        responseData: error.response?.data,
+        errorMessage: errorMessage,
+        stack: error.stack
+      }
+    });
+
+    // This ensures the error is logged even when running in Docker
+    console.error("API Error Details for Sentry:", {
+      message: errorMessage,
+      code: errorCode,
+      url: error.config?.url,
+      method: error.config?.method
+    });
+
     return Promise.reject(error);
   }
 );
 
 // API functions
 export const api = {
+  // Wrap API calls with error handling
   // Search documents - new endpoint
   async searchDocuments(request: SearchQuery): Promise<SearchResult[]> {
-    const response = await apiClient.post("/api/search/", request);
-    return response.data;
+    try {
+      const response = await apiClient.post("/api/search/", request);
+      return response.data;
+    } catch (error) {
+      // Error is already captured by interceptor
+      throw error;
+    }
   },
 
   // Legacy search endpoint - for backward compatibility
   async legacySearchDocuments(
     request: LegacyQueryRequest
   ): Promise<LegacyQueryResponse> {
-    const response = await apiClient.post("/api/search/api", request);
-    return response.data;
+    try {
+      const response = await apiClient.post("/api/search/api", request);
+      return response.data;
+    } catch (error) {
+      // Error is already captured by interceptor
+      throw error;
+    }
   },
 
   // RAG search
   async ragSearch(request: QueryRequest): Promise<QueryResponse> {
-    const response = await apiClient.post("/api/rag-search", request);
-    return response.data;
+    try {
+      const response = await apiClient.post("/api/rag-search", request);
+      return response.data;
+    } catch (error) {
+      // Error is already captured by interceptor
+      throw error;
+    }
   },
 
   // Query documents
   async queryDocuments(request: QueryRequest): Promise<QueryResponse> {
-    const response = await apiClient.post("/api/query", request);
-    return response.data;
+    try {
+      const response = await apiClient.post("/api/query", request);
+      return response.data;
+    } catch (error) {
+      // Error is already captured by interceptor
+      throw error;
+    }
   },
 
   // Health check
   async healthCheck(): Promise<Record<string, any>> {
-    const response = await apiClient.get("/api/health");
-    return response.data;
+    try {
+      const response = await apiClient.get("/api/health");
+      return response.data;
+    } catch (error) {
+      // Error is already captured by interceptor
+      throw error;
+    }
   },
 
   // Get full document
   async getDocument(documentId: string): Promise<DocumentResponse> {
-    const response = await apiClient.get(
-      `/api/documents/${encodeURIComponent(documentId)}`
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get(
+        `/api/documents/${encodeURIComponent(documentId)}`
+      );
+      return response.data;
+    } catch (error) {
+      // Error is already captured by interceptor
+      throw error;
+    }
   },
 
   // Upload document
   async uploadDocument(file: File): Promise<Record<string, any>> {
-    const formData = new FormData();
-    formData.append("file", file);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const response = await apiClient.post("/api/documents/upload", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    return response.data;
+      const response = await apiClient.post("/api/documents/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      // Error is already captured by interceptor
+      throw error;
+    }
   },
 };
 

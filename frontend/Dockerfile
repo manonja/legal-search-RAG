@@ -32,6 +32,9 @@ ENV NODE_ENV=production
 ENV PORT=8080
 ENV HOSTNAME="0.0.0.0"
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DEBUG_SENTRY=true
+
+# Environment variables that will be replaced at runtime
 ENV NEXT_PUBLIC_SENTRY_DSN=""
 ENV NEXT_PUBLIC_API_URL=""
 ENV NEXT_PUBLIC_API_TOKEN=""
@@ -43,7 +46,6 @@ ENV NEXT_PUBLIC_FIREBASE_PROJECT_ID=""
 ENV NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=""
 ENV NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=""
 ENV NEXT_PUBLIC_FIREBASE_APP_ID=""
-
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
@@ -57,9 +59,16 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.js ./
 COPY --from=builder /app/package.json ./package.json
 
+# Make sure instrumentation files are included
+COPY --from=builder /app/src/instrumentation-client.ts ./
+COPY --from=builder /app/src/instrumentation ./src/instrumentation
+
 # Automatically leverage output traces to reduce image size
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Ensure proper permissions for nextjs user
+RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 

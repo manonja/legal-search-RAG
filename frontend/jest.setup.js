@@ -49,3 +49,94 @@ if (typeof window === "undefined") {
     },
   });
 }
+
+// Mock global objects that might not exist in Node environment
+global.Request = class Request {};
+global.Headers = class Headers {
+  constructor(init) {
+    this.headers = new Map();
+    if (init) {
+      Object.entries(init).forEach(([key, value]) => {
+        this.set(key, value);
+      });
+    }
+  }
+
+  get(name) {
+    return this.headers.get(name);
+  }
+
+  set(name, value) {
+    this.headers.set(name, value);
+  }
+
+  has(name) {
+    return this.headers.has(name);
+  }
+};
+
+// Mock URL if needed
+if (typeof URL === 'undefined') {
+  global.URL = require('url').URL;
+}
+
+// Mock localStorage
+class LocalStorageMock {
+  constructor() {
+    this.store = {};
+  }
+
+  getItem(key) {
+    return this.store[key] || null;
+  }
+
+  setItem(key, value) {
+    this.store[key] = String(value);
+  }
+
+  removeItem(key) {
+    delete this.store[key];
+  }
+
+  clear() {
+    this.store = {};
+  }
+
+  key(index) {
+    return Object.keys(this.store)[index] || null;
+  }
+
+  get length() {
+    return Object.keys(this.store).length;
+  }
+}
+
+if (typeof localStorage === 'undefined') {
+  global.localStorage = new LocalStorageMock();
+}
+
+// Set up fetch mock
+global.fetch = jest.fn();
+
+// Polyfill Response from node-fetch
+if (typeof Response === 'undefined') {
+  const { Response } = require('node-fetch');
+  global.Response = Response;
+}
+
+// Polyfill ReadableStream for Node.js test environment
+if (typeof ReadableStream === 'undefined') {
+  // Check if node:stream/web exists (available in Node v16+)
+  try {
+    const { ReadableStream } = require('node:stream/web');
+    global.ReadableStream = ReadableStream;
+    console.log('Polyfilled ReadableStream using node:stream/web');
+  } catch (err) {
+    console.error(
+      'Failed to polyfill ReadableStream. node:stream/web not available?' +
+        ' Tests involving streams might fail.'
+    );
+    // Fallback or error if necessary
+    global.ReadableStream = class MockReadableStream {};
+  }
+}

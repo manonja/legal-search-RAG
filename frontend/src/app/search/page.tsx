@@ -1,14 +1,15 @@
 "use client";
 
 import SearchResultCard from "@/components/SearchResultCard";
-import { api, LegacyQueryRequest, LegacySearchResult } from "@/lib/api";
+import { api, LegacyQueryRequest, LegacySearchResult, SearchResult } from "@/lib/api";
+import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<LegacySearchResult[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [totalFound, setTotalFound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,6 @@ export default function SearchPage() {
     setHasSearched(true);
 
     try {
-      // For compatibility with existing components, we still use the legacy search endpoint
       const request: LegacyQueryRequest = {
         query_text: query,
         n_results: 10,
@@ -33,18 +33,59 @@ export default function SearchPage() {
 
       const response = await api.legacySearchDocuments(request);
 
+      if (!response || !response.results) {
+        throw new Error("Invalid response format from API");
+      }
+
       console.log(
         "Search results metadata:",
-        response.results.map((r) => r.metadata)
+        response.results.map((r) => r?.metadata || {})
       );
 
-      setResults(response.results);
-      setTotalFound(response.total_found);
+      const mappedResults: SearchResult[] = response.results.map((legacyResult: LegacySearchResult) => {
+        let similarityValue = 0;
+        if (typeof (legacyResult as any).distance === 'number') {
+           similarityValue = 1 - (legacyResult as any).distance;
+        } else if (typeof legacyResult.similarity === 'number') {
+           similarityValue = legacyResult.similarity;
+        }
 
-      // Emit search event
+        const textValue = (legacyResult as any).text || legacyResult.chunk || "";
+
+        return {
+          text: textValue,
+          metadata: legacyResult.metadata || {},
+          distance: 1 - similarityValue,
+        };
+      });
+
+      setResults(mappedResults);
+      setTotalFound(response.total_found || 0);
+
       window.dispatchEvent(new Event("search-performed"));
-    } catch (err) {
-      console.error("Search error:", err);
+    } catch (error: any) {
+      console.error("Search error:", error);
+
+      Sentry.captureException(error, {
+        tags: {
+          component: "SearchPage",
+          action: "legacySearchDocuments",
+          errorType: error.name || "UnknownError",
+          errorCode: error.code || "UNKNOWN_CODE"
+        },
+        extra: {
+          query,
+          message: error.message || "No error message",
+          stack: error.stack || "No stack trace"
+        }
+      });
+
+      console.error("Search error details for Sentry:", {
+        message: error.message || "No message",
+        code: error.code || "No code",
+        type: error.name || "Unknown type"
+      });
+
       setError("An error occurred while searching. Please try again.");
       setResults([]);
       setTotalFound(0);
@@ -54,38 +95,42 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 max-w-7xl">
-      {/* Header Section */}
-      <section className="text-center py-10">
-        <h1 className="text-4xl text-gray-800 font-bold mb-5">
+    <div className="container mx-auto px-4 max-w-4xl pt-16">
+      <section className="text-center mb-12">
+        <h1 className="text-4xl text-gray-800 font-bold mb-4">
           Document Search
         </h1>
-        <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
           Search legal documents with semantic similarity to find relevant
           information.
         </p>
       </section>
 
-      {/* Search Form */}
       <form onSubmit={handleSearch} className="mb-8">
-        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center p-4">
-            <span className="mr-3 text-gray-500">🔍</span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search legal documents..."
-              className="flex-1 border-none outline-none text-base"
-              required
-            />
-            <button
-              type="submit"
-              className="bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
-              disabled={isLoading}
-            >
-              {isLoading ? "Searching..." : "Search"}
-            </button>
+        <div className="max-w-3xl mx-auto">
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center p-3">
+              <span className="mr-3 text-gray-400">🔍</span>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search legal documents..."
+                className="flex-1 border-none outline-none text-sm bg-transparent"
+                required
+                disabled={isLoading}
+              />
+              <button
+                type="submit"
+                className="bg-gray-800 text-white px-5 py-1.5 rounded-full font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                disabled={isLoading}
+                data-testid="search-submit-button"
+              >
+                {isLoading ? (
+                  <div className="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white" data-testid="loading-spinner"></div>
+                ) : "Search"}
+              </button>
+            </div>
           </div>
         </div>
       </form>
@@ -96,7 +141,6 @@ export default function SearchPage() {
         </div>
       )}
 
-      {/* Results Section */}
       {results.length > 0 ? (
         <section className="border border-gray-200 rounded-xl overflow-hidden my-10 shadow-sm">
           <div className="p-5">
