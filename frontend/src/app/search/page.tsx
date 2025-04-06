@@ -1,7 +1,7 @@
 "use client";
 
 import SearchResultCard from "@/components/SearchResultCard";
-import { api, LegacyQueryRequest, LegacySearchResult } from "@/lib/api";
+import { api, LegacyQueryRequest, LegacySearchResult, SearchResult } from "@/lib/api";
 import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -9,7 +9,7 @@ import { useState } from "react";
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<LegacySearchResult[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [totalFound, setTotalFound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
