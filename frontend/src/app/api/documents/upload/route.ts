@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxyApiRequest } from '@/lib/apiProxy';
 
-// Disable public access to this endpoint and increase the limit for file uploads
+// Disable public access to this endpoint and increase timeout for large uploads
 export const dynamic = 'force-dynamic';
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+export const maxDuration = 60; // Allow 60 seconds for file uploads
 
 /**
  * POST handler for the /api/documents/upload endpoint

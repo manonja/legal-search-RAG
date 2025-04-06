@@ -41,8 +41,6 @@ const nextConfig = {
     serverComponentsExternalPackages: [],
     // Enable instrumentation hook for Sentry
     instrumentationHook: true,
-    // Configure custom path for client-side instrumentation
-    clientInstrumentationHook: "src/instrumentation-client.ts",
   },
 
   // Add proper handling for trailing slash and path resolution
