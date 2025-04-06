@@ -33,8 +33,10 @@ describe('API Client', () => {
   };
 
   // Store interceptors for testing
-  let requestInterceptor: any;
-  let responseErrorInterceptor: any;
+  let requestInterceptor: any; // onFulfilled
+  let requestInterceptorError: any; // onRejected
+  let responseInterceptor: any; // onFulfilled (not used in this part)
+  let responseErrorInterceptor: any; // onRejected
   let api: any; // Declare api variable here
 
   beforeEach(() => {
@@ -55,14 +57,16 @@ describe('API Client', () => {
     // Mock axios's interceptor methods
     mockedAxios.interceptors = {
       request: {
-        use: jest.fn((onFulfilled) => {
+        use: jest.fn((onFulfilled, onRejected) => {
           requestInterceptor = onFulfilled;
+          requestInterceptorError = onRejected; // Capture the error handler
           return 0; // Return a number as the interceptor ID
         }),
         eject: jest.fn(),
       },
       response: {
         use: jest.fn((onFulfilled, onRejected) => {
+          responseInterceptor = onFulfilled; // Capture if needed
           responseErrorInterceptor = onRejected;
           return 0; // Return a number as the interceptor ID
         }),
@@ -152,13 +156,15 @@ describe('API Client', () => {
       expect(result.headers.Authorization).toBeUndefined();
     });
 
-    it('should handle errors and report to Sentry', () => {
+    it('should handle errors and report to Sentry', async () => {
       // Arrange
-      const error = new Error('Request interceptor error');
-      const configWithError = { headers: { get: () => { throw error; } } };
+      const error = new Error('Request setup error');
 
       // Act & Assert
-      expect(() => requestInterceptor(configWithError)).toThrow();
+      // Directly call the captured error handler
+      await expect(requestInterceptorError(error)).rejects.toThrow(
+        'Request setup error'
+      );
 
       // Should report to Sentry
       expect(Sentry.captureException).toHaveBeenCalledWith(

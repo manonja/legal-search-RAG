@@ -37,22 +37,25 @@ export async function proxyApiRequest(
       fullUrl = `https://${fullUrl}`;
     }
 
-    // Set up headers
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${apiToken}`,
-      ...(requestInit.headers as Record<string, string> || {}),
-    };
+    // Set up headers, prioritizing requestInit headers
+    const headers = new Headers(requestInit.headers);
 
-    // Only add Content-Type for requests with bodies, or if it's not a FormData request
-    if (body && contentType !== 'multipart/form-data') {
-      headers['Content-Type'] = contentType;
+    // Add Authorization header (unless already present in requestInit)
+    if (!headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${apiToken}`);
+    }
+
+    // Add Content-Type if needed and not already present
+    if (body && !headers.has('Content-Type') && contentType !== 'multipart/form-data') {
+      headers.set('Content-Type', contentType);
     }
 
     // Prepare the request
     const requestOptions: RequestInit = {
-      method,
-      headers,
+      // Start with requestInit to allow overrides
       ...requestInit,
+      method,
+      headers, // Use the constructed Headers object directly
     };
 
     // Add body if needed

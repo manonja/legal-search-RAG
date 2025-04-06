@@ -76,11 +76,12 @@ describe('apiProxy', () => {
         'https://api.example.com/api/test',
         expect.objectContaining({
           method: 'GET',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token-123',
-          }),
+          headers: expect.any(Headers),
         })
       );
+      // Check specific header on the Headers object
+      const actualHeaders = (global.fetch as jest.Mock).mock.calls[0][1].headers as Headers;
+      expect(actualHeaders.get('Authorization')).toBe('Bearer test-token-123');
     });
 
     it('should handle POST requests with JSON body', async () => {
@@ -101,13 +102,14 @@ describe('apiProxy', () => {
         'https://api.example.com/api/search',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token-123',
-            'Content-Type': 'application/json',
-          }),
+          headers: expect.any(Headers),
           body: JSON.stringify(body),
         })
       );
+      // More specific header check
+      const actualHeaders = (global.fetch as jest.Mock).mock.calls[0][1].headers as Headers;
+      expect(actualHeaders.get('Authorization')).toBe('Bearer test-token-123');
+      expect(actualHeaders.get('Content-Type')).toBe('application/json');
     });
 
     it('should handle FormData correctly', async () => {
@@ -139,16 +141,14 @@ describe('apiProxy', () => {
         'https://api.example.com/api/documents/upload',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token-123',
-          }),
+          headers: expect.any(Headers), // Check for Headers object type
           body: formData,
         })
       );
 
       // Should not include Content-Type header for FormData
-      const headers = (global.fetch as jest.Mock).mock.calls[0][1].headers;
-      expect(headers['Content-Type']).toBeUndefined();
+      const actualHeadersFD = (global.fetch as jest.Mock).mock.calls[0][1].headers as Headers;
+      expect(actualHeadersFD.has('Content-Type')).toBe(false);
     });
 
     it('should handle API URL without protocol', async () => {
@@ -308,11 +308,12 @@ describe('apiProxy', () => {
 
     it('should use custom content type if provided', async () => {
       // Arrange
+      const body = { xmlData: '<test></test>' };
       const request = createMockRequest();
       const options = {
         endpoint: '/api/custom',
         method: 'POST' as const,
-        body: { data: 'test' },
+        body,
         contentType: 'application/xml',
       };
 
@@ -323,11 +324,13 @@ describe('apiProxy', () => {
       expect(global.fetch).toHaveBeenCalledWith(
         'https://api.example.com/api/custom',
         expect.objectContaining({
-          headers: expect.objectContaining({
-            'Content-Type': 'application/xml',
-          }),
+          headers: expect.any(Headers),
+          body: JSON.stringify(body),
         })
       );
+      // More specific header check
+      const actualHeadersCustom = (global.fetch as jest.Mock).mock.calls[0][1].headers as Headers;
+      expect(actualHeadersCustom.get('Content-Type')).toBe('application/xml');
     });
 
     it('should include additional request options if provided', async () => {

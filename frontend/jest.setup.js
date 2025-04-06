@@ -115,11 +115,6 @@ if (typeof localStorage === 'undefined') {
   global.localStorage = new LocalStorageMock();
 }
 
-// Mock FormData
-if (typeof FormData === 'undefined') {
-  global.FormData = require('form-data');
-}
-
 // Set up fetch mock
 global.fetch = jest.fn();
 
@@ -131,6 +126,17 @@ if (typeof Response === 'undefined') {
 
 // Polyfill ReadableStream for Node.js test environment
 if (typeof ReadableStream === 'undefined') {
-  const { ReadableStream } = require('node:stream/web');
-  global.ReadableStream = ReadableStream;
+  // Check if node:stream/web exists (available in Node v16+)
+  try {
+    const { ReadableStream } = require('node:stream/web');
+    global.ReadableStream = ReadableStream;
+    console.log('Polyfilled ReadableStream using node:stream/web');
+  } catch (err) {
+    console.error(
+      'Failed to polyfill ReadableStream. node:stream/web not available?' +
+        ' Tests involving streams might fail.'
+    );
+    // Fallback or error if necessary
+    global.ReadableStream = class MockReadableStream {};
+  }
 }
