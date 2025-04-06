@@ -95,36 +95,42 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 max-w-7xl">
-      <section className="text-center py-10">
-        <h1 className="text-4xl text-gray-800 font-bold mb-5">
+    <div className="container mx-auto px-4 max-w-4xl pt-16">
+      <section className="text-center mb-12">
+        <h1 className="text-4xl text-gray-800 font-bold mb-4">
           Document Search
         </h1>
-        <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
           Search legal documents with semantic similarity to find relevant
           information.
         </p>
       </section>
 
       <form onSubmit={handleSearch} className="mb-8">
-        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center p-4">
-            <span className="mr-3 text-gray-500">🔍</span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search legal documents..."
-              className="flex-1 border-none outline-none text-base"
-              required
-            />
-            <button
-              type="submit"
-              className="bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors"
-              disabled={isLoading}
-            >
-              {isLoading ? "Searching..." : "Search"}
-            </button>
+        <div className="max-w-3xl mx-auto">
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center p-3">
+              <span className="mr-3 text-gray-400">🔍</span>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search legal documents..."
+                className="flex-1 border-none outline-none text-sm bg-transparent"
+                required
+                disabled={isLoading}
+              />
+              <button
+                type="submit"
+                className="bg-gray-800 text-white px-5 py-1.5 rounded-full font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                disabled={isLoading}
+                data-testid="search-submit-button"
+              >
+                {isLoading ? (
+                  <div className="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white" data-testid="loading-spinner"></div>
+                ) : "Search"}
+              </button>
+            </div>
           </div>
         </div>
       </form>
