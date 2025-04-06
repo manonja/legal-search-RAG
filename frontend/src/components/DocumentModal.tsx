@@ -21,13 +21,22 @@ export default function DocumentModal({
 
   useEffect(() => {
     async function fetchFullDocument() {
-      if (!document?.metadata?.source) return;
+      // Use document_id if available, otherwise fallback (though source is likely wrong)
+      const docId = document?.metadata?.document_id;
+      const docSource = document?.metadata?.source;
+
+      if (!docId && !docSource) {
+        setError("Missing document identifier to fetch details.");
+        return;
+      }
 
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await api.getDocument(document.metadata.source);
+        // Prefer document_id if available
+        const identifier = docId || docSource!;
+        const response = await api.getDocument(identifier);
         setFullDocument(response);
       } catch (err) {
         console.error("Error fetching document:", err);

@@ -1,9 +1,9 @@
-import { LegacySearchResult } from "@/lib/api";
+import { SearchResult } from "@/lib/api";
 import { useState } from "react";
 import DocumentModal from "./DocumentModal";
 
 interface SearchResultCardProps {
-  result: LegacySearchResult;
+  result: SearchResult;
   query: string;
   index: number;
 }
@@ -15,6 +15,10 @@ export default function SearchResultCard({
 }: SearchResultCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Log the received result object for debugging
+  // console.log(`SearchResultCard[${index}] received result:`, result);
+  // console.log(`SearchResultCard[${index}] result.text:`, result?.text); // Log text instead of chunk
 
   // Function to extract a meaningful title from the content
   const extractTitle = (content: string | undefined): string => {
@@ -78,7 +82,12 @@ export default function SearchResultCard({
   };
 
   // Get the display title using our hierarchy of fallbacks
-  const displayTitle = extractTitle(result.chunk);
+  const displayTitle = extractTitle(result.text);
+
+  // Calculate similarity percentage from distance
+  const similarityPercentage = typeof result.distance === 'number'
+    ? ((1 - result.distance) * 100).toFixed(1)
+    : '--';
 
   return (
     <>
@@ -93,7 +102,7 @@ export default function SearchResultCard({
 
         <div className="flex gap-3 mb-4 flex-wrap">
           <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-            Similarity: {(result.similarity * 100).toFixed(1)}%
+            Similarity: {similarityPercentage}%
           </span>
           {result.metadata?.page_number && (
             <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
@@ -109,11 +118,11 @@ export default function SearchResultCard({
             relative
           `}
         >
-          {highlightText(result.chunk, query)}
+          {highlightText(result.text, query)}
         </div>
 
         <div className="mt-4 flex gap-4">
-          {!isExpanded && result.chunk && result.chunk.length > 250 && (
+          {!isExpanded && result.text && result.text.length > 250 && (
             <button
               className="text-gray-500 hover:text-gray-700 text-sm font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-gray-200 rounded px-2 py-1"
               onClick={() => setIsExpanded(true)}
@@ -143,7 +152,12 @@ export default function SearchResultCard({
       <DocumentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        document={result}
+        document={{
+          chunk: result.text,
+          metadata: result.metadata,
+          similarity: typeof result.distance === 'number' ? 1 - result.distance : 0,
+          rank: 0
+        }}
       />
     </>
   );

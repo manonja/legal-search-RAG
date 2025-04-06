@@ -1,7 +1,7 @@
 "use client";
 
 import SearchResultCard from "@/components/SearchResultCard";
-import { api, LegacyQueryRequest, LegacySearchResult } from "@/lib/api";
+import { api, LegacyQueryRequest, SearchResult, LegacyQueryResponse } from "@/lib/api";
 import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -9,7 +9,7 @@ import { useState } from "react";
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<LegacySearchResult[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [totalFound, setTotalFound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,9 @@ export default function SearchPage() {
         min_similarity: 0.7,
       };
 
-      const response = await api.legacySearchDocuments(request);
+      // Type assertion needed as legacySearchDocuments returns LegacyQueryResponse
+      // but the actual data shape matches SearchResult[]
+      const response = await api.legacySearchDocuments(request) as unknown as { results: SearchResult[], total_found: number };
 
       // Validate response data before processing
       if (!response || !response.results) {
@@ -45,14 +47,8 @@ export default function SearchPage() {
         response.results.map((r) => r?.metadata || {})
       );
 
-      // Ensure each result has at least an empty object for metadata and a chunk string
-      const safeResults = response.results.map(result => ({
-        ...result,
-        chunk: result.chunk || "",
-        metadata: result.metadata || {},
-      }));
-
-      setResults(safeResults);
+      // Remove the mapping logic, use results directly
+      setResults(response.results || []);
       setTotalFound(response.total_found || 0);
 
       // Emit search event
