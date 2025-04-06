@@ -121,6 +121,16 @@ if (typeof FormData === 'undefined') {
 }
 
 // Set up fetch mock
-if (typeof fetch === 'undefined') {
-  global.fetch = jest.fn();
+global.fetch = jest.fn();
+
+// Polyfill Response from node-fetch
+if (typeof Response === 'undefined') {
+  const { Response } = require('node-fetch');
+  global.Response = Response;
+}
+
+// Polyfill ReadableStream for Node.js test environment
+if (typeof ReadableStream === 'undefined') {
+  const { ReadableStream } = require('node:stream/web');
+  global.ReadableStream = ReadableStream;
 }
