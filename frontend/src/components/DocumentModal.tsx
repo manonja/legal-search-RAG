@@ -90,13 +90,20 @@ export default function DocumentModal({
                     "Document Details"}
                 </Dialog.Title>
 
-                {document?.metadata?.page_number && (
-                  <div className="mb-4">
-                    <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                      Page: {document.metadata.page_number}
-                    </span>
-                  </div>
-                )}
+                {/* Display Metadata: Page Number and Original Path */}
+                <div className="mb-4 space-y-2 text-sm text-gray-600">
+                  {document?.metadata?.page_number && (
+                    <div>
+                      <span className="font-medium">Page:</span> {document.metadata.page_number}
+                    </div>
+                  )}
+                  {document?.metadata?.original_file_path && (
+                    <div>
+                       <span className="font-medium">Original File:</span>
+                       <span className="italic break-all">{document.metadata.original_file_path}</span>
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-2">
                   <div className="prose max-w-none">

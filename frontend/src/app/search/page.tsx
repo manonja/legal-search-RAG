@@ -1,7 +1,7 @@
 "use client";
 
 import SearchResultCard from "@/components/SearchResultCard";
-import { api, LegacyQueryRequest, SearchResult, LegacyQueryResponse } from "@/lib/api";
+import { api, LegacyQueryRequest, LegacySearchResult } from "@/lib/api";
 import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -9,7 +9,7 @@ import { useState } from "react";
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<LegacySearchResult[]>([]);
   const [totalFound, setTotalFound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,38 +25,47 @@ export default function SearchPage() {
     setHasSearched(true);
 
     try {
-      // For compatibility with existing components, we still use the legacy search endpoint
       const request: LegacyQueryRequest = {
         query_text: query,
         n_results: 10,
         min_similarity: 0.7,
       };
 
-      // Type assertion needed as legacySearchDocuments returns LegacyQueryResponse
-      // but the actual data shape matches SearchResult[]
-      const response = await api.legacySearchDocuments(request) as unknown as { results: SearchResult[], total_found: number };
+      const response = await api.legacySearchDocuments(request);
 
-      // Validate response data before processing
       if (!response || !response.results) {
         throw new Error("Invalid response format from API");
       }
 
-      // Log for debugging - safely access metadata with optional chaining
       console.log(
         "Search results metadata:",
         response.results.map((r) => r?.metadata || {})
       );
 
-      // Remove the mapping logic, use results directly
-      setResults(response.results || []);
+      const mappedResults: SearchResult[] = response.results.map((legacyResult: LegacySearchResult) => {
+        let similarityValue = 0;
+        if (typeof (legacyResult as any).distance === 'number') {
+           similarityValue = 1 - (legacyResult as any).distance;
+        } else if (typeof legacyResult.similarity === 'number') {
+           similarityValue = legacyResult.similarity;
+        }
+
+        const textValue = (legacyResult as any).text || legacyResult.chunk || "";
+
+        return {
+          text: textValue,
+          metadata: legacyResult.metadata || {},
+          distance: 1 - similarityValue,
+        };
+      });
+
+      setResults(mappedResults);
       setTotalFound(response.total_found || 0);
 
-      // Emit search event
       window.dispatchEvent(new Event("search-performed"));
     } catch (error: any) {
       console.error("Search error:", error);
 
-      // Report error to Sentry with more context
       Sentry.captureException(error, {
         tags: {
           component: "SearchPage",
@@ -71,7 +80,6 @@ export default function SearchPage() {
         }
       });
 
-      // Log for debugging in Docker
       console.error("Search error details for Sentry:", {
         message: error.message || "No message",
         code: error.code || "No code",
@@ -88,7 +96,6 @@ export default function SearchPage() {
 
   return (
     <div className="container mx-auto px-4 max-w-7xl">
-      {/* Header Section */}
       <section className="text-center py-10">
         <h1 className="text-4xl text-gray-800 font-bold mb-5">
           Document Search
@@ -99,7 +106,6 @@ export default function SearchPage() {
         </p>
       </section>
 
-      {/* Search Form */}
       <form onSubmit={handleSearch} className="mb-8">
         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center p-4">
@@ -129,7 +135,6 @@ export default function SearchPage() {
         </div>
       )}
 
-      {/* Results Section */}
       {results.length > 0 ? (
         <section className="border border-gray-200 rounded-xl overflow-hidden my-10 shadow-sm">
           <div className="p-5">
