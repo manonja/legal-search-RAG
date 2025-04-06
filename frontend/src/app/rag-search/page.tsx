@@ -15,6 +15,16 @@ export default function RagSearchPage() {
     Array<{ role: string; content: string }>
   >([]);
 
+  // Function to clear conversation
+  const handleClearConversation = () => {
+    setConversationHistory([]);
+    setResponse(null);
+    setError(null);
+    setQuery(""); // Also clear the input field
+    // Optionally reset conversationId if you track it server-side
+    // setConversationId(null);
+  };
+
   // Function to highlight matching text
   const highlightText = (text: string, searchQuery: string) => {
     if (!searchQuery.trim()) return text;
@@ -145,7 +155,16 @@ export default function RagSearchPage() {
       {conversationHistory.length > 0 && (
         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-8">
           <div className="p-5">
-            <h2 className="text-lg font-medium mb-4">Conversation History</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Conversation History</h2>
+              <button
+                onClick={handleClearConversation}
+                className="text-sm text-gray-500 hover:text-gray-700 hover:underline"
+                title="Clear conversation history"
+              >
+                Clear Chat
+              </button>
+            </div>
             <div className="space-y-4">
               {conversationHistory.map((msg, index) => (
                 <div
@@ -176,11 +195,6 @@ export default function RagSearchPage() {
       {response && (
         <section className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div className="p-6">
-            {/* Answer Section */}
-            <div className="prose max-w-none mb-6">
-              <ReactMarkdown>{response.answer}</ReactMarkdown>
-            </div>
-
             {/* Sources */}
             {response.sources && response.sources.length > 0 && (
               <div className="mt-6 pt-6 border-t border-gray-100">
@@ -191,9 +205,12 @@ export default function RagSearchPage() {
                   {response.sources.map((source, index) => (
                     <div
                       key={index}
-                      className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700"
+                      className="bg-gray-50 rounded-lg p-3 text-sm flex items-center gap-2"
                     >
-                      {source}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <code className="text-gray-700 break-all">{source}</code>
                     </div>
                   ))}
                 </div>
