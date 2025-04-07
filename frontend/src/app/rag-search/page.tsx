@@ -2,12 +2,23 @@
 
 import {
   QueryRequest,
-  QueryResponse,
+  QueryResponse as ApiQueryResponse,
   api,
 } from "@/lib/api"; // Assuming api lib structure
 import { useEffect, useState, useRef, ChangeEvent, FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import { v4 as uuidv4 } from "uuid"; // Need to install uuid: npm install uuid @types/uuid
+
+// Define local interfaces to match the actual response structure
+interface SourceItem {
+  filename: string;
+  document_id: string;
+}
+
+// Our local QueryResponse that matches the actual API response structure
+interface QueryResponse extends Omit<ApiQueryResponse, 'sources'> {
+  sources: SourceItem[];
+}
 
 // Define the structure for a single turn in the conversation
 interface ConversationTurn {
@@ -15,7 +26,7 @@ interface ConversationTurn {
   userQuery: string;
   assistantResponse: {
     answer: string;
-    sources: string[];
+    sources: SourceItem[];
     confidence: number | null;
   } | null;
   isLoading: boolean;
@@ -146,8 +157,10 @@ export default function RagSearchPage() {
         max_tokens: 1000,
       };
 
-      const result: QueryResponse = await api.ragSearch(request);
+      // Type assert the response as our local QueryResponse
+      const result = await api.ragSearch(request) as unknown as QueryResponse;
 
+      // Now update with the properly typed result
       setConversationTurns((prevTurns) =>
         prevTurns.map((turn) =>
           turn.id === turnId
@@ -288,18 +301,31 @@ export default function RagSearchPage() {
                             <ReactMarkdown>{turn.assistantResponse.answer}</ReactMarkdown>
                           </div>
                           {/* Sources */}
-                          {turn.assistantResponse.sources && turn.assistantResponse.sources.length > 0 && (
+                          {turn.assistantResponse?.sources && turn.assistantResponse.sources.length > 0 && (
                               <div className="mt-4 pt-3 border-t border-gray-100" data-testid="sources-section">
                                 <h4 className="text-xs font-semibold text-gray-600 mb-2 uppercase">Sources:</h4>
                                 <div className="space-y-2">
-                                  {turn.assistantResponse.sources.map((source, index) => (
+                                  {(() => {
+                                    // Deduplicate sources by filename
+                                    const uniqueSources = [];
+                                    const seenFilenames = new Set();
+
+                                    for (const source of turn.assistantResponse.sources) {
+                                      if (!seenFilenames.has(source.filename)) {
+                                        seenFilenames.add(source.filename);
+                                        uniqueSources.push(source);
+                                      }
+                                    }
+
+                                    return uniqueSources.map((source, index) => (
                                       <div key={index} className="bg-gray-100 rounded p-2 text-xs flex items-center gap-1.5" data-testid="source-item">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                         </svg>
-                                        <code className="text-gray-700 break-all">{source.includes('/') ? source.substring(source.lastIndexOf('/') + 1) : source}</code>
+                                        <code className="text-gray-700 break-all">{source.filename}</code>
                                       </div>
-                                  ))}
+                                    ));
+                                  })()}
                                 </div>
                               </div>
                           )}
