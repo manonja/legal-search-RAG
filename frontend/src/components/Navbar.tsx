@@ -12,7 +12,6 @@ export default function Navbar() {
     { name: "Document Search", href: "/search" },
     { name: "Ask Legal Questions", href: "/rag-search" },
     { name: "Book Demo", href: "/book-demo" },
-    { name: "About", href: "/about" },
   ];
 
   return (
