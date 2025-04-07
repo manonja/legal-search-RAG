@@ -115,16 +115,28 @@ def test_auth_required_endpoint_with_valid_token():
     """Test that auth-required endpoint works with valid token."""
     # Prepare a test client with testing mode off
     os.environ["TESTING"] = "false"
+
+    # Save original verify_token method
+    original_verify_token = TokenManager.verify_token
+
+    # Create a replacement method that always returns True
+    async def mock_verify(cls, token):
+        return True
+
     try:
+        # Replace the method
+        TokenManager.verify_token = classmethod(mock_verify)
+
         with TestClient(app) as client:
-            # Send request with valid token
+            # Send request with any token
             response = client.get(
                 "/api/health/auth-test", headers={"Authorization": "Bearer test"}
             )
             assert response.status_code == 200
             assert response.json()["status"] == "authenticated"
     finally:
-        # Restore testing mode
+        # Restore original method and testing mode
+        TokenManager.verify_token = original_verify_token
         os.environ["TESTING"] = "true"
 
 

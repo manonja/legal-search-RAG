@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, Dict, Union
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from app.core.struct_logger import log
 
 from app.core.config import get_settings
+from app.core.struct_logger import log
 from app.services.datastore import DocumentMetadata
 from app.services.documents.upload import process_uploaded_document
 
@@ -23,7 +23,7 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
 
     This endpoint:
     1. Saves the uploaded file
-    2. Detects file type (PDF/DOCX)
+    2. Detects file type (PDF/DOCX/DOC)
     3. Converts to text
     4. Chunks the text
     5. Generates embeddings
@@ -49,6 +49,8 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
                 effective_content_type = "application/pdf"
             elif file.filename.lower().endswith(".docx"):
                 effective_content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            elif file.filename.lower().endswith(".doc"):
+                effective_content_type = "application/msword"
             else:
                 effective_content_type = content_type
         else:
@@ -58,11 +60,12 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
         allowed_mime_types = {
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/msword",
         }
         if effective_content_type not in allowed_mime_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type: {content_type}. Only PDF (application/pdf) and DOCX (application/vnd.openxmlformats-officedocument.wordprocessingml.document) files are supported.",
+                detail=f"Unsupported file type: {content_type}. Only PDF (application/pdf), DOCX (application/vnd.openxmlformats-officedocument.wordprocessingml.document), and DOC (application/msword) files are supported.",
             )
 
         # Get settings
