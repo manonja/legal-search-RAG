@@ -4,14 +4,14 @@ This module provides functionality to query documents using vector similarity se
 and generate responses using OpenAI's API.
 """
 
-from typing import Optional
+from typing import Optional, List
 import os
 
 import openai
 from app.core.struct_logger import log
 
 from app.core.config import get_settings
-from app.models.query import QueryResponse
+from app.models.query import QueryResponse, SourceInfo
 from app.models.search import SearchQuery
 from app.services.documents.search import search_documents
 
@@ -96,36 +96,19 @@ async def process_query(
         # Log the retrieved context for debugging
         log.debug("Context retrieved for LLM", context=context)
 
-        # Create sources list for response using ORIGINAL filenames
-        sources = []
-        seen_sources = set()  # Use a set for efficient tracking of unique sources
+        # Create sources list for response using ORIGINAL filenames and Document IDs
+        sources: List[SourceInfo] = []  # Type hint for clarity
+        seen_document_ids = set()
         for result in search_results:
-            # Prioritize the direct original_filename metadata key
-            clean_source_name = result.metadata.get("original_filename")
+            doc_id = result.metadata.get("document_id")
+            original_filename = result.metadata.get("original_filename")
 
-            # If clean name isn't directly available, fallback to path cleaning
-            if not clean_source_name:
-                source_path = result.metadata.get(
-                    "original_source"
-                ) or result.metadata.get("source")
-                if source_path:
-                    base_name = os.path.basename(source_path)
-                    if base_name.startswith("chunked_"):
-                        clean_source_name = base_name[len("chunked_") :]
-                    else:
-                        clean_source_name = base_name
-                    if clean_source_name.endswith(".txt"):
-                        clean_source_name = clean_source_name[:-4]
-                # Keep clean_source_name as None if no path found
-
-            # Add the cleaned/retrieved name if it's valid and hasn't been seen
-            if (
-                clean_source_name
-                and clean_source_name.strip()
-                and clean_source_name not in seen_sources
-            ):
-                sources.append(clean_source_name.strip())
-                seen_sources.add(clean_source_name.strip())
+            # Ensure we have both ID and filename, and haven't seen this ID
+            if doc_id and original_filename and doc_id not in seen_document_ids:
+                sources.append(
+                    SourceInfo(filename=original_filename, document_id=doc_id)
+                )
+                seen_document_ids.add(doc_id)
 
         # Generate prompt for OpenAI - Enhanced for clarity and citation
         system_message = "You are a highly proficient legal assistant AI specializing in analyzing provided legal document excerpts and providing accurate, cited answers."

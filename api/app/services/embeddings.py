@@ -71,14 +71,45 @@ def process_chunks(
         # Generate IDs for batch
         ids = [f"{doc_id}_chunk_{j + i + 1}" for j in range(len(batch))]
 
-        # Prepare chunk metadata
+        # Prepare chunk metadata - ensuring required fields are present
         metadatas = []
-        for _ in batch:
-            chunk_metadata = {"source": str(chunk_file)}
-            if document_metadata:
-                # Include document metadata with each chunk
-                chunk_metadata.update(document_metadata)
-            metadatas.append(chunk_metadata)
+        if document_metadata:
+            # Ensure required keys are present in the provided metadata
+            required_keys = ["document_id", "original_filename"]
+            if not all(key in document_metadata for key in required_keys):
+                log.error(
+                    "Document metadata missing required keys for ChromaDB indexing",
+                    missing_keys=[
+                        k for k in required_keys if k not in document_metadata
+                    ],
+                    provided_metadata=document_metadata,
+                )
+                # Decide how to handle: raise error, skip, or add with partial data?
+                # Raising an error is safest to ensure data integrity.
+                raise ValueError(
+                    "Document metadata missing required keys for indexing."
+                )
+
+            # Create metadata for each chunk in the batch
+            for _ in batch:
+                # Start with the essential fields for retrieval
+                chunk_metadata = {
+                    "document_id": document_metadata["document_id"],
+                    "original_filename": document_metadata["original_filename"],
+                    # Optionally include other fields if useful, e.g., original_file_path
+                    # "original_file_path": document_metadata.get("original_file_path"),
+                }
+                # You could add other relevant per-chunk info here if needed (e.g., chunk number)
+                metadatas.append(chunk_metadata)
+        else:
+            # Fallback if no document_metadata is provided (should ideally not happen in normal flow)
+            # This maintains previous behavior but logs a warning.
+            log.warning(
+                "No document metadata provided for chunk indexing, using fallback.",
+                chunk_file=str(chunk_file),
+            )
+            for _ in batch:
+                metadatas.append({"source": str(chunk_file), "document_id": doc_id})
 
         # Add to Chroma (it will handle embeddings through OpenAI)
         collection.add(

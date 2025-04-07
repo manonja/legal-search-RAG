@@ -13,6 +13,7 @@ from httpx import AsyncClient
 
 from app.core.config import get_settings
 from app.main import app
+from tests.constants import MOCK_PDF_TEXT, MOCK_DOCX_TEXT  # Import constants
 
 # Set testing environment variable
 os.environ["TESTING"] = "true"
@@ -364,20 +365,28 @@ def test_upload_document(
     # Verify text splitting
     mock_create_text_splitter.assert_called_once()
     splitter_instance = mock_create_text_splitter.return_value
-    splitter_instance.split_text.assert_called_once()
+    # Ensure split_text was called with the text extracted by the mock PDF extractor
+    splitter_instance.split_text.assert_called_once_with(MOCK_PDF_TEXT)
 
     # Verify that process_chunks was called
     mock_process_chunks.assert_called_once()
 
-    # Verify process_chunks arguments
-    args = mock_process_chunks.call_args[0]
-    # Verify the first argument is a Path to a file with the expected name
-    assert isinstance(args[0], Path), (
-        "First argument to process_chunks should be a Path"
+    # Verify process_chunks arguments using kwargs
+    assert mock_process_chunks.call_args is not None, "process_chunks was not called"
+    kwargs = mock_process_chunks.call_args.kwargs  # Access keyword args
+    assert "chunk_file" in kwargs, "chunk_file missing in process_chunks kwargs"
+    assert isinstance(kwargs["chunk_file"], Path), (
+        "chunk_file argument should be a Path"
     )
-    assert args[0].name.endswith(f"chunked_sample.pdf.txt"), (
-        f"Expected chunked filename, got {args[0].name}"
+    assert "document_metadata" in kwargs, (
+        "document_metadata missing in process_chunks kwargs"
     )
+    assert isinstance(kwargs["document_metadata"], dict), (
+        "document_metadata should be a dict"
+    )
+    # Optionally add more specific checks on metadata content if needed:
+    # assert kwargs["document_metadata"]["document_id"] == document_id
+    # assert kwargs["document_metadata"]["original_filename"] == "sample.pdf"
 
 
 def test_upload_document_docx(
@@ -453,20 +462,35 @@ def test_upload_document_docx(
         # Verify text splitting
         mock_create_text_splitter.assert_called_once()
         splitter_instance = mock_create_text_splitter.return_value
-        splitter_instance.split_text.assert_called_once()
+        # Ensure split_text was called with the text extracted by the mock DOCX extractor
+        splitter_instance.split_text.assert_called_once_with(MOCK_DOCX_TEXT)
 
         # Verify that process_chunks was called
         mock_process_chunks.assert_called_once()
 
-        # Verify process_chunks arguments
-        args = mock_process_chunks.call_args[0]
-        # Verify the first argument is a Path to a file with the expected name
-        assert isinstance(args[0], Path), (
-            "First argument to process_chunks should be a Path"
+        # Verify process_chunks arguments using kwargs
+        assert mock_process_chunks.call_args is not None, (
+            "process_chunks was not called"
         )
-        assert args[0].name.endswith(f"chunked_test_document.docx.txt"), (
-            f"Expected chunked filename, got {args[0].name}"
+        kwargs = mock_process_chunks.call_args.kwargs  # Access keyword args
+        assert "chunk_file" in kwargs, "chunk_file missing in process_chunks kwargs"
+        assert isinstance(kwargs["chunk_file"], Path), (
+            "chunk_file argument should be a Path"
         )
+        # Check that the chunk file path includes the document_id from the response
+        # This assumes the mock_datastore_service correctly returns the ID used in the response
+        assert document_id in kwargs["chunk_file"].name, (
+            f"Chunk filename {kwargs['chunk_file'].name} should contain document_id {document_id}"
+        )
+        assert "document_metadata" in kwargs, (
+            "document_metadata missing in process_chunks kwargs"
+        )
+        assert isinstance(kwargs["document_metadata"], dict), (
+            "document_metadata should be a dict"
+        )
+        # Optionally add more specific checks on metadata content if needed:
+        # assert kwargs["document_metadata"]["document_id"] == document_id
+        # assert kwargs["document_metadata"]["original_filename"] == "test_document.docx"
 
     finally:
         os.unlink(docx_path)

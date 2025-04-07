@@ -95,35 +95,25 @@ async def process_uploaded_document(
 
         # Create text splitter
         text_splitter = create_text_splitter()
-
-        # Split text into chunks
         chunks = text_splitter.split_text(extracted_text)
 
-        # Save chunks to file in temporary directory
-        chunks_file = temp_path / f"chunked_{file.filename}.txt"
-        with open(chunks_file, "w", encoding="utf-8") as f:
-            for i, chunk in enumerate(chunks):
-                f.write(f"### CHUNK {i + 1}\n")
-                f.write(chunk)
-                f.write("\n\n")
+        # Store chunks temporarily for processing
+        chunk_file = temp_path / f"{document_metadata.document_id}_chunks.txt"
+        with open(chunk_file, "w", encoding="utf-8") as f:
+            # Separate chunks clearly, e.g., using a specific marker
+            f.write("### CHUNK".join(chunks))
 
-        # Process chunks and store in ChromaDB with document metadata
-        # Convert to dict if it's a Pydantic model
-        metadata_dict = (
-            document_metadata.model_dump()
-            if hasattr(document_metadata, "model_dump")
-            else dict(document_metadata)
+        # Process chunks and store embeddings
+        process_chunks(
+            chunk_file=chunk_file,
+            chroma_dir=settings.CHROMA_DIR,
+            document_metadata=document_metadata.model_dump(),  # Pass metadata as dict
         )
-        process_chunks(chunks_file, settings.CHROMA_DIR, metadata_dict)
 
-        # Return result dictionary with both attribute and dictionary access supported
+        # Return processing results including document ID and chunk count
         return {
-            "document_id": document_metadata.document_id
-            if hasattr(document_metadata, "document_id")
-            else document_metadata["document_id"],
-            "original_filename": document_metadata.original_filename
-            if hasattr(document_metadata, "original_filename")
-            else document_metadata["original_filename"],
+            "message": "Document processed successfully",
+            "document_id": document_metadata.document_id,
+            "original_filename": document_metadata.original_filename,
             "num_chunks": len(chunks),
-            "status": "success",
         }

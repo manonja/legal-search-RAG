@@ -105,13 +105,34 @@ def test_upload_document(
         # Verify text splitting
         mock_create_text_splitter.assert_called_once()
         splitter_instance = mock_create_text_splitter.return_value
-        splitter_instance.split_text.assert_called_once()
+        # Ensure split_text was called with the text extracted by the mock extractor
+        splitter_instance.split_text.assert_called_once_with(expected_text)
 
         # Verify chunk processing
         mock_process_chunks.assert_called_once()
-        args = mock_process_chunks.call_args[0]
-        assert args[0].name.endswith(f"chunked_{filename}.txt"), (
-            f"Expected chunked filename, got {args[0].name}"
+
+        # Verify process_chunks arguments using kwargs
+        assert mock_process_chunks.call_args is not None, (
+            "process_chunks was not called"
+        )
+        kwargs = mock_process_chunks.call_args.kwargs  # Access keyword args
+        assert "chunk_file" in kwargs, "chunk_file missing in process_chunks kwargs"
+        assert isinstance(kwargs["chunk_file"], Path), (
+            "chunk_file argument should be a Path"
+        )
+        # Check that the chunk file path includes the document_id from the response
+        assert document_id in kwargs["chunk_file"].name, (
+            f"Chunk filename {kwargs['chunk_file'].name} should contain document_id {document_id}"
+        )
+        assert "document_metadata" in kwargs, (
+            "document_metadata missing in process_chunks kwargs"
+        )
+        assert isinstance(kwargs["document_metadata"], dict), (
+            "document_metadata should be a dict"
+        )
+        # Check that the passed metadata contains the correct original filename
+        assert kwargs["document_metadata"]["original_filename"] == filename, (
+            "Filename in document_metadata mismatch"
         )
 
     finally:
