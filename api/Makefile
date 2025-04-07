@@ -58,7 +58,7 @@ patch:
 
 # Docker repository paths
 DEV_REPO=us-central1-docker.pkg.dev/maja-dev/maja-dev
-PROD_REPO=us-central1-docker.pkg.dev/maja-dev/maja-prod
+PROD_REPO=us-central1-docker.pkg.dev/maja-prod/maja-prod
 ENV ?= dev
 VERSION = $$(cat VERSION)
 

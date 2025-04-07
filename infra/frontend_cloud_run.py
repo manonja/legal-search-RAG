@@ -26,6 +26,10 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
         with open(version_file, "r") as f:
             version = f.read().strip()
 
+    # Get project ID from config
+    config = pulumi.Config("maja-infra")
+    secret_project_id = config.require("secret_project_id")
+
     # Create service account for the Cloud Run service
     service_account = create_service_account(stack)
 
@@ -107,7 +111,8 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                             name="NEXT_PUBLIC_SENTRY_DSN",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="sentry-dsn", version="latest"
+                                    secret=f"projects/{secret_project_id}/secrets/sentry-dsn",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -115,7 +120,8 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                             name="NEXT_PUBLIC_API_TOKEN",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="maja-legal-api-token", version="latest"
+                                    secret=f"projects/{secret_project_id}/secrets/maja-legal-api-token",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -123,7 +129,8 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                             name="NEXT_PUBLIC_ADMIN_PASSWORD",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="frontend-admin-password", version="latest"
+                                    secret=f"projects/{secret_project_id}/secrets/frontend-admin-password",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -131,7 +138,8 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                             name="NEXT_PUBLIC_USER_PASSWORD",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="frontend-user-password", version="latest"
+                                    secret=f"projects/{secret_project_id}/secrets/frontend-user-password",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -171,34 +179,41 @@ def create_service_account(stack: str):
 def grant_secret_access(sa):
     """Grant access to the Secret Manager secrets for the API token and API keys"""
 
+    # Get the project ID from config instead of hardcoding
+    config = pulumi.Config("maja-infra")
+    secret_project_id = config.require("secret_project_id")
+
+    # Get current stack for resource naming
+    stack = pulumi.get_stack()
+
     # Grant access to API token secret
     secretmanager.SecretIamMember(
-        "frontend-api-token-access",
-        secret_id="projects/952577461734/secrets/maja-legal-api-token",
+        f"frontend-api-token-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/maja-legal-api-token",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
     # Grant access for admin password secret
     secretmanager.SecretIamMember(
-        "frontend-admin-password-access",
-        secret_id="projects/952577461734/secrets/frontend-admin-password",
+        f"frontend-admin-password-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/frontend-admin-password",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
     # Grant access for user password secret
     secretmanager.SecretIamMember(
-        "frontend-user-password-access",
-        secret_id="projects/952577461734/secrets/frontend-user-password",
+        f"frontend-user-password-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/frontend-user-password",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
     # Grant access to Sentry DSN secret
     secretmanager.SecretIamMember(
-        "frontend-sentry-dsn-access",
-        secret_id="projects/952577461734/secrets/sentry-dsn",
+        f"frontend-sentry-dsn-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/sentry-dsn",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )

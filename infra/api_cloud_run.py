@@ -26,6 +26,10 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
         with open(version_file, "r") as f:
             version = f.read().strip()
 
+    # Get project ID from config
+    config = pulumi.Config("maja-infra")
+    project_id = config.require("secret_project_id")
+
     # Create service account for the Cloud Run service
     service_account = create_service_account(stack, chroma_bucket)
 
@@ -89,7 +93,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="GOOGLE_API_KEY",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="google-gemini-api-key", version="latest"
+                                    secret=f"projects/{project_id}/secrets/google-gemini-api-key",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -97,7 +102,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="OPENAI_API_KEY",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="openai-api-key", version="latest"
+                                    secret=f"projects/{project_id}/secrets/openai-api-key",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -105,7 +111,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="SENTRY_DSN",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="sentry-dsn", version="latest"
+                                    secret=f"projects/{project_id}/secrets/sentry-dsn",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -114,7 +121,8 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             name="API_TOKEN",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                    secret="maja-legal-api-token", version="latest"
+                                    secret=f"projects/{project_id}/secrets/maja-legal-api-token",
+                                    version="latest",
                                 )
                             ),
                         ),
@@ -140,7 +148,7 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                         cloudrunv2.ServiceTemplateContainerEnvArgs(name="DEBUG", value="false"),
                         # Authentication settings
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name="GCP_PROJECT_ID", value="952577461734"
+                            name="GCP_PROJECT_ID", value=project_id
                         ),
                         # Removed: API_TOKEN_SECRET_NAME as we now directly use API_TOKEN env var
                     ],
@@ -201,34 +209,41 @@ def create_service_account(stack: str, chroma_bucket):
 def grant_secret_access(sa):
     """Grant access to the Secret Manager secrets for the API token and API keys"""
 
+    # Get the project ID from config instead of hardcoding
+    config = pulumi.Config("maja-infra")
+    secret_project_id = config.require("secret_project_id")
+
+    # Get current stack for resource naming
+    stack = pulumi.get_stack()
+
     # Grant access to API token secret
     secretmanager.SecretIamMember(
-        "maja-legal-api-token-access",
-        secret_id="projects/952577461734/secrets/maja-legal-api-token",
+        f"maja-legal-api-token-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/maja-legal-api-token",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
     # Grant access to OpenAI API key secret
     secretmanager.SecretIamMember(
-        "openai-api-key-access",
-        secret_id="projects/952577461734/secrets/openai-api-key",
+        f"openai-api-key-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/openai-api-key",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
     # Grant access to Google Gemini API key secret
     secretmanager.SecretIamMember(
-        "google-gemini-api-key-access",
-        secret_id="projects/952577461734/secrets/google-gemini-api-key",
+        f"google-gemini-api-key-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/google-gemini-api-key",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
 
     # Grant access to Sentry DSN secret
     secretmanager.SecretIamMember(
-        "sentry-dsn-access",
-        secret_id="projects/952577461734/secrets/sentry-dsn",
+        f"sentry-dsn-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/sentry-dsn",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
