@@ -3,12 +3,16 @@
 import os
 import tempfile
 from pathlib import Path
+import uuid
+from typing import List
 
 import pytest
 from fastapi.testclient import TestClient
 
 from tests.constants import MOCK_PDF_TEXT, MOCK_DOCX_TEXT
 from tests.fixtures.document_fixtures import mock_datastore_service  # Import fixture
+from app.services.datastore import DocumentMetadata, DatastoreService
+from app.core.config import Settings
 
 
 @pytest.mark.parametrize(

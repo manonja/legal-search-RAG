@@ -11,7 +11,7 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, List
 
 from fastapi import UploadFile
 from pydantic import BaseModel, Field
@@ -223,6 +223,52 @@ class DatastoreService:
 
         with open(text_path, "r", encoding="utf-8") as f:
             return f.read()
+
+    def list_document_ids(self) -> List[str]:
+        """List all document IDs available in the datastore."""
+        document_ids = []
+        for entry in self.data_dir.iterdir():
+            if entry.is_dir():
+                # Check if it looks like a UUID directory and has metadata
+                try:
+                    uuid.UUID(entry.name)  # Check if the name is a valid UUID
+                    metadata_file = entry / "metadata.json"
+                    if metadata_file.exists():
+                        document_ids.append(entry.name)
+                except ValueError:
+                    # Not a UUID-named directory, skip
+                    continue
+        log.info("Listed document IDs", count=len(document_ids))
+        return document_ids
+
+    def delete_document(self, document_id: str) -> bool:
+        """Delete a document and its associated files.
+
+        Args:
+            document_id: The ID of the document to delete.
+
+        Returns:
+            True if the document was deleted, False otherwise.
+        """
+        doc_dir = self.data_dir / document_id
+        if not doc_dir.exists() or not doc_dir.is_dir():
+            log.warning(
+                "Attempted to delete non-existent document", document_id=document_id
+            )
+            return False
+
+        try:
+            shutil.rmtree(doc_dir)
+            log.info("Document deleted successfully", document_id=document_id)
+            return True
+        except OSError as e:
+            log.error(
+                "Error deleting document directory",
+                document_id=document_id,
+                error=str(e),
+                exc_info=True,
+            )
+            return False
 
 
 def get_datastore_service(settings: Settings) -> DatastoreService:

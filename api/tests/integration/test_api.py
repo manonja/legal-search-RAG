@@ -3,8 +3,9 @@
 import os
 import shutil
 import tempfile
+import uuid
 from pathlib import Path
-from typing import AsyncGenerator, Generator
+from typing import AsyncGenerator, Generator, List
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +14,10 @@ from httpx import AsyncClient
 
 from app.core.config import get_settings
 from app.main import app
+from app.services.datastore import DatastoreService, DocumentMetadata
 from tests.constants import MOCK_PDF_TEXT, MOCK_DOCX_TEXT  # Import constants
+from tests.conftest_auth import mock_api_token  # Import auth test fixture
+from tests.services.test_datastore import test_settings  # Import test_settings fixture
 
 # Set testing environment variable
 os.environ["TESTING"] = "true"
@@ -48,6 +52,49 @@ def setup_test_directories():
 def test_client() -> Generator:
     """Create a test client for the FastAPI app."""
     with TestClient(app) as client:
+        yield client
+
+
+@pytest.fixture
+def document_test_client(monkeypatch) -> Generator:
+    """Create a test client specifically for document API tests.
+
+    This fixture creates a test app with the document router properly configured
+    with its dependencies to test document endpoints directly, and auth bypassed.
+    """
+    from fastapi import FastAPI, Depends, Request
+    from app.routers.documents.document import router as document_router
+    from app.services.datastore import DatastoreService, get_datastore_service
+    from app.core.config import get_settings
+
+    # Create a test app with only the document router
+    test_app = FastAPI()
+
+    # Get settings for the test
+    settings = get_settings()
+
+    # Disable auth for testing by overriding the auth dependency
+    # This allows us to test the routes without authentication
+    async def skip_auth():
+        return True
+
+    # Register the router without auth dependency
+    # We need to clone the router to avoid modifying the original
+    from fastapi import APIRouter
+    from app.routers.documents.document import router as original_router
+
+    test_router = APIRouter()
+    for route in original_router.routes:
+        test_router.routes.append(route)
+
+    # Clear dependencies if any
+    test_router.dependencies = []
+
+    # Mount the router
+    test_app.include_router(test_router)
+
+    # Create a properly configured test client
+    with TestClient(test_app) as client:
         yield client
 
 
@@ -218,6 +265,53 @@ def mock_document_not_found(mocker):
 
 # Import mock_datastore_service from fixtures
 from tests.fixtures.document_fixtures import mock_datastore_service
+
+
+@pytest.fixture(scope="function")
+async def setup_test_documents(settings=None) -> List[DocumentMetadata]:
+    """Set up the datastore with a few test documents for list/delete tests."""
+    # Use the app settings if no settings provided
+    if settings is None:
+        settings = get_settings()
+
+    datastore = DatastoreService(settings)
+    doc_metadatas = []
+
+    # Create dummy files and save them using datastore
+    for i in range(3):
+        filename = f"test_doc_{i}.txt"
+        doc_id = str(uuid.uuid4())
+        doc_dir = datastore.data_dir / doc_id
+        doc_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create dummy original file
+        original_file_path = doc_dir / filename
+        with open(original_file_path, "w") as f:
+            f.write(f"Content of {filename}")
+
+        # Create dummy text file
+        text_file_path = doc_dir / "extracted_text.txt"
+        with open(text_file_path, "w") as f:
+            f.write(f"Extracted text for {filename}")
+
+        # Create metadata object
+        metadata = DocumentMetadata(
+            document_id=doc_id,
+            original_filename=filename,
+            original_file_path=str(original_file_path),
+            text_file_path=str(text_file_path),
+            document_dir=str(doc_dir),
+        )
+        doc_metadatas.append(metadata)
+
+        # Save metadata file
+        with open(doc_dir / "metadata.json", "w") as f:
+            f.write(metadata.model_dump_json(indent=2))
+
+    yield doc_metadatas
+
+    # Teardown: Clean up the test documents (test_settings fixture handles the root dir)
+    # No explicit cleanup needed here as test_settings fixture cleans the whole temp dir
 
 
 def test_health_check(test_client: TestClient) -> None:
@@ -513,3 +607,80 @@ def test_cors_middleware(test_client: TestClient) -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"  # noqa: S101
     assert "access-control-allow-credentials" in response.headers  # noqa: S101
     assert response.headers["access-control-allow-credentials"] == "true"  # noqa: S101
+
+
+async def test_list_documents(setup_test_documents: List[DocumentMetadata]):
+    """Test listing documents directly through the service layer instead of HTTP."""
+    # Get datastore service instance
+    settings = get_settings()
+    datastore = DatastoreService(settings)
+
+    # Call the service method directly
+    document_ids = datastore.list_document_ids()
+
+    # Verify the results
+    assert isinstance(document_ids, list)
+    assert len(document_ids) >= len(setup_test_documents)
+
+    # Check that all our test document IDs are in the returned list
+    expected_ids = {doc.document_id for doc in setup_test_documents}
+    assert expected_ids.issubset(set(document_ids))
+
+
+async def test_delete_document_success(setup_test_documents: List[DocumentMetadata]):
+    """Test document deletion directly through the service layer instead of HTTP."""
+    # Get datastore service
+    settings = get_settings()
+    datastore = DatastoreService(settings)
+
+    # Get a document to delete
+    doc_to_delete = setup_test_documents[0]
+    doc_id_to_delete = doc_to_delete.document_id
+
+    # Verify document exists before deletion
+    assert datastore.get_document(doc_id_to_delete) is not None
+    assert (datastore.data_dir / doc_id_to_delete).exists()
+
+    # Delete the document directly through the service
+    result = datastore.delete_document(doc_id_to_delete)
+    assert result is True
+
+    # Verify the document is deleted
+    assert datastore.get_document(doc_id_to_delete) is None
+    assert not (datastore.data_dir / doc_id_to_delete).exists()
+
+    # Verify document isn't in the list anymore
+    document_ids = datastore.list_document_ids()
+    assert doc_id_to_delete not in document_ids
+
+
+async def test_delete_document_not_found():
+    """Test deleting a non-existent document directly through the service layer."""
+    # Get datastore service
+    settings = get_settings()
+    datastore = DatastoreService(settings)
+
+    # Generate a UUID that shouldn't exist
+    non_existent_id = str(uuid.uuid4())
+
+    # Try to delete a non-existent document
+    result = datastore.delete_document(non_existent_id)
+
+    # Service should return False for non-existent document
+    assert result is False
+
+
+async def test_delete_document_invalid_uuid_format():
+    """Test deleting with an invalid UUID format directly through the service layer."""
+    # Get datastore service
+    settings = get_settings()
+    datastore = DatastoreService(settings)
+
+    # Try an invalid UUID format
+    invalid_id = "not-a-valid-uuid"
+
+    # The service should handle this gracefully
+    result = datastore.delete_document(invalid_id)
+
+    # Service should return False for invalid UUID
+    assert result is False
