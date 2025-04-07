@@ -39,7 +39,6 @@ def test_upload_document(
     filename,
     mock_extract_pdf_text,
     mock_extract_docx_text,
-    mock_create_text_splitter,
     mock_process_chunks,
     mock_datastore_service,
     test_pdf_document,
@@ -76,7 +75,9 @@ def test_upload_document(
         assert response_json["original_filename"] == filename, (
             "Original filename should be preserved"
         )
-        assert response_json["chunks"] == 3, "Should have 3 chunks"
+        assert response_json["chunks"] == 1, (
+            "Should have 1 chunk for the short mock text"
+        )
         assert response_json["status"] == "success", "Status should be 'success'"
         assert response_json["message"] == "Document processed successfully", (
             "Message should indicate success"
@@ -102,16 +103,28 @@ def test_upload_document(
             )
             mock_extract_docx_text.assert_called_once()
 
-        # Verify text splitting
-        mock_create_text_splitter.assert_called_once()
-        splitter_instance = mock_create_text_splitter.return_value
-        splitter_instance.split_text.assert_called_once()
-
         # Verify chunk processing
         mock_process_chunks.assert_called_once()
-        args = mock_process_chunks.call_args[0]
-        assert args[0].name.endswith(f"chunked_{filename}.txt"), (
-            f"Expected chunked filename, got {args[0].name}"
+
+        # Verify process_chunks arguments using kwargs
+        assert mock_process_chunks.call_args is not None, (
+            "process_chunks was not called"
+        )
+        kwargs = mock_process_chunks.call_args.kwargs  # Access keyword args
+        assert "chunks" in kwargs, "chunks list missing in process_chunks kwargs"
+        assert isinstance(kwargs["chunks"], list), "chunks argument should be a list"
+        assert "document_metadata" in kwargs, (
+            "document_metadata missing in process_chunks kwargs"
+        )
+        assert isinstance(kwargs["document_metadata"], dict), (
+            "document_metadata should be a dict"
+        )
+        # Check that the passed metadata contains the correct original filename and document_id
+        assert kwargs["document_metadata"]["original_filename"] == filename, (
+            "Filename in document_metadata mismatch"
+        )
+        assert kwargs["document_metadata"]["document_id"] == document_id, (
+            "Document ID in document_metadata mismatch"
         )
 
     finally:
@@ -123,7 +136,6 @@ def test_get_document(
     test_client: TestClient,
     test_pdf_document: Path,
     mock_extract_pdf_text,
-    mock_create_text_splitter,
     mock_process_chunks,
     mock_chroma_client,
     mock_document_service,

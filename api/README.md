@@ -289,3 +289,35 @@ response = requests.post("http://localhost:8000/api/search",
 ### Testing
 
 During testing, authentication is automatically disabled. The `TESTING=true` environment variable is set by pytest fixtures to bypass token validation in test environments.
+
+## Testing
+
+This project uses `pytest` for testing. To run the tests:
+
+1.  **Install development dependencies:**
+
+    ```bash
+    make install-dev
+    ```
+
+2.  **Execute the test suite:**
+
+    ```bash
+    uv run pytest
+    ```
+
+3.  **Run specific test directories (e.g., integration tests):**
+
+    ```bash
+    uv run pytest tests/integration/
+    ```
+
+You can use standard `pytest` flags with `uv run`, for example:
+
+```bash
+# Run tests verbosely
+uv run pytest -v
+
+# Run tests with coverage report for the 'app' directory
+uv run pytest --cov=app tests/
+```

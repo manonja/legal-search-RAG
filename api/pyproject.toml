@@ -30,6 +30,8 @@ dependencies = [
     "pydantic-settings>=2.8.1",
     "python-multipart>=0.0.20",
     "structlog>=23.2.0,<24.0.0",
+    "tiktoken",
+    "semchunk",
 ]
 
 

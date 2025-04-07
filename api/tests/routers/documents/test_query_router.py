@@ -5,12 +5,22 @@ from fastapi.testclient import TestClient
 from app.main import app
 from tests.constants import TEST_QUERY
 from tests.fixtures import mock_process_query_router
+from app.models.query import QueryResponse, SourceInfo
 
 client = TestClient(app)
 
 
 def test_query_documents_success(mock_process_query_router):
     """Test successfully querying documents."""
+    mock_process_query_router.return_value = QueryResponse(
+        answer="This is a test response",
+        sources=[
+            SourceInfo(filename="Source 1", document_id="uuid-1"),
+            SourceInfo(filename="Source 2", document_id="uuid-2"),
+        ],
+        confidence=0.8,
+    )
+
     response = client.post(
         "/api/query",
         json={
@@ -21,10 +31,14 @@ def test_query_documents_success(mock_process_query_router):
         },
     )
     assert response.status_code == 200
-    assert response.json()["answer"] == "This is a test response"
-    assert len(response.json()["sources"]) == 2
-    assert response.json()["sources"] == ["Source 1", "Source 2"]
-    assert response.json()["confidence"] == 0.8
+    json_response = response.json()
+    assert json_response["answer"] == "This is a test response"
+    assert len(json_response["sources"]) == 2
+    assert json_response["sources"] == [
+        {"filename": "Source 1", "document_id": "uuid-1"},
+        {"filename": "Source 2", "document_id": "uuid-2"},
+    ]
+    assert json_response["confidence"] == 0.8
     mock_process_query_router.assert_called_once()
 
 
@@ -75,7 +89,13 @@ def test_query_documents_error(mock_process_query_router):
     """Test querying documents with an error."""
     mock_process_query_router.side_effect = Exception("Query error")
     response = client.post(
-        "/api/query", json={"query": TEST_QUERY, "max_results": 5, "temperature": 0.7}
+        "/api/query",
+        json={
+            "query": TEST_QUERY,
+            "max_results": 5,
+            "temperature": 0.7,
+            "max_tokens": 1000,
+        },
     )
     assert response.status_code == 500
     assert "Query error" in response.json()["detail"]

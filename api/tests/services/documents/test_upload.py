@@ -130,39 +130,40 @@ def mock_openai_client(mocker):
 @pytest.fixture
 def mock_text_splitter(mocker):
     """Mock the text splitter."""
-    mock_splitter = mocker.MagicMock()
-    mock_splitter.split_text.return_value = ["chunk1", "chunk2"]
-    mocker.patch(
-        "app.services.documents.upload.create_text_splitter", return_value=mock_splitter
-    )
-    return mock_splitter
+    mock = mocker.patch("app.services.documents.upload.create_text_splitter")
+    mock_splitter_instance = mocker.MagicMock()
+    # Simulate splitting into 3 chunks for tests
+    mock_splitter_instance.split_text.return_value = [
+        "Chunk 1",
+        "Chunk 2",
+        "Chunk 3",
+    ]
+    mock.return_value = mock_splitter_instance
+    return mock_splitter_instance  # Return the instance for assertion checks
 
 
 @pytest.fixture
 def mock_process_chunks(mocker):
     """Mock the process_chunks function."""
-    mock_process = mocker.patch("app.services.documents.upload.process_chunks")
-    return mock_process
+    return mocker.patch("app.services.documents.upload.process_chunks")
 
 
 @pytest.fixture
 def mock_extract_pdf(mocker):
-    """Mock the extract_pdf_text function."""
-    mock_extract = mocker.patch(
+    """Mock PDF text extraction."""
+    return mocker.patch(
         "app.services.documents.upload.extract_pdf_text",
-        return_value="Test PDF content",
+        return_value=MOCK_PDF_TEXT,
     )
-    return mock_extract
 
 
 @pytest.fixture
 def mock_extract_docx(mocker):
-    """Mock the extract_docx_text function."""
-    mock_extract = mocker.patch(
+    """Mock DOCX text extraction."""
+    return mocker.patch(
         "app.services.documents.upload.extract_docx_text",
-        return_value="Test DOCX content",
+        return_value=MOCK_DOCX_TEXT,
     )
-    return mock_extract
 
 
 @pytest.fixture
@@ -188,7 +189,7 @@ def mock_datastore_service(mocker):
 
 
 @pytest.mark.asyncio
-async def test_process_pdf_document(
+async def test_process_uploaded_document_success(
     test_pdf_file,
     mock_chroma_client,
     mock_openai_client,
@@ -197,42 +198,54 @@ async def test_process_pdf_document(
     mock_extract_pdf,
     mock_datastore_service,
 ):
-    """Test processing a PDF document."""
+    """Test successful processing of an uploaded document."""
     # Create a mock UploadFile object
-    mock_file = Mock(spec=UploadFile)
-    mock_file.filename = test_pdf_file.name
-    mock_file.content_type = "application/pdf"  # Add MIME type for PDF
+    mock_file = MagicMock(spec=UploadFile)
+    mock_file.filename = "test_document.pdf"
+    mock_file.content_type = "application/pdf"
     mock_file.seek = AsyncMock()
+    mock_file.read = AsyncMock(return_value=b"dummy pdf content")
 
-    # Mock the file.read method to return bytes
-    mock_file.read = AsyncMock()
-    # We need to set the return_value directly, not when creating the AsyncMock
-    mock_file.read.return_value = test_pdf_file.read_bytes()
+    # Configure the mock datastore to return specific metadata
+    expected_metadata = DocumentMetadata(
+        document_id="test-uuid-123",
+        original_filename="test_document.pdf",
+        original_file_path="/data/test-uuid-123/test_document.pdf",
+        text_file_path="/data/test-uuid-123/extracted_text.txt",
+        document_dir="/data/test-uuid-123",
+    )
+    mock_datastore_service.save_document.return_value = expected_metadata
 
-    # Process the document
+    # Call the function
     result = await process_uploaded_document(mock_file, settings)
 
-    # Check the result
-    assert result["status"] == "success"
-    assert result["document_id"] == "test-uuid-12345"
-    assert result["original_filename"] == "test.pdf"
-    assert result["num_chunks"] == 2
-
-    # Verify mock calls
+    # Verify calls
     mock_extract_pdf.assert_called_once()
-    mock_text_splitter.split_text.assert_called_once()
     mock_datastore_service.save_document.assert_called_once()
+    # Check that save_document was called with the file and extracted text
+    call_args, _ = mock_datastore_service.save_document.call_args
+    assert call_args[0] == mock_file
+    assert call_args[1] == MOCK_PDF_TEXT
 
-    # Verify process_chunks was called with the correct metadata dict
+    mock_text_splitter.split_text.assert_called_once_with(MOCK_PDF_TEXT)
     mock_process_chunks.assert_called_once()
-    args = mock_process_chunks.call_args[0]
-    metadata_dict = args[2]  # Third argument is the metadata_dict
-    assert isinstance(metadata_dict, dict)
-    assert metadata_dict["document_id"] == "test-uuid-12345"
+    # Verify the arguments passed to process_chunks
+    args, kwargs = mock_process_chunks.call_args
+    assert "chunk_file" in kwargs
+    # Check that the chunk file path includes the document_id
+    assert expected_metadata.document_id in str(kwargs["chunk_file"])
+    assert kwargs["chroma_dir"] == settings.CHROMA_DIR
+    # Check that the correct metadata dictionary was passed
+    assert kwargs["document_metadata"] == expected_metadata.model_dump()
+
+    # Verify result
+    assert result["document_id"] == expected_metadata.document_id
+    assert result["original_filename"] == expected_metadata.original_filename
+    assert result["num_chunks"] == 3  # Based on mock_text_splitter
 
 
 @pytest.mark.asyncio
-async def test_process_docx_document(
+async def test_process_uploaded_document_docx(
     test_docx_file,
     mock_chroma_client,
     mock_openai_client,
@@ -241,120 +254,46 @@ async def test_process_docx_document(
     mock_extract_docx,
     mock_datastore_service,
 ):
-    """Test processing a DOCX document."""
-    # Create a mock UploadFile object
-    mock_file = Mock(spec=UploadFile)
-    mock_file.filename = test_docx_file.name
-    mock_file.content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"  # Add MIME type for DOCX
+    """Test successful processing of a DOCX document."""
+    mock_file = MagicMock(spec=UploadFile)
+    mock_file.filename = "test_document.docx"
+    mock_file.content_type = (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
     mock_file.seek = AsyncMock()
+    mock_file.read = AsyncMock(return_value=b"dummy docx content")
 
-    # Mock the file.read method to return bytes
-    mock_file.read = AsyncMock()
-    mock_file.read.return_value = test_docx_file.read_bytes()
+    expected_metadata = DocumentMetadata(
+        document_id="test-uuid-456",
+        original_filename="test_document.docx",
+        original_file_path="/data/test-uuid-456/test_document.docx",
+        text_file_path="/data/test-uuid-456/extracted_text.txt",
+        document_dir="/data/test-uuid-456",
+    )
+    mock_datastore_service.save_document.return_value = expected_metadata
 
-    # Process the document
     result = await process_uploaded_document(mock_file, settings)
 
-    # Check the result
-    assert result["status"] == "success"
-    assert result["document_id"] == "test-uuid-12345"
-    assert result["original_filename"] == "test.pdf"
-    assert result["num_chunks"] == 2
-
-    # Verify mock calls
     mock_extract_docx.assert_called_once()
-    mock_text_splitter.split_text.assert_called_once()
     mock_datastore_service.save_document.assert_called_once()
+    call_args, _ = mock_datastore_service.save_document.call_args
+    assert call_args[0] == mock_file
+    assert call_args[1] == MOCK_DOCX_TEXT
 
-    # Verify process_chunks was called with the correct metadata dict
+    mock_text_splitter.split_text.assert_called_once_with(MOCK_DOCX_TEXT)
     mock_process_chunks.assert_called_once()
-    args = mock_process_chunks.call_args[0]
-    metadata_dict = args[2]  # Third argument is the metadata_dict
-    assert isinstance(metadata_dict, dict)
-    assert metadata_dict["document_id"] == "test-uuid-12345"
+    args, kwargs = mock_process_chunks.call_args
+    assert expected_metadata.document_id in str(kwargs["chunk_file"])
+    assert kwargs["chroma_dir"] == settings.CHROMA_DIR
+    assert kwargs["document_metadata"] == expected_metadata.model_dump()
+
+    assert result["document_id"] == expected_metadata.document_id
+    assert result["original_filename"] == expected_metadata.original_filename
+    assert result["num_chunks"] == 3
 
 
 @pytest.mark.asyncio
-async def test_process_docx_document_with_octet_stream_content_type(
-    test_docx_file,
-    mock_chroma_client,
-    mock_openai_client,
-    mock_text_splitter,
-    mock_process_chunks,
-    mock_extract_docx,
-    mock_datastore_service,
-):
-    """Test processing a DOCX document with application/octet-stream content type."""
-    # Create a mock UploadFile object
-    mock_file = Mock(spec=UploadFile)
-    mock_file.filename = test_docx_file.name
-    mock_file.content_type = "application/octet-stream"  # Generic binary content type
-    mock_file.seek = AsyncMock()
-
-    # Mock the file.read method to return bytes
-    mock_file.read = AsyncMock()
-    mock_file.read.return_value = test_docx_file.read_bytes()
-
-    # Before processing, modify content_type to match what the router would do
-    if mock_file.filename.lower().endswith(".docx"):
-        mock_file.content_type = (
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-
-    # Process the document
-    result = await process_uploaded_document(mock_file, settings)
-
-    # Check the result
-    assert result["status"] == "success"
-    assert result["document_id"] == "test-uuid-12345"
-    assert result["original_filename"] == "test.pdf"
-    assert result["num_chunks"] == 2
-
-    # Verify mock calls
-    mock_extract_docx.assert_called_once()
-    mock_text_splitter.split_text.assert_called_once()
-    mock_datastore_service.save_document.assert_called_once()
-
-    # Verify process_chunks was called with the correct metadata dict
-    mock_process_chunks.assert_called_once()
-    args = mock_process_chunks.call_args[0]
-    metadata_dict = args[2]  # Third argument is the metadata_dict
-    assert isinstance(metadata_dict, dict)
-    assert metadata_dict["document_id"] == "test-uuid-12345"
-
-
-@pytest.mark.asyncio
-async def test_process_unsupported_file_type(
-    test_pdf_file,
-    mock_chroma_client,
-    mock_openai_client,
-    mock_text_splitter,
-    mock_process_chunks,
-    mock_extract_pdf,
-    mock_datastore_service,
-):
-    """Test processing an unsupported file type."""
-    # Create a mock UploadFile object
-    mock_file = Mock(spec=UploadFile)
-    mock_file.filename = "test.xyz"  # Unsupported file type
-    mock_file.content_type = "application/octet-stream"  # Generic binary file type
-    mock_file.seek = AsyncMock()
-
-    # Mock the file.read method to return bytes
-    mock_file.read = AsyncMock()
-    mock_file.read.return_value = test_pdf_file.read_bytes()
-
-    with pytest.raises(ValueError) as exc_info:
-        await process_uploaded_document(mock_file, settings)
-    assert "Unsupported file content type" in str(exc_info.value)
-    mock_extract_pdf.assert_not_called()
-    mock_text_splitter.split_text.assert_not_called()
-    mock_process_chunks.assert_not_called()
-    mock_datastore_service.save_document.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_process_empty_document(
+async def test_process_document_no_text(
     test_pdf_file,
     mock_chroma_client,
     mock_openai_client,

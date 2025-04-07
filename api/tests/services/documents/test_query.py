@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.services.documents.query import process_query, get_openai_client
 from app.models.search import SearchResult
+from app.models.query import SourceInfo
 from tests.constants import TEST_QUERY
 from app.core.config import get_settings
 
@@ -18,13 +19,27 @@ def mock_search_documents():
         mock_search.return_value = [
             SearchResult(
                 text="Test document chunk 1",
-                metadata={"source": "document1.pdf"},
+                metadata={
+                    "original_filename": "document1.pdf",
+                    "document_id": "uuid-1",
+                },
                 distance=0.1,
             ),
             SearchResult(
                 text="Test document chunk 2",
-                metadata={"source": "document2.pdf"},
+                metadata={
+                    "original_filename": "document2.pdf",
+                    "document_id": "uuid-2",
+                },
                 distance=0.3,
+            ),
+            SearchResult(
+                text="Test document chunk 3 from doc 1",
+                metadata={
+                    "original_filename": "document1.pdf",
+                    "document_id": "uuid-1",
+                },
+                distance=0.15,
             ),
         ]
         yield mock_search
@@ -71,12 +86,19 @@ async def test_process_query_success(mock_search_documents, mock_openai_client):
     # Check result structure
     assert result.answer == "This is a test AI response"
     assert len(result.sources) == 2
-    assert "document1.pdf" in result.sources
-    assert "document2.pdf" in result.sources
+    assert isinstance(result.sources[0], SourceInfo)
+    assert isinstance(result.sources[1], SourceInfo)
+    # Check content (order might vary, so check presence)
+    source_docs = {(s.filename, s.document_id) for s in result.sources}
+    assert ("document1.pdf", "uuid-1") in source_docs
+    assert ("document2.pdf", "uuid-2") in source_docs
 
     # Check confidence calculation
-    # (1.0 - (0.1 + 0.3)/2/2.0) = 1.0 - 0.2/2.0 = 1.0 - 0.1 = 0.9
-    assert result.confidence == 0.9
+    # (1.0 - (0.1 + 0.3 + 0.15)/3/2.0) = 1.0 - 0.55/3/2.0 = 1.0 - 0.0916... = 0.9083...
+    # Original test used only first two, let's keep that for now, maybe adjust later
+    # avg_distance = (0.1 + 0.3) / 2 -> confidence = 1.0 - 0.2 = 0.9
+    # Update: Calculation now includes all results before deduplication for sources
+    assert result.confidence == pytest.approx(1.0 - ((0.1 + 0.3 + 0.15) / 3 / 2.0))
 
     # Verify search was called with correct parameters
     mock_search_documents.assert_called_once()

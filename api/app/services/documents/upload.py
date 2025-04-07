@@ -18,14 +18,18 @@ from typing import Any, Dict, Union
 from fastapi import UploadFile
 
 from app.core.config import Settings
-from app.services.chunk import create_text_splitter
 from app.services.datastore import DocumentMetadata, get_datastore_service
 from app.services.embeddings import process_chunks
 from app.services.process_docs import extract_docx_text, extract_pdf_text
+import semchunk
+import tiktoken
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+try:
+    from app.core.struct_logger import log as logger
+except ImportError:
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
 
 async def process_uploaded_document(
@@ -93,37 +97,54 @@ async def process_uploaded_document(
         await file.seek(0)  # Reset file position for saving
         document_metadata = await datastore.save_document(file, extracted_text)
 
-        # Create text splitter
-        text_splitter = create_text_splitter()
+        # --- Start Semchunk Integration ---
+        try:
+            # Get the tokenizer encoding using the name from settings
+            tokenizer = tiktoken.get_encoding(settings.SEMCHUNK_TOKENIZER)
+            # Create the chunker function using chunkerify
+            chunker = semchunk.chunkerify(
+                tokenizer_or_token_counter=lambda text: len(tokenizer.encode(text)),
+                chunk_size=settings.SEMCHUNK_CHUNK_SIZE,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to initialize semchunk chunker",
+                tokenizer=settings.SEMCHUNK_TOKENIZER,
+                error=str(e),
+            )
+            raise ValueError("Failed to initialize text chunker configuration.") from e
 
-        # Split text into chunks
-        chunks = text_splitter.split_text(extracted_text)
+        # Perform chunking using semchunk
+        try:
+            chunks = chunker(extracted_text, overlap=settings.SEMCHUNK_OVERLAP_TOKENS)
+            if not chunks:
+                logger.warning(
+                    "Semchunk produced no chunks for document",
+                    document_id=document_metadata.document_id,
+                    original_filename=document_metadata.original_filename,
+                )
+                raise ValueError("Text splitting resulted in zero chunks.")
 
-        # Save chunks to file in temporary directory
-        chunks_file = temp_path / f"chunked_{file.filename}.txt"
-        with open(chunks_file, "w", encoding="utf-8") as f:
-            for i, chunk in enumerate(chunks):
-                f.write(f"### CHUNK {i + 1}\n")
-                f.write(chunk)
-                f.write("\n\n")
+        except Exception as e:
+            logger.error(
+                "Error during semchunk text splitting",
+                document_id=document_metadata.document_id,
+                error=str(e),
+            )
+            raise ValueError("Failed to split document text into chunks.") from e
+        # --- End Semchunk Integration ---
 
-        # Process chunks and store in ChromaDB with document metadata
-        # Convert to dict if it's a Pydantic model
-        metadata_dict = (
-            document_metadata.model_dump()
-            if hasattr(document_metadata, "model_dump")
-            else dict(document_metadata)
+        # Process chunks and store embeddings
+        process_chunks(
+            chunks=chunks,
+            chroma_dir=settings.CHROMA_DIR,
+            document_metadata=document_metadata.model_dump(),
         )
-        process_chunks(chunks_file, settings.CHROMA_DIR, metadata_dict)
 
-        # Return result dictionary with both attribute and dictionary access supported
+        # Return processing results including document ID and chunk count
         return {
-            "document_id": document_metadata.document_id
-            if hasattr(document_metadata, "document_id")
-            else document_metadata["document_id"],
-            "original_filename": document_metadata.original_filename
-            if hasattr(document_metadata, "original_filename")
-            else document_metadata["original_filename"],
+            "message": "Document processed successfully",
+            "document_id": document_metadata.document_id,
+            "original_filename": document_metadata.original_filename,
             "num_chunks": len(chunks),
-            "status": "success",
         }

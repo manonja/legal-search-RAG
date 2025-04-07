@@ -13,6 +13,7 @@ from httpx import AsyncClient
 
 from app.core.config import get_settings
 from app.main import app
+from tests.constants import MOCK_PDF_TEXT, MOCK_DOCX_TEXT  # Import constants
 
 # Set testing environment variable
 os.environ["TESTING"] = "true"
@@ -142,20 +143,6 @@ def mock_extract_docx_text(mocker):
     )
     mocker.patch("app.services.documents.upload.extract_docx_text", new=mock_extract)
     return mock_extract
-
-
-@pytest.fixture
-def mock_create_text_splitter(mocker):
-    """Mock the text splitter creation function."""
-    mock_splitter = mocker.MagicMock()
-    mock_splitter.split_text.return_value = [
-        "This is chunk 1",
-        "This is chunk 2",
-        "This is chunk 3",
-    ]
-    mock_create = mocker.MagicMock(return_value=mock_splitter)
-    mocker.patch("app.services.documents.upload.create_text_splitter", new=mock_create)
-    return mock_create
 
 
 @pytest.fixture
@@ -306,7 +293,6 @@ def test_upload_document(
     test_pdf_document: Path,
     mock_extract_pdf_text,
     mock_extract_docx_text,
-    mock_create_text_splitter,
     mock_process_chunks,
     mock_chroma_client,
     mock_datastore_service,
@@ -336,8 +322,8 @@ def test_upload_document(
     assert response_json["original_filename"] == "sample.pdf", (
         "Original filename should be preserved"
     )
-    assert response_json["chunks"] == 3, (
-        "Should have 3 chunks from mock_create_text_splitter"
+    assert response_json["chunks"] == 1, (
+        "Should have 1 chunk for the short mock text with semchunk"
     )
     assert response_json["status"] == "success", "Status should be 'success'"
     assert response_json["message"] == "Document processed successfully", (
@@ -361,30 +347,29 @@ def test_upload_document(
         "DOCX extraction should not be called for PDF files"
     )
 
-    # Verify text splitting
-    mock_create_text_splitter.assert_called_once()
-    splitter_instance = mock_create_text_splitter.return_value
-    splitter_instance.split_text.assert_called_once()
-
     # Verify that process_chunks was called
     mock_process_chunks.assert_called_once()
 
-    # Verify process_chunks arguments
-    args = mock_process_chunks.call_args[0]
-    # Verify the first argument is a Path to a file with the expected name
-    assert isinstance(args[0], Path), (
-        "First argument to process_chunks should be a Path"
+    # Verify process_chunks arguments using kwargs
+    assert mock_process_chunks.call_args is not None, "process_chunks was not called"
+    kwargs = mock_process_chunks.call_args.kwargs  # Access keyword args
+    assert "chunks" in kwargs, "chunks list missing in process_chunks kwargs"
+    assert isinstance(kwargs["chunks"], list), "chunks argument should be a list"
+    assert "document_metadata" in kwargs, (
+        "document_metadata missing in process_chunks kwargs"
     )
-    assert args[0].name.endswith(f"chunked_sample.pdf.txt"), (
-        f"Expected chunked filename, got {args[0].name}"
+    assert isinstance(kwargs["document_metadata"], dict), (
+        "document_metadata should be a dict"
     )
+    # Optionally add more specific checks on metadata content if needed:
+    # assert kwargs["document_metadata"]["document_id"] == document_id
+    # assert kwargs["document_metadata"]["original_filename"] == "sample.pdf"
 
 
 def test_upload_document_docx(
     test_client: TestClient,
     mock_extract_pdf_text,
     mock_extract_docx_text,
-    mock_create_text_splitter,
     mock_process_chunks,
     mock_chroma_client,
     mock_datastore_service,
@@ -427,8 +412,8 @@ def test_upload_document_docx(
         assert response_json["original_filename"] == "test_document.docx", (
             "Original filename should be preserved"
         )
-        assert response_json["chunks"] == 3, (
-            "Should have 3 chunks from mock_create_text_splitter"
+        assert response_json["chunks"] == 1, (
+            "Should have 1 chunk for the short mock text with semchunk"
         )
         assert response_json["status"] == "success", "Status should be 'success'"
         assert response_json["message"] == "Document processed successfully", (
@@ -450,23 +435,25 @@ def test_upload_document_docx(
         )
         mock_extract_docx_text.assert_called_once()
 
-        # Verify text splitting
-        mock_create_text_splitter.assert_called_once()
-        splitter_instance = mock_create_text_splitter.return_value
-        splitter_instance.split_text.assert_called_once()
-
         # Verify that process_chunks was called
         mock_process_chunks.assert_called_once()
 
-        # Verify process_chunks arguments
-        args = mock_process_chunks.call_args[0]
-        # Verify the first argument is a Path to a file with the expected name
-        assert isinstance(args[0], Path), (
-            "First argument to process_chunks should be a Path"
+        # Verify process_chunks arguments using kwargs
+        assert mock_process_chunks.call_args is not None, (
+            "process_chunks was not called"
         )
-        assert args[0].name.endswith(f"chunked_test_document.docx.txt"), (
-            f"Expected chunked filename, got {args[0].name}"
+        kwargs = mock_process_chunks.call_args.kwargs  # Access keyword args
+        assert "chunks" in kwargs, "chunks list missing in process_chunks kwargs"
+        assert isinstance(kwargs["chunks"], list), "chunks argument should be a list"
+        assert "document_metadata" in kwargs, (
+            "document_metadata missing in process_chunks kwargs"
         )
+        assert isinstance(kwargs["document_metadata"], dict), (
+            "document_metadata should be a dict"
+        )
+        # Optionally add more specific checks on metadata content if needed:
+        # assert kwargs["document_metadata"]["document_id"] == document_id
+        # assert kwargs["document_metadata"]["original_filename"] == "test_document.docx"
 
     finally:
         os.unlink(docx_path)
@@ -476,7 +463,6 @@ def test_get_document(
     test_client: TestClient,
     test_pdf_document: Path,
     mock_extract_pdf_text,
-    mock_create_text_splitter,
     mock_process_chunks,
     mock_chroma_client,
     mock_document_service,

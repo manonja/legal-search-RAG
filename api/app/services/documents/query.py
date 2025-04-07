@@ -4,13 +4,14 @@ This module provides functionality to query documents using vector similarity se
 and generate responses using OpenAI's API.
 """
 
-from typing import Optional
+from typing import Optional, List
+import os
 
 import openai
 from app.core.struct_logger import log
 
 from app.core.config import get_settings
-from app.models.query import QueryResponse
+from app.models.query import QueryResponse, SourceInfo
 from app.models.search import SearchQuery
 from app.services.documents.search import search_documents
 
@@ -58,48 +59,98 @@ async def process_query(
                 confidence=0.0,
             )
 
-        # Format context from search results
-        context = "\n\n".join(
-            [
-                f"Document: {result.metadata.get('source', 'Unknown')}\n{result.text}"
-                for result in search_results
-            ]
-        )
-
-        # Create sources list for response
-        sources = []
+        # Format context from search results with proper source and page info
+        context_parts = []
         for result in search_results:
-            source = result.metadata.get("source", "Unknown")
-            if source not in sources:
-                sources.append(source)
+            # Prioritize the direct original_filename metadata key
+            clean_source_name = result.metadata.get("original_filename")
 
-        # Generate prompt for OpenAI
-        prompt = f"""You are a legal assistant answering questions based on the provided document excerpts.
-Answer the following question using ONLY the information from the provided document excerpts.
-If the information needed is not present in the excerpts, say "I don't have enough information to answer this question."
-Do not make up information or use your general knowledge.
+            # If clean name isn't directly available, fallback to path cleaning
+            if not clean_source_name:
+                source_path = result.metadata.get(
+                    "original_source"
+                ) or result.metadata.get("source")
+                if source_path:
+                    base_name = os.path.basename(source_path)
+                    if base_name.startswith("chunked_"):
+                        clean_source_name = base_name[len("chunked_") :]
+                    else:
+                        clean_source_name = base_name
+                    if clean_source_name.endswith(".txt"):
+                        clean_source_name = clean_source_name[:-4]
+                # Keep clean_source_name as None if no path found
 
-DOCUMENT EXCERPTS:
-{context}
+            # Page number handling (remains the same)
+            page_number_val = result.metadata.get("page_number")
+            page_info = (
+                f"Page: {page_number_val}" if page_number_val is not None else ""
+            )
 
-QUESTION: {query}
+            # Format context part using the determined clean source name
+            context_parts.append(
+                f"Source Document: {clean_source_name}\n{page_info}\nExcerpt:\n{result.text}".strip()
+            )
+        # Use '---' as a clear separator between excerpts
+        context = "\n---\n".join(context_parts)
 
-Answer concisely and accurately, citing the relevant document sources when possible.
-"""
+        # Log the retrieved context for debugging
+        log.debug("Context retrieved for LLM", context=context)
+
+        # Create sources list for response using ORIGINAL filenames and Document IDs
+        sources: List[SourceInfo] = []  # Type hint for clarity
+        seen_document_ids = set()
+        for result in search_results:
+            doc_id = result.metadata.get("document_id")
+            original_filename = result.metadata.get("original_filename")
+
+            # Ensure we have both ID and filename, and haven't seen this ID
+            if doc_id and original_filename and doc_id not in seen_document_ids:
+                sources.append(
+                    SourceInfo(filename=original_filename, document_id=doc_id)
+                )
+                seen_document_ids.add(doc_id)
+
+        # Generate prompt for OpenAI - Enhanced for clarity and citation
+        system_message = "You are a highly proficient legal assistant AI specializing in analyzing provided legal document excerpts and providing accurate, cited answers."
+
+        # Define the main prompt using a standard f-string for clarity
+        prompt = f"""
+        You are a highly proficient legal assistant AI. Your task is to answer the user's question based *solely* on the provided document excerpts.
+
+        Follow these instructions precisely:
+        1.  Analyze the user's QUESTION carefully.
+        2.  Review the DOCUMENT EXCERPTS provided below. Each excerpt is clearly marked with its 'Source Document' and potentially a 'Page'.
+        3.  Synthesize a comprehensive and accurate answer to the QUESTION using *only* information found in the excerpts.
+        4.  Structure your answer clearly. Use headings, lists, or paragraphs as appropriate for readability.
+        5.  **Crucially, whenever you state a fact or principle derived from an excerpt, you MUST cite the source. Use the format (Source Document: [Document Name], Page: [Page Number]) if the page number is provided for that excerpt. If the page number is NOT provided for an excerpt, use the format (Source Document: [Document Name]).** Do not invent citations or cite generally. Use the exact 'Source Document' and 'Page' values provided.
+        6.  If the excerpts do not contain the information needed to answer the question, state clearly: "Based on the provided documents, I cannot answer this question." Do not use external knowledge.
+        7.  Keep the tone professional and objective.
+
+        DOCUMENT EXCERPTS:
+        ---
+        {context}
+        ---
+
+        QUESTION: {query}
+
+        Answer:
+        """
 
         # Get OpenAI client
         client = get_openai_client()
 
         # Call OpenAI API for response generation
+        log.info("Generating response with OpenAI", model=settings.OPENAI_MODEL)
         response = client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
+            model=settings.OPENAI_MODEL,  # Ensure this uses a capable model like gpt-4-turbo
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a legal assistant that answers questions based on provided documents.",
+                    "content": system_message,  # Use updated system message
                 },
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": prompt},  # Use updated prompt
             ],
+            # Consider lower temp (e.g., 0.2) for more factual/cited answers
             temperature=temperature,
             max_tokens=max_tokens,
         )

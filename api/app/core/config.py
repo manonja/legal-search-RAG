@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     SENTRY_ENABLE_TRACING: bool = True
     SENTRY_SEND_PII: bool = True  # Send personally identifiable information
 
+    # Chunking Settings (New)
+    SEMCHUNK_TOKENIZER: str = (
+        "cl100k_base"  # Default for text-embedding-3-small/large, gpt-4, gpt-3.5-turbo
+    )
+    SEMCHUNK_CHUNK_SIZE: int = 512  # Default token chunk size
+    SEMCHUNK_OVERLAP_TOKENS: int = 50  # Default token overlap
+
     # Additional Sentry settings for production
     @property
     def is_production(self) -> bool:
@@ -86,9 +93,7 @@ class Settings(BaseSettings):
         return 0.1 if self.is_production else 0.5
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="allow",  # Allow extra fields from env file
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
     def get_google_api_key(self) -> str:
