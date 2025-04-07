@@ -15,14 +15,18 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Union
 
+import semchunk
+import tiktoken
 from fastapi import UploadFile
 
 from app.core.config import Settings
 from app.services.datastore import DocumentMetadata, get_datastore_service
 from app.services.embeddings import process_chunks
-from app.services.process_docs import extract_docx_text, extract_pdf_text
-import semchunk
-import tiktoken
+from app.services.process_docs import (
+    extract_doc_text,
+    extract_docx_text,
+    extract_pdf_text,
+)
 
 # Configure logging
 try:
@@ -76,6 +80,8 @@ async def process_uploaded_document(
                 content_type = "application/pdf"
             elif file.filename.lower().endswith(".docx"):
                 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            elif file.filename.lower().endswith(".doc"):
+                content_type = "application/msword"
 
         # Extract text based on content type
         if content_type == "application/pdf":
@@ -85,6 +91,8 @@ async def process_uploaded_document(
             == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ):
             extracted_text = extract_docx_text(str(file_path))
+        elif content_type == "application/msword":
+            extracted_text = extract_doc_text(str(file_path))
         else:
             raise ValueError(
                 f"Unsupported file content type: {content_type}. Could not determine how to extract text."

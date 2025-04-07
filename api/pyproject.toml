@@ -32,6 +32,7 @@ dependencies = [
     "structlog>=23.2.0,<24.0.0",
     "tiktoken",
     "semchunk",
+    "antiword>=0.1.0",
 ]
 
 

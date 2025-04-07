@@ -5,7 +5,11 @@ WORKDIR /app
 
 # Install build-time system dependencies (if any are needed by uv or package builds)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     curl \
+    git \
+    libpq-dev \
+    antiword \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
