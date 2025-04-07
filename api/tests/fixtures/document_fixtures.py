@@ -24,14 +24,15 @@ def mock_extract_docx_text(mocker):
     return mock_extract
 
 
-@pytest.fixture
-def mock_create_text_splitter(mocker):
-    """Mock the text splitter creation function."""
-    mock_splitter = mocker.MagicMock()
-    mock_splitter.split_text.return_value = MOCK_DOCUMENT_CHUNKS
-    mock_create = mocker.MagicMock(return_value=mock_splitter)
-    mocker.patch("app.services.documents.upload.create_text_splitter", new=mock_create)
-    return mock_create
+# Fixture is no longer needed as create_text_splitter was removed
+# @pytest.fixture
+# def mock_create_text_splitter(mocker):
+#     """Mock the text splitter creation function."""
+#     mock_splitter = mocker.MagicMock()
+#     mock_splitter.split_text.return_value = MOCK_DOCUMENT_CHUNKS
+#     mock_create = mocker.MagicMock(return_value=mock_splitter)
+#     mocker.patch("app.services.documents.upload.create_text_splitter", new=mock_create)
+#     return mock_create # Return the mock create function itself
 
 
 @pytest.fixture

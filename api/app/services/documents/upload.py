@@ -18,14 +18,18 @@ from typing import Any, Dict, Union
 from fastapi import UploadFile
 
 from app.core.config import Settings
-from app.services.chunk import create_text_splitter
 from app.services.datastore import DocumentMetadata, get_datastore_service
 from app.services.embeddings import process_chunks
 from app.services.process_docs import extract_docx_text, extract_pdf_text
+import semchunk
+import tiktoken
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+try:
+    from app.core.struct_logger import log as logger
+except ImportError:
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
 
 async def process_uploaded_document(
@@ -93,21 +97,48 @@ async def process_uploaded_document(
         await file.seek(0)  # Reset file position for saving
         document_metadata = await datastore.save_document(file, extracted_text)
 
-        # Create text splitter
-        text_splitter = create_text_splitter()
-        chunks = text_splitter.split_text(extracted_text)
+        # --- Start Semchunk Integration ---
+        try:
+            # Get the tokenizer encoding using the name from settings
+            tokenizer = tiktoken.get_encoding(settings.SEMCHUNK_TOKENIZER)
+            # Create the chunker function using chunkerify
+            chunker = semchunk.chunkerify(
+                tokenizer_or_token_counter=lambda text: len(tokenizer.encode(text)),
+                chunk_size=settings.SEMCHUNK_CHUNK_SIZE,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to initialize semchunk chunker",
+                tokenizer=settings.SEMCHUNK_TOKENIZER,
+                error=str(e),
+            )
+            raise ValueError("Failed to initialize text chunker configuration.") from e
 
-        # Store chunks temporarily for processing
-        chunk_file = temp_path / f"{document_metadata.document_id}_chunks.txt"
-        with open(chunk_file, "w", encoding="utf-8") as f:
-            # Separate chunks clearly, e.g., using a specific marker
-            f.write("### CHUNK".join(chunks))
+        # Perform chunking using semchunk
+        try:
+            chunks = chunker(extracted_text, overlap=settings.SEMCHUNK_OVERLAP_TOKENS)
+            if not chunks:
+                logger.warning(
+                    "Semchunk produced no chunks for document",
+                    document_id=document_metadata.document_id,
+                    original_filename=document_metadata.original_filename,
+                )
+                raise ValueError("Text splitting resulted in zero chunks.")
+
+        except Exception as e:
+            logger.error(
+                "Error during semchunk text splitting",
+                document_id=document_metadata.document_id,
+                error=str(e),
+            )
+            raise ValueError("Failed to split document text into chunks.") from e
+        # --- End Semchunk Integration ---
 
         # Process chunks and store embeddings
         process_chunks(
-            chunk_file=chunk_file,
+            chunks=chunks,
             chroma_dir=settings.CHROMA_DIR,
-            document_metadata=document_metadata.model_dump(),  # Pass metadata as dict
+            document_metadata=document_metadata.model_dump(),
         )
 
         # Return processing results including document ID and chunk count

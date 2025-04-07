@@ -39,7 +39,6 @@ def test_upload_document(
     filename,
     mock_extract_pdf_text,
     mock_extract_docx_text,
-    mock_create_text_splitter,
     mock_process_chunks,
     mock_datastore_service,
     test_pdf_document,
@@ -76,7 +75,9 @@ def test_upload_document(
         assert response_json["original_filename"] == filename, (
             "Original filename should be preserved"
         )
-        assert response_json["chunks"] == 3, "Should have 3 chunks"
+        assert response_json["chunks"] == 1, (
+            "Should have 1 chunk for the short mock text"
+        )
         assert response_json["status"] == "success", "Status should be 'success'"
         assert response_json["message"] == "Document processed successfully", (
             "Message should indicate success"
@@ -102,12 +103,6 @@ def test_upload_document(
             )
             mock_extract_docx_text.assert_called_once()
 
-        # Verify text splitting
-        mock_create_text_splitter.assert_called_once()
-        splitter_instance = mock_create_text_splitter.return_value
-        # Ensure split_text was called with the text extracted by the mock extractor
-        splitter_instance.split_text.assert_called_once_with(expected_text)
-
         # Verify chunk processing
         mock_process_chunks.assert_called_once()
 
@@ -116,23 +111,20 @@ def test_upload_document(
             "process_chunks was not called"
         )
         kwargs = mock_process_chunks.call_args.kwargs  # Access keyword args
-        assert "chunk_file" in kwargs, "chunk_file missing in process_chunks kwargs"
-        assert isinstance(kwargs["chunk_file"], Path), (
-            "chunk_file argument should be a Path"
-        )
-        # Check that the chunk file path includes the document_id from the response
-        assert document_id in kwargs["chunk_file"].name, (
-            f"Chunk filename {kwargs['chunk_file'].name} should contain document_id {document_id}"
-        )
+        assert "chunks" in kwargs, "chunks list missing in process_chunks kwargs"
+        assert isinstance(kwargs["chunks"], list), "chunks argument should be a list"
         assert "document_metadata" in kwargs, (
             "document_metadata missing in process_chunks kwargs"
         )
         assert isinstance(kwargs["document_metadata"], dict), (
             "document_metadata should be a dict"
         )
-        # Check that the passed metadata contains the correct original filename
+        # Check that the passed metadata contains the correct original filename and document_id
         assert kwargs["document_metadata"]["original_filename"] == filename, (
             "Filename in document_metadata mismatch"
+        )
+        assert kwargs["document_metadata"]["document_id"] == document_id, (
+            "Document ID in document_metadata mismatch"
         )
 
     finally:
@@ -144,7 +136,6 @@ def test_get_document(
     test_client: TestClient,
     test_pdf_document: Path,
     mock_extract_pdf_text,
-    mock_create_text_splitter,
     mock_process_chunks,
     mock_chroma_client,
     mock_document_service,
