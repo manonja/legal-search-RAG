@@ -11,13 +11,13 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from pydantic import BaseModel, Field
-from app.core.struct_logger import log
 
 from app.core.config import Settings
+from app.core.struct_logger import log
 
 
 class DocumentMetadata(BaseModel):
@@ -258,6 +258,34 @@ class DatastoreService:
             return False
 
         try:
+            # First, delete document chunks from ChromaDB
+            try:
+                from app.core.config import get_settings
+                from app.services.database.chroma import get_chroma_client
+
+                settings = get_settings()
+                # Get ChromaDB client
+                chroma_client = get_chroma_client()
+
+                # Get the collection
+                collection = chroma_client.get_collection(name=settings.COLLECTION_NAME)
+
+                # Use the where filter to find and delete all chunks with this document_id
+                collection.delete(where={"document_id": document_id})
+
+                log.info(
+                    "Deleted document chunks from ChromaDB", document_id=document_id
+                )
+            except Exception as e:
+                log.warning(
+                    "Error deleting document chunks from ChromaDB",
+                    document_id=document_id,
+                    error=str(e),
+                    exc_info=True,
+                )
+                # Continue with file deletion even if ChromaDB deletion fails
+
+            # Then delete files from filesystem
             shutil.rmtree(doc_dir)
             log.info("Document deleted successfully", document_id=document_id)
             return True
