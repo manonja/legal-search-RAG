@@ -129,6 +129,9 @@ The API provides the following endpoints:
 ### Document Management
 - `POST /api/documents/upload`: Upload and process documents (PDF, DOCX)
 - `GET /api/documents/{document_id}`: Retrieve document content by ID
+- `GET /api/documents/{document_id}/download`: Download the original document file by ID
+- `GET /api/documents`: List all available document IDs
+- `DELETE /api/documents/{document_id}`: Delete a document and its associated files by ID
 
 ### Search & Query
 - `POST /api/search`: Perform vector-based semantic search on documents
