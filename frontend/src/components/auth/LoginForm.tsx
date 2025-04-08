@@ -38,8 +38,8 @@ const LoginForm: React.FC = () => {
       // based on where the user was trying to go.
       // For simplicity here, we might redirect to a default page if needed,
       // but often the middleware handles this better.
-      // router.push('/dashboard'); // Example redirect
-       console.log('Login successful');
+      router.push('/'); // Redirect to root page instead of dashboard
+       console.log('Login successful, redirecting to root...');
     } catch (error: any) {
       console.error("Login failed:", error);
       // Handle specific Firebase error codes
