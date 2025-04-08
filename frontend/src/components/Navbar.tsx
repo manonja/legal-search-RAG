@@ -7,11 +7,21 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { currentUser, loading, logout } = useAuth();
+  const { currentUser, firebaseUser, loading, logout } = useAuth();
   const router = useRouter();
+
+  // Add debug logs to check auth state
+  useEffect(() => {
+    console.log("[Navbar] Auth state:", {
+      currentUser: currentUser ? currentUser.uid : null,
+      firebaseUser: firebaseUser ? firebaseUser.uid : null,
+      loading
+    });
+  }, [currentUser, firebaseUser, loading]);
 
   const navItems = [
     { name: "Document Search", href: "/search" },

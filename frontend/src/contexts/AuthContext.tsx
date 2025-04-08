@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signOut as firebaseSignOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, UserCredential } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User, UserRole } from '@/types/user';
 import { LoginFormData, SignupFormData, ResetPasswordFormData } from '@/types/forms';
@@ -32,6 +32,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unsubscribeUserDoc, setUnsubscribeUserDoc] = useState<(() => void) | null>(null);
+
+  // Clean up any existing listener when component unmounts or user changes
+  useEffect(() => {
+    return () => {
+      if (unsubscribeUserDoc) {
+        console.log("[AuthContext] Cleaning up Firestore user doc listener");
+        unsubscribeUserDoc();
+      }
+    };
+  }, [unsubscribeUserDoc]);
 
   useEffect(() => {
     console.log("[AuthContext] Setting up auth state change listener");
@@ -39,6 +50,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("[AuthContext] Auth state changed:", user ? `User: ${user.uid}` : "No user");
       setFirebaseUser(user);
+
+      // Clean up any existing Firestore listener when auth state changes
+      if (unsubscribeUserDoc) {
+        console.log("[AuthContext] Cleaning up previous user doc listener");
+        unsubscribeUserDoc();
+        setUnsubscribeUserDoc(null);
+      }
 
       if (user) {
         const userDocRef = doc(db, 'users', user.uid);
@@ -49,6 +67,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (userDoc.exists()) {
             console.log("[AuthContext] User document found in Firestore");
             setCurrentUser(userDoc.data() as User);
+
+            // Set up a real-time listener for user document changes
+            console.log("[AuthContext] Setting up real-time listener for user document");
+            const unsub = onSnapshot(userDocRef, (doc) => {
+              if (doc.exists()) {
+                console.log("[AuthContext] User document updated in real-time");
+                setCurrentUser(doc.data() as User);
+              } else {
+                console.warn("[AuthContext] User document no longer exists in real-time update");
+                setCurrentUser(null);
+              }
+            }, (error) => {
+              console.error("[AuthContext] Error in real-time user document listener:", error);
+            });
+
+            setUnsubscribeUserDoc(() => unsub);
           } else {
             console.warn("[AuthContext] Firestore user document not found for UID:", user.uid);
             console.log("[AuthContext] Creating new user document in Firestore");
@@ -68,6 +102,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               if (newUserDoc.exists()) {
                 console.log("[AuthContext] New user document fetched successfully");
                 setCurrentUser(newUserDoc.data() as User);
+
+                // Set up a real-time listener for the newly created user document
+                console.log("[AuthContext] Setting up real-time listener for new user document");
+                const unsub = onSnapshot(userDocRef, (doc) => {
+                  if (doc.exists()) {
+                    console.log("[AuthContext] New user document updated in real-time");
+                    setCurrentUser(doc.data() as User);
+                  } else {
+                    console.warn("[AuthContext] New user document no longer exists in real-time update");
+                    setCurrentUser(null);
+                  }
+                }, (error) => {
+                  console.error("[AuthContext] Error in real-time new user document listener:", error);
+                });
+
+                setUnsubscribeUserDoc(() => unsub);
               } else {
                 console.error("[AuthContext] Failed to create and fetch Firestore user document");
                 setCurrentUser(null); // Set to null if creation/fetch failed
@@ -99,14 +149,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Logout function
   const logout = useCallback(async () => {
     try {
+      console.log("[AuthContext] Logout initiated");
+      if (unsubscribeUserDoc) {
+        console.log("[AuthContext] Cleaning up user doc listener before logout");
+        unsubscribeUserDoc();
+        setUnsubscribeUserDoc(null);
+      }
       await firebaseSignOut(auth);
+      console.log("[AuthContext] Firebase signOut complete");
       // State updates (currentUser=null, firebaseUser=null) are handled by onAuthStateChanged
     } catch (error) {
-      console.error("Error signing out: ", error);
+      console.error("[AuthContext] Error signing out: ", error);
       // Optionally handle logout errors (e.g., display a message)
       throw error; // Re-throw error for components to handle if needed
     }
-  }, []);
+  }, [unsubscribeUserDoc]);
 
   // Login function
   const login = useCallback(async ({ email, password }: LoginFormData) => {
