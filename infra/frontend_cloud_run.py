@@ -189,8 +189,10 @@ def grant_secret_access(sa):
     # Get current stack for resource naming
     stack = pulumi.get_stack()
 
+    bindings = []
+
     # Grant access to API token secret
-    secretmanager.SecretIamMember(
+    api_token_binding = secretmanager.SecretIamMember(
         f"frontend-api-token-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/maja-legal-api-token",
         role="roles/secretmanager.secretAccessor",
@@ -199,7 +201,7 @@ def grant_secret_access(sa):
     bindings.append(api_token_binding)
 
     # Grant access for admin password secret
-    secretmanager.SecretIamMember(
+    admin_password_binding = secretmanager.SecretIamMember(
         f"frontend-admin-password-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/frontend-admin-password",
         role="roles/secretmanager.secretAccessor",
@@ -208,7 +210,7 @@ def grant_secret_access(sa):
     bindings.append(admin_password_binding)
 
     # Grant access for user password secret
-    secretmanager.SecretIamMember(
+    user_password_binding = secretmanager.SecretIamMember(
         f"frontend-user-password-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/frontend-user-password",
         role="roles/secretmanager.secretAccessor",
@@ -217,7 +219,7 @@ def grant_secret_access(sa):
     bindings.append(user_password_binding)
 
     # Grant access to Sentry DSN secret
-    secretmanager.SecretIamMember(
+    sentry_binding = secretmanager.SecretIamMember(
         f"frontend-sentry-dsn-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/sentry-dsn",
         role="roles/secretmanager.secretAccessor",
