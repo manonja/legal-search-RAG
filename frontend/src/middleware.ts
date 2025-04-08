@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
-import { adminAuth } from './lib/firebaseAdmin'; // Import Admin SDK Auth
 
 const SESSION_COOKIE_NAME = '__session';
 
@@ -14,26 +13,6 @@ const ADMIN_REQUIRED_ROUTES = ['/admin']; // Example admin page
 const PUBLIC_ROUTES = ['/', '/login', '/signup', '/about', '/book-demo'];
 // Public API routes (login/logout itself, health checks)
 const PUBLIC_API_ROUTES = ['/api/health', '/api/auth/session'];
-
-async function verifyAuth(request: NextRequest): Promise<{ uid: string | null; isAdmin: boolean; error?: any }> {
-  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-
-  if (!sessionCookie) {
-    return { uid: null, isAdmin: false };
-  }
-
-  try {
-    // Verify the session cookie. `checkRevoked` is true.
-    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const isAdmin = decodedClaims.admin === true; // Check for custom admin claim
-    return { uid: decodedClaims.uid, isAdmin };
-  } catch (error: any) {
-    // Session cookie is invalid or revoked. Firebase error codes:
-    // auth/session-cookie-expired, auth/session-cookie-revoked, auth/argument-error
-    console.warn(`Auth verification error: ${error.code}`);
-    return { uid: null, isAdmin: false, error };
-  }
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -48,6 +27,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+
   // --- Handle API Routes ---
   if (pathname.startsWith('/api/')) {
     // Allow public API routes
@@ -55,18 +36,16 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // --- Verify Session for non-public API routes ---
-    const { uid: apiUid, error: apiAuthError } = await verifyAuth(request);
-    if (!apiUid) {
-        console.warn(`API Auth failed for ${pathname}: ${apiAuthError?.code || 'No session'}`);
+    // For non-public API routes, check for session cookie presence
+    if (!sessionCookie) {
+        console.warn(`API Auth failed for ${pathname}: No session cookie`);
         return new NextResponse(JSON.stringify({ error: 'Authentication required' }), { status: 401 });
     }
 
-    // TODO: Potentially add role checks for specific API routes if needed
-    // e.g., if (pathname.startsWith('/api/admin/') && !isAdmin) { return 403 }
+    // Actual verification will happen within the API route handler itself
+    // using adminAuth.verifySessionCookie
 
-    // --- Existing Referer Check (Optional - depends if APIs are exclusively internal) ---
-    // You might remove this if session validation is sufficient, or keep it for extra defense
+    // Optional Referer Check (kept for now)
     const referer = request.headers.get('referer');
     const host = request.headers.get('host');
     const isValidReferer =
@@ -78,7 +57,7 @@ export async function middleware(request: NextRequest) {
       return new NextResponse(JSON.stringify({ error: 'Unauthorized access' }), { status: 403 });
     }
 
-    // If all checks pass for API route
+    // Cookie exists and referer is valid (if checked)
     return NextResponse.next();
   }
 
@@ -95,38 +74,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Verify authentication status
-  const { uid, isAdmin, error: authError } = await verifyAuth(request);
-
-  if (!uid) {
-    // Not authenticated
-    if (requiresAuth) {
-        console.log(`Redirecting unauthenticated user from ${pathname} to /login`);
-        // Redirect to login, preserving the intended destination
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('redirect', pathname);
-        return NextResponse.redirect(loginUrl);
-    }
-    // If it's not a specifically protected route, allow (might be handled by page logic)
-    return NextResponse.next();
+  // Handle protected routes
+  if (requiresAuth) {
+      if (!sessionCookie) {
+          // No cookie, redirect to login
+          console.log(`Redirecting unauthenticated user from ${pathname} to /login (no cookie)`);
+          const loginUrl = new URL('/login', request.url);
+          loginUrl.searchParams.set('redirect', pathname);
+          return NextResponse.redirect(loginUrl);
+      }
+      // Cookie exists, let the request through.
+      // Verification and role checks happen in Server Components/Page logic.
+      return NextResponse.next();
   }
 
-  // User is authenticated (uid exists)
-
-  // If trying to access auth pages (login/signup) while logged in, redirect to dashboard
-  if (pathname === '/login' || pathname === '/signup') {
-    console.log(`Redirecting authenticated user from ${pathname} to /dashboard`);
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  // Handle auth pages (login/signup) when a cookie *exists*
+  // Redirect logged-in users away from login/signup
+  if ((pathname === '/login' || pathname === '/signup') && sessionCookie) {
+      // We don't know for *sure* they are validly logged in here, but they have a cookie.
+      // Redirecting to dashboard is usually the desired UX.
+      // The dashboard page itself MUST verify the cookie.
+      console.log(`Redirecting user with session cookie from ${pathname} to /dashboard`);
+      return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Check for admin role if accessing an admin route
-  if (isAdminRoute && !isAdmin) {
-    console.log(`Redirecting non-admin user from ${pathname} to /dashboard`);
-    // Redirect non-admins trying to access admin pages
-    return NextResponse.redirect(new URL('/dashboard', request.url)); // Or an unauthorized page
-  }
-
-  // If authenticated and authorized for the route, allow access
+  // Allow any other routes (e.g., public pages not explicitly listed)
   return NextResponse.next();
 }
 
