@@ -39,12 +39,38 @@ const SignupForm: React.FC = () => {
     setIsLoading(true);
     setFormError(null);
     try {
-        // Only pass necessary fields (email, password) to the actual signup function
-        await signup({ email: data.email, password: data.password });
-      // Signup successful, AuthContext state will update.
-      // Middleware should handle redirecting from login/signup pages.
-      console.log('Signup successful');
-      // router.push('/dashboard'); // Example redirect if needed
+      console.log("Attempting to sign up with Firebase...");
+      // Only pass necessary fields (email, password) to the actual signup function
+      const userCredential = await signup({ email: data.email, password: data.password });
+      console.log("Firebase signup successful, getting ID token...");
+
+      // After Firebase signup, get the ID token to establish a session
+      const idToken = await userCredential.user.getIdToken();
+      console.log("ID token retrieved, setting up session...");
+
+      // Send the ID token to the server to set up a session cookie
+      const response = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const responseData = await response.json();
+      console.log("Session API response:", responseData);
+
+      if (!response.ok) {
+        throw new Error(`Session setup failed: ${responseData.error || response.statusText}`);
+      }
+
+      console.log("Session cookie set successfully, redirecting...");
+
+      // Force a page reload to ensure Firebase auth state syncs with the session cookie
+      // This is necessary because the client-side Firebase SDK doesn't automatically
+      // detect the server-side session cookie without a page refresh
+      window.location.href = '/';
+      // Don't use router.push here as it won't cause a full page refresh
     } catch (error: any) {
       console.error("Signup failed:", error);
       let errorMessage = 'Signup failed. Please try again.';
@@ -52,6 +78,9 @@ const SignupForm: React.FC = () => {
         errorMessage = 'This email address is already registered.';
       } else if (error.code === 'auth/weak-password') {
         errorMessage = 'Password is too weak. Please choose a stronger password.';
+      } else if (error.message) {
+        // Show the actual error message for debugging
+        errorMessage = `Error: ${error.message}`;
       }
       setFormError(errorMessage);
     } finally {

@@ -32,22 +32,49 @@ const LoginForm: React.FC = () => {
     setIsLoading(true);
     setFormError(null);
     try {
-      await login(data);
-      // Login successful, AuthContext state will update.
-      // Redirect logic will likely be handled by middleware or page component
-      // based on where the user was trying to go.
-      // For simplicity here, we might redirect to a default page if needed,
-      // but often the middleware handles this better.
-      router.push('/'); // Redirect to root page instead of dashboard
-       console.log('Login successful, redirecting to root...');
+      console.log("Attempting to login with Firebase...");
+      const userCredential = await login(data);
+      console.log("Firebase login successful, getting ID token...");
+
+      // After Firebase login, get the ID token to establish a session
+      const idToken = await userCredential.user.getIdToken();
+      console.log("ID token retrieved, setting up session...");
+
+      // Send the ID token to the server to set up a session cookie
+      const response = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const responseData = await response.json();
+      console.log("Session API response:", responseData);
+
+      if (!response.ok) {
+        throw new Error(`Session setup failed: ${responseData.error || response.statusText}`);
+      }
+
+      console.log("Session cookie set successfully, redirecting...");
+
+      // Force a page reload to ensure Firebase auth state syncs with the session cookie
+      // This is necessary because the client-side Firebase SDK doesn't automatically
+      // detect the server-side session cookie without a page reload
+      window.location.href = '/';
+      // Don't use router.push here as it won't cause a full page refresh
+      // router.push('/');
     } catch (error: any) {
-      console.error("Login failed:", error);
+      console.error("Login process failed:", error);
       // Handle specific Firebase error codes
       let errorMessage = 'Login failed. Please check your credentials.';
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         errorMessage = 'Invalid email or password.';
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = 'Too many login attempts. Please try again later.';
+      } else if (error.message) {
+        // Show the actual error message for debugging
+        errorMessage = `Error: ${error.message}`;
       }
       setFormError(errorMessage);
     } finally {

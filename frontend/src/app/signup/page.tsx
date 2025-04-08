@@ -20,7 +20,7 @@ const SignupPage: React.FC = () => {
 
         <p className="mt-10 text-center text-sm text-gray-500">
           Already have an account?{' '}
-          <Link href="/login" className="font-semibold leading-6 text-blue-600 hover:text-blue-500">
+          <Link href="/login?bypassAuthRedirect=true" className="font-semibold leading-6 text-blue-600 hover:text-blue-500">
             Sign in here
           </Link>
         </p>

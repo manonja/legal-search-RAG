@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, logout } = useAuth();
   const router = useRouter();
 
   const navItems = [
@@ -21,8 +21,15 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
+      console.log("Logging out...");
+      await logout();
+
+      console.log("Clearing session cookie...");
       await axios.delete("/api/auth/session");
-      console.log("Logout initiated from Navbar");
+
+      console.log("Logout successful, refreshing page...");
+      // Force a full page reload to clear all state
+      window.location.href = '/?logout=true';
     } catch (error) {
       console.error("Failed to logout from Navbar:", error);
     }
@@ -93,13 +100,13 @@ export default function Navbar() {
         ) : (
           <>
             <Link
-              href="/login"
+              href="/login?bypassAuthRedirect=true"
               className="text-sm font-medium text-gray-500 hover:text-blue-400"
             >
               Login
             </Link>
             <Link
-              href="/signup"
+              href="/signup?bypassAuthRedirect=true"
               className="ml-4 bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors inline-block text-sm"
             >
               Sign Up

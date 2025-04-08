@@ -34,47 +34,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("[AuthContext] Setting up auth state change listener");
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("[AuthContext] Auth state changed:", user ? `User: ${user.uid}` : "No user");
       setFirebaseUser(user);
+
       if (user) {
         const userDocRef = doc(db, 'users', user.uid);
         try {
+          console.log("[AuthContext] Fetching user document from Firestore");
           const userDoc = await getDoc(userDocRef);
+
           if (userDoc.exists()) {
+            console.log("[AuthContext] User document found in Firestore");
             setCurrentUser(userDoc.data() as User);
           } else {
-            console.warn("Firestore user document not found for UID:", user.uid);
+            console.warn("[AuthContext] Firestore user document not found for UID:", user.uid);
+            console.log("[AuthContext] Creating new user document in Firestore");
+
             const newUser: Omit<User, 'createdAt'> = {
               uid: user.uid,
               email: user.email,
               displayName: user.displayName,
               role: 'user', // Default role
             };
+
             try {
               await setDoc(userDocRef, { ...newUser, createdAt: serverTimestamp() });
+              console.log("[AuthContext] New user document created, fetching it");
+
               const newUserDoc = await getDoc(userDocRef); // Re-fetch after creation
               if (newUserDoc.exists()) {
+                console.log("[AuthContext] New user document fetched successfully");
                 setCurrentUser(newUserDoc.data() as User);
               } else {
-                console.error("Failed to create and fetch Firestore user document.");
+                console.error("[AuthContext] Failed to create and fetch Firestore user document");
                 setCurrentUser(null); // Set to null if creation/fetch failed
               }
             } catch (createError) {
-              console.error("Error creating Firestore user document:", createError);
+              console.error("[AuthContext] Error creating Firestore user document:", createError);
               setCurrentUser(null);
             }
           }
         } catch (fetchError) {
-          console.error("Error fetching Firestore user document:", fetchError);
+          console.error("[AuthContext] Error fetching Firestore user document:", fetchError);
           setCurrentUser(null);
         }
       } else {
+        console.log("[AuthContext] No user found, setting currentUser to null");
         setCurrentUser(null);
       }
+
       setLoading(false);
+      console.log("[AuthContext] Auth state loading complete");
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log("[AuthContext] Cleaning up auth state change listener");
+      unsubscribe();
+    };
   }, []);
 
   // Logout function
