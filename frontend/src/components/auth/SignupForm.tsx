@@ -62,12 +62,12 @@ const SignupForm: React.FC = () => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {formError && (
-        <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
+        <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
           {formError}
         </div>
       )}
       <div>
-        <label htmlFor="email-signup" className="block text-sm font-medium leading-6 text-gray-900 dark:text-gray-100">
+        <label htmlFor="email-signup" className="block text-sm font-medium leading-6 text-gray-700">
           Email address
         </label>
         <div className="mt-2">
@@ -77,14 +77,14 @@ const SignupForm: React.FC = () => {
             autoComplete="email"
             required
             {...register('email')}
-            className={`block w-full rounded-md border-0 py-1.5 text-gray-900 dark:text-gray-100 dark:bg-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6 ${errors.email ? 'ring-red-500' : ''}`}
+            className={`block w-full rounded-md border border-gray-300 py-1.5 px-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm sm:leading-6 ${errors.email ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
-          {errors.email && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>}
+          {errors.email && <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>}
         </div>
       </div>
 
       <div>
-        <label htmlFor="password-signup" className="block text-sm font-medium leading-6 text-gray-900 dark:text-gray-100">
+        <label htmlFor="password-signup" className="block text-sm font-medium leading-6 text-gray-700">
           Password
         </label>
         <div className="mt-2">
@@ -94,14 +94,14 @@ const SignupForm: React.FC = () => {
             autoComplete="new-password"
             required
             {...register('password')}
-            className={`block w-full rounded-md border-0 py-1.5 text-gray-900 dark:text-gray-100 dark:bg-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6 ${errors.password ? 'ring-red-500' : ''}`}
+            className={`block w-full rounded-md border border-gray-300 py-1.5 px-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm sm:leading-6 ${errors.password ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
-          {errors.password && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>}
+          {errors.password && <p className="mt-2 text-sm text-red-600">{errors.password.message}</p>}
         </div>
       </div>
 
       <div>
-        <label htmlFor="confirmPassword-signup" className="block text-sm font-medium leading-6 text-gray-900 dark:text-gray-100">
+        <label htmlFor="confirmPassword-signup" className="block text-sm font-medium leading-6 text-gray-700">
           Confirm Password
         </label>
         <div className="mt-2">
@@ -111,9 +111,9 @@ const SignupForm: React.FC = () => {
             autoComplete="new-password"
             required
             {...register('confirmPassword')}
-            className={`block w-full rounded-md border-0 py-1.5 text-gray-900 dark:text-gray-100 dark:bg-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6 ${errors.confirmPassword ? 'ring-red-500' : ''}`}
+            className={`block w-full rounded-md border border-gray-300 py-1.5 px-3 text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm sm:leading-6 ${errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
-          {errors.confirmPassword && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword.message}</p>}
+          {errors.confirmPassword && <p className="mt-2 text-sm text-red-600">{errors.confirmPassword.message}</p>}
         </div>
       </div>
 
@@ -121,7 +121,7 @@ const SignupForm: React.FC = () => {
         <button
           type="submit"
           disabled={isLoading}
-          className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex w-full justify-center rounded-md bg-gray-800 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Creating account...' : 'Sign up'}
         </button>

@@ -4,15 +4,29 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import axios from "axios";
+import { useRouter } from "next/navigation";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { currentUser, loading } = useAuth();
+  const router = useRouter();
 
   const navItems = [
     { name: "Document Search", href: "/search" },
     { name: "Ask Legal Questions", href: "/rag-search" },
     { name: "Book Demo", href: "/book-demo" },
   ];
+
+  const handleLogout = async () => {
+    try {
+      await axios.delete("/api/auth/session");
+      console.log("Logout initiated from Navbar");
+    } catch (error) {
+      console.error("Failed to logout from Navbar:", error);
+    }
+  };
 
   return (
     <nav className="flex items-center justify-between py-5 border-b border-gray-200 px-4 md:px-8">
@@ -32,21 +46,66 @@ export default function Navbar() {
       </Link>
 
       {/* Navigation Items - Center */}
-      <div className="flex items-center justify-center space-x-8 flex-1 mx-10">
+      <div className="hidden sm:flex items-center justify-center space-x-8 flex-1 mx-10">
         {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "inline-flex items-center px-1 pt-1 border-b text-sm font-medium",
+              "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium",
               pathname === item.href
-                ? "border-blue-400 text-gray-900"
+                ? "border-blue-400 text-blue-400"
                 : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
             )}
           >
             {item.name}
           </Link>
         ))}
+      </div>
+
+      {/* Auth Links/Actions - Right */}
+      <div className="flex items-center space-x-4">
+        {loading ? (
+          <div className="h-8 w-24 bg-gray-200 rounded animate-pulse"></div>
+        ) : currentUser ? (
+          <>
+            {currentUser.role === "admin" && (
+              <Link
+                href="/admin"
+                className="text-sm font-medium text-gray-500 hover:text-blue-400"
+              >
+                Admin
+              </Link>
+            )}
+            <Link
+              href="/dashboard"
+              className="text-sm font-medium text-gray-500 hover:text-blue-400"
+            >
+              Dashboard
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-sm font-medium text-red-600 hover:text-red-500"
+            >
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/login"
+              className="text-sm font-medium text-gray-500 hover:text-blue-400"
+            >
+              Login
+            </Link>
+            <Link
+              href="/signup"
+              className="ml-4 bg-gray-800 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-700 transition-colors inline-block text-sm"
+            >
+              Sign Up
+            </Link>
+          </>
+        )}
       </div>
     </nav>
   );

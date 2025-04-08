@@ -23,7 +23,7 @@ const LoginPage: React.FC = () => {
     <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         {/* Optional: Add logo/image here */}
-        <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900 dark:text-white">
+        <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
           Sign in to your account
         </h2>
       </div>
@@ -31,9 +31,9 @@ const LoginPage: React.FC = () => {
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
         <LoginForm />
 
-        <p className="mt-10 text-center text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-10 text-center text-sm text-gray-500">
           Not a member?{' '}
-          <Link href="/signup" className="font-semibold leading-6 text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+          <Link href="/signup" className="font-semibold leading-6 text-blue-600 hover:text-blue-500">
             Sign up now
           </Link>
         </p>
