@@ -34,7 +34,10 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
     service_account = create_service_account(stack)
 
     # Grant access to secrets
-    grant_secret_access(service_account)
+    secret_iam_bindings = grant_secret_access(service_account)
+
+    # Combine explicit dependencies with secret bindings
+    all_dependencies = (dependencies or []) + secret_iam_bindings
 
     # Create Cloud Run service
     service = cloudrunv2.Service(
@@ -147,7 +150,7 @@ def create_frontend_service(stack: str, docker_repository, api_service, dependen
                 )
             ],
         ),
-        opts=pulumi.ResourceOptions(depends_on=dependencies if dependencies else None),
+        opts=pulumi.ResourceOptions(depends_on=all_dependencies),
     )
 
     # Set up IAM policy for the service to be publicly accessible
@@ -186,37 +189,45 @@ def grant_secret_access(sa):
     # Get current stack for resource naming
     stack = pulumi.get_stack()
 
+    bindings = []
+
     # Grant access to API token secret
-    secretmanager.SecretIamMember(
+    api_token_binding = secretmanager.SecretIamMember(
         f"frontend-api-token-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/maja-legal-api-token",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
+    bindings.append(api_token_binding)
 
     # Grant access for admin password secret
-    secretmanager.SecretIamMember(
+    admin_password_binding = secretmanager.SecretIamMember(
         f"frontend-admin-password-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/frontend-admin-password",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
+    bindings.append(admin_password_binding)
 
     # Grant access for user password secret
-    secretmanager.SecretIamMember(
+    user_password_binding = secretmanager.SecretIamMember(
         f"frontend-user-password-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/frontend-user-password",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
+    bindings.append(user_password_binding)
 
     # Grant access to Sentry DSN secret
-    secretmanager.SecretIamMember(
+    sentry_binding = secretmanager.SecretIamMember(
         f"frontend-sentry-dsn-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/sentry-dsn",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
+    bindings.append(sentry_binding)
+
+    return bindings
 
 
 def get_frontend_url(service):
