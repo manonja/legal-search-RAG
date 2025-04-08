@@ -1,4 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 // Optionally import other Firebase services you need, e.g.:
 // import { getFirestore } from "firebase/firestore";
 // import { getAuth } from "firebase/auth";
@@ -22,6 +24,10 @@ if (!getApps().length) {
 
 // Export the initialized app
 export { firebaseApp };
+
+// Export other initialized services
+export const db = getFirestore(firebaseApp);
+export const auth = getAuth(firebaseApp);
 
 // Optionally export other initialized services
 // export const db = getFirestore(firebaseApp);
