@@ -1,5 +1,6 @@
 config:
   gcp:project: maja-dev
   maja-infra:env: dev
+  maja-infra:secret_project_id: "952577461734"
   pulumi:tags:
     template: gcp-python

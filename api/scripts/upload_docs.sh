@@ -19,9 +19,9 @@ usage() {
 
 # Source the .env file
 if [ -f "$ENV_FILE" ]; then
-    # Load API_TOKEN from .env
-    export $(grep -v '^#' "$ENV_FILE" | xargs)
+    # Load API_TOKEN from .env - only export lines that are properly formatted key=value pairs
     echo "Found .env file at $ENV_FILE"
+    export $(grep -v '^#' "$ENV_FILE" | grep '=' | sed 's/ *#.*//g' | xargs)
 else
     echo "Warning: .env file not found at $ENV_FILE"
 fi
@@ -68,13 +68,34 @@ fi
 echo "Starting upload to $url"
 echo "Using token: Bearer ${token:0:5}..."
 
-# Count matched files
-matched_files=0
-for file in $files; do
-    if [ -f "$file" ]; then
-        ((matched_files++))
-    fi
-done
+# Detect if we need to use find for file matching (for complex patterns)
+if [[ "$files" == *"{"*"}"* ]]; then
+    # Extract the base directory and patterns from the file pattern
+    base_dir=$(dirname "$files")
+    pattern=$(basename "$files")
+
+    # Extract file extensions from the pattern
+    extensions=$(echo "$pattern" | grep -o "{.*}" | tr -d "{}" | tr "," " ")
+
+    # Use find to get files with the specified extensions
+    file_list=()
+    for ext in $extensions; do
+        while IFS= read -r file; do
+            file_list+=("$file")
+        done < <(find "$base_dir" -type f -name "*.$ext" 2>/dev/null)
+    done
+
+    # Count matched files
+    matched_files=${#file_list[@]}
+else
+    # Use direct shell expansion for simple patterns
+    matched_files=0
+    for file in $files; do
+        if [ -f "$file" ]; then
+            ((matched_files++))
+        fi
+    done
+fi
 
 if [ "$matched_files" -eq 0 ]; then
     echo "Error: No files matched the pattern '$files'"
@@ -83,10 +104,11 @@ fi
 
 echo "Found $matched_files files to upload"
 
-# Upload each file
-uploaded=0
-for file in $files; do
-    if [ -f "$file" ]; then
+# Upload each file - either from file list array or direct shell expansion
+if [[ ${#file_list[@]} -gt 0 ]]; then
+    # Use the files from the file_list array
+    uploaded=0
+    for file in "${file_list[@]}"; do
         echo "Uploading $file..."
 
         # Handle JQ formatting conditionally
@@ -111,9 +133,40 @@ for file in $files; do
         if [ "$uploaded" -lt "$matched_files" ]; then
             sleep 1
         fi
-    else
-        echo "Warning: $file not found or not a regular file. Skipping."
-    fi
-done
+    done
+else
+    # Use direct shell expansion
+    uploaded=0
+    for file in $files; do
+        if [ -f "$file" ]; then
+            echo "Uploading $file..."
+
+            # Handle JQ formatting conditionally
+            if [ -n "$JQ_FLAG" ]; then
+                response=$(curl -X POST "$url" \
+                    -H "Authorization: Bearer $token" \
+                    --form "file=@$file" \
+                    --silent | jq .)
+            else
+                response=$(curl -X POST "$url" \
+                    -H "Authorization: Bearer $token" \
+                    --form "file=@$file" \
+                    --silent)
+            fi
+
+            echo "$response"
+            echo ""
+            ((uploaded++))
+            echo "Progress: $uploaded/$matched_files"
+
+            # Add delay between uploads
+            if [ "$uploaded" -lt "$matched_files" ]; then
+                sleep 1
+            fi
+        else
+            echo "Warning: $file not found or not a regular file. Skipping."
+        fi
+    done
+fi
 
 echo "Upload process completed. Uploaded $uploaded/$matched_files files."
