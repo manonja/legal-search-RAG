@@ -1,34 +1,49 @@
 import pulumi
 import pulumi_gcp as gcp
 
-# Ensure the Firebase Management API is enabled
-firebase_api = gcp.projects.Service(
-    "firebase-api", service="firebase.googleapis.com", disable_on_destroy=False
-)
 
-# Ensure the Firestore API is enabled
-firestore_api = gcp.projects.Service(
-    "firestore-api", service="firestore.googleapis.com", disable_on_destroy=False
-)
+def create_firestore_database(stack: str):
+    # Ensure the Firebase Management API is enabled
+    firebase_api = gcp.projects.Service(
+        "firebase-api", service="firebase.googleapis.com", disable_on_destroy=False
+    )
 
-# Create a new Firebase project resource linked to the GCP project
-# This doesn't create a new Firebase project, but links the GCP project to Firebase
-firebase_project = gcp.firebase.Project(
-    "firebaseProject",
-    project=gcp.config.project,  # Use the current GCP project
-    opts=pulumi.ResourceOptions(depends_on=[firebase_api]),  # Depends on Firebase API being enabled
-)
+    # Ensure the Firestore API is enabled
+    firestore_api = gcp.projects.Service(
+        "firestore-api", service="firestore.googleapis.com", disable_on_destroy=False
+    )
 
-# Create a Firestore database for the project
-firestore_database = gcp.firestore.Database(
-    "firestoreDatabase",
-    project=firebase_project.project,
-    name="(default)",  # Use "(default)" for the default database
-    location_id="us-central1",  # Specify the region to match Cloud Run
-    type="FIRESTORE_NATIVE",  # Specify the database type
-    # Ensure Firestore API is enabled and Firebase project link exists
-    opts=pulumi.ResourceOptions(depends_on=[firestore_api, firebase_project]),
-)
+    firebase_project = gcp.firebase.Project(
+        "firebase-api", project=f"maja-{stack}", opts=pulumi.ResourceOptions(protect=True)
+    )
 
-# Export the Firestore database name
-pulumi.export("firestore_database_name", firestore_database.name)
+    maja_law_frontend_webapp = gcp.firebase.WebApp(
+        "Maja-law-frontend-webapp",
+        api_key_id="bbcd05d4-aea9-4679-897c-42be7c78f986",
+        display_name="Maja-law-frontend",
+        project=f"maja-{stack}",
+        opts=pulumi.ResourceOptions(protect=True),
+    )
+
+    # import firestore database
+    # Use Database resource to match the imported state
+    firestore_database = gcp.firestore.Database(
+        "maja-firestore-database",
+        app_engine_integration_mode="DISABLED",
+        concurrency_mode="PESSIMISTIC",
+        point_in_time_recovery_enablement="POINT_IN_TIME_RECOVERY_DISABLED",
+        delete_protection_state="DELETE_PROTECTION_ENABLED",
+        location_id="us-central1",
+        name="(default)",
+        project="maja-dev",
+        type="FIRESTORE_NATIVE",
+        opts=pulumi.ResourceOptions(protect=True, import_="projects/maja-dev/databases/(default)"),
+    )
+
+    return (
+        firestore_database,
+        maja_law_frontend_webapp,
+        firebase_project,
+        firebase_api,
+        firestore_api,
+    )

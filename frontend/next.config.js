@@ -26,6 +26,22 @@ const nextConfig = {
 
   // Enable faster refresh during development
   webpack: (config, { dev, isServer }) => {
+    // Only include firebase-admin in the server bundle
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        // Provide polyfills for Node.js modules used by Firebase Admin SDK
+        fs: false,
+        path: false,
+        os: false,
+        net: false,
+        tls: false,
+        child_process: false,
+        process: false,
+        crypto: false,
+      };
+    }
+
     // Additional webpack configurations if needed
     return config;
   },
@@ -38,7 +54,7 @@ const nextConfig = {
 
   // Configure server to listen on all network interfaces
   experimental: {
-    serverComponentsExternalPackages: [],
+    serverComponentsExternalPackages: ['firebase-admin'], // Ensure firebase-admin is treated as external in Server Components
     // Enable instrumentation hook for Sentry
     instrumentationHook: true,
   },
