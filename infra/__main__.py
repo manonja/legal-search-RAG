@@ -5,6 +5,7 @@ import pulumi
 from api_cloud_run import create_api_service, get_api_url
 from apis import enable_required_apis
 from buckets import create_chroma_datastore_bucket
+from firestore import create_firestore_database
 from frontend_cloud_run import create_frontend_service, get_frontend_url
 from registry import create_docker_repository, get_repository_exports
 
@@ -35,6 +36,11 @@ frontend_service = create_frontend_service(
 # Get repository exports
 repo_exports = get_repository_exports(docker_repository)
 
+# Create the Firestore database
+firestore_database, maja_law_frontend_webapp, firebase_project, firebase_api, firestore_api = (
+    create_firestore_database(stack)
+)
+
 # Export the repository values
 for key, value in repo_exports.items():
     pulumi.export(key, value)
@@ -61,6 +67,9 @@ pulumi.export(
         "/myimage:latest",
     ),
 )
+
+# Export the Firestore database name
+pulumi.export("firestore_database_name", firestore_database.name)
 
 pulumi.export(
     "gcloud_auth_command",
