@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+
+    # RunPod Settings
+    RUNPOD_API_KEY: Optional[str] = None
+    RUNPOD_MIXTRAL_ENDPOINT_ID: Optional[str] = None
+    USE_RUNPOD: bool = False
+
     # ChromaDB Settings
     COLLECTION_NAME: str = "legal_docs"
 
