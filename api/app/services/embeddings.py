@@ -1,7 +1,7 @@
 """Handle document embeddings and vector store operations.
 
-This module provides functionality to generate embeddings using OpenAI's API
-and store them in a Chroma vector database for efficient retrieval.
+This module provides functionality to generate embeddings using RunPod's serverless API
+with HuggingFace models and store them in a Chroma vector database for efficient retrieval.
 """
 
 import json
@@ -9,25 +9,17 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, List
 
-from chromadb.utils.embedding_functions.openai_embedding_function import (
-    OpenAIEmbeddingFunction,
-)
 from app.core.struct_logger import log
 from tqdm import tqdm
 
 from app.core.config import get_settings
 from app.services.database.chroma import get_chroma_client
+from app.services.database.embedding_function import HuggingFaceEmbeddingFunction
 
 # Get application settings
 settings = get_settings()
 
 BATCH_SIZE = 100
-
-# Initialize OpenAI embedding function
-openai_ef = OpenAIEmbeddingFunction(
-    api_key=settings.OPENAI_API_KEY,
-    model_name=settings.EMBEDDING_MODEL,
-)
 
 
 def process_chunks(
@@ -47,11 +39,11 @@ def process_chunks(
     # Use the shared Chroma client
     chroma_client = get_chroma_client()
 
-    # Create or get collection with OpenAI embedding function
+    # Create or get collection with HuggingFace embedding function
     collection = chroma_client.get_or_create_collection(
         name=settings.COLLECTION_NAME,
         metadata={"description": "Legal document embeddings"},
-        embedding_function=openai_ef,  # type: ignore
+        embedding_function=HuggingFaceEmbeddingFunction(),
     )
 
     # Get doc_id reliably from the required document_metadata
@@ -97,7 +89,7 @@ def process_chunks(
             }
             metadatas.append(chunk_metadata)
 
-        # Add to Chroma (it will handle embeddings through OpenAI)
+        # Add to Chroma (it will handle embeddings through HuggingFace)
         try:
             collection.add(
                 ids=ids,
