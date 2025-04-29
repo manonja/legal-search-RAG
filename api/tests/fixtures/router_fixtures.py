@@ -122,7 +122,10 @@ def mock_process_query_router(mocker):
     mock_query = mocker.AsyncMock(
         return_value={
             "answer": "This is a test response",
-            "sources": ["Source 1", "Source 2"],
+            "sources": [
+                {"filename": "Source 1", "document_id": "uuid-1"},
+                {"filename": "Source 2", "document_id": "uuid-2"},
+            ],
             "confidence": 0.8,
         }
     )
