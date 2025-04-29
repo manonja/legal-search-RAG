@@ -51,13 +51,6 @@ You can verify the integration by:
 3. Making a request to the `/rag-search` endpoint
 4. Confirming the response is from Mixtral-8x7B
 
-## Switching Between Providers
-
-To switch back to OpenAI:
-
-```
-USE_RUNPOD=false
-```
 
 ## Troubleshooting
 

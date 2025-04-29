@@ -38,7 +38,7 @@ embed-docs:
 
 # Start the API server
 serve-api:
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn app.main:app --reload --reload-exclude=.venv/* --host 0.0.0.0 --port 8000 --timeout-keep-alive 30 --timeout-graceful-shutdown 10
 
 # Version management
 get-version:
