@@ -43,11 +43,14 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
-    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
 
     # RunPod Settings
     RUNPOD_API_KEY: Optional[str] = None
     RUNPOD_MIXTRAL_ENDPOINT_ID: Optional[str] = None
+    RUNPOD_MODEL_NAME: str = "runpod-llm-model"
+    RUNPOD_EMBEDDING_ENDPOINT_ID: Optional[str] = None
+    HF_EMBEDDING_MODEL: str = "nlpaueb/legal-bert-base-uncased"
+    EMBEDDING_DIMENSION: int = 768
     USE_RUNPOD: bool = False
 
     # ChromaDB Settings
