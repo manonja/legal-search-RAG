@@ -19,6 +19,10 @@ from app.services.process_docs import extract_docx_text, extract_pdf_text
 # Get settings
 settings = get_settings()
 
+# Mock constants for text extraction
+MOCK_PDF_TEXT = "This is a test PDF document content."
+MOCK_DOCX_TEXT = "This is a test DOCX document content."
+
 
 @pytest.fixture(autouse=True)
 def setup_test_directories():
@@ -117,10 +121,10 @@ def mock_openai_client(mocker):
     """Mock the OpenAI client."""
     mock_client = mocker.MagicMock()
 
-    # We need to patch the OpenAIEmbeddingFunction
+    # We need to patch the embedding function
     mock_embedding_function = mocker.MagicMock()
     mocker.patch(
-        "app.services.embeddings.OpenAIEmbeddingFunction",
+        "app.services.database.embedding_function.HuggingFaceEmbeddingFunction",
         return_value=mock_embedding_function,
     )
 
@@ -130,16 +134,15 @@ def mock_openai_client(mocker):
 @pytest.fixture
 def mock_text_splitter(mocker):
     """Mock the text splitter."""
-    mock = mocker.patch("app.services.documents.upload.create_text_splitter")
-    mock_splitter_instance = mocker.MagicMock()
-    # Simulate splitting into 3 chunks for tests
-    mock_splitter_instance.split_text.return_value = [
+    mock_chunker_fn = mocker.MagicMock()
+    mock_chunker_fn.return_value = [
         "Chunk 1",
         "Chunk 2",
         "Chunk 3",
     ]
-    mock.return_value = mock_splitter_instance
-    return mock_splitter_instance  # Return the instance for assertion checks
+    mock_chunkerify = mocker.patch("app.services.documents.upload.semchunk.chunkerify")
+    mock_chunkerify.return_value = mock_chunker_fn
+    return mock_chunker_fn  # Return the chunker function for assertions
 
 
 @pytest.fixture
@@ -227,16 +230,19 @@ async def test_process_uploaded_document_success(
     assert call_args[0] == mock_file
     assert call_args[1] == MOCK_PDF_TEXT
 
-    mock_text_splitter.split_text.assert_called_once_with(MOCK_PDF_TEXT)
+    # Verify chunker was called with the right parameters
+    mock_text_splitter.assert_called_once_with(
+        MOCK_PDF_TEXT, overlap=settings.SEMCHUNK_OVERLAP_TOKENS
+    )
     mock_process_chunks.assert_called_once()
     # Verify the arguments passed to process_chunks
     args, kwargs = mock_process_chunks.call_args
-    assert "chunk_file" in kwargs
-    # Check that the chunk file path includes the document_id
-    assert expected_metadata.document_id in str(kwargs["chunk_file"])
+    assert "chunks" in kwargs
+    assert "chroma_dir" in kwargs
+    assert "document_metadata" in kwargs
     assert kwargs["chroma_dir"] == settings.CHROMA_DIR
-    # Check that the correct metadata dictionary was passed
     assert kwargs["document_metadata"] == expected_metadata.model_dump()
+    assert len(kwargs["chunks"]) == 3
 
     # Verify result
     assert result["document_id"] == expected_metadata.document_id
@@ -280,12 +286,18 @@ async def test_process_uploaded_document_docx(
     assert call_args[0] == mock_file
     assert call_args[1] == MOCK_DOCX_TEXT
 
-    mock_text_splitter.split_text.assert_called_once_with(MOCK_DOCX_TEXT)
+    # Verify chunker was called with the right parameters
+    mock_text_splitter.assert_called_once_with(
+        MOCK_DOCX_TEXT, overlap=settings.SEMCHUNK_OVERLAP_TOKENS
+    )
     mock_process_chunks.assert_called_once()
     args, kwargs = mock_process_chunks.call_args
-    assert expected_metadata.document_id in str(kwargs["chunk_file"])
+    assert "chunks" in kwargs
+    assert "chroma_dir" in kwargs
+    assert "document_metadata" in kwargs
     assert kwargs["chroma_dir"] == settings.CHROMA_DIR
     assert kwargs["document_metadata"] == expected_metadata.model_dump()
+    assert len(kwargs["chunks"]) == 3
 
     assert result["document_id"] == expected_metadata.document_id
     assert result["original_filename"] == expected_metadata.original_filename
