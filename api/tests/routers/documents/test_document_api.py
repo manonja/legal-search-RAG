@@ -1,5 +1,6 @@
 """Integration tests for the document API endpoints."""
 
+import os
 import pytest
 import shutil
 import uuid
@@ -12,23 +13,29 @@ from fastapi.testclient import TestClient
 from app.main import app  # Import your main FastAPI app
 from app.services.datastore import DatastoreService, DocumentMetadata
 from app.core.config import get_settings, Settings
-from tests.services.test_datastore import test_settings  # Reuse the fixture
+from tests.fixtures.shared_fixtures import (
+    test_settings,
+    test_settings_module,
+)  # Import both fixtures
 
 # Mark all tests in this module as asyncio
 pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture(scope="module")
-def client(test_settings: Settings):
+def client(test_settings_module: Settings):
     """Create a TestClient instance for the API tests."""
-    # Ensure TEST_MODE is True for tests to bypass auth if needed
-    test_settings.TEST_MODE = True
+    # Ensure TESTING environment variable is set for tests to bypass auth
+    os.environ["TESTING"] = "true"
 
     # Override dependency to use test settings
-    app.dependency_overrides[get_settings] = lambda: test_settings
+    app.dependency_overrides[get_settings] = lambda: test_settings_module
     yield TestClient(app)
     # Clean up overrides after tests
     app.dependency_overrides = {}
+    # Clean up environment variable if needed
+    if "TESTING" in os.environ:
+        del os.environ["TESTING"]
 
 
 @pytest.fixture(scope="function")
