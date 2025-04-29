@@ -1,11 +1,25 @@
 #!/bin/bash
 
 # upload_docs.sh - Script to upload documents to the API
+# This script handles uploading documents to the Legal Search RAG API
 
 # Find the .env file in the parent directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="$PROJECT_ROOT/.env"
+
+# Set up logging
+log() {
+  local level="$1"
+  local message="$2"
+  local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+  echo "[$timestamp] [$level] $message"
+}
+
+log_info() { log "INFO" "$1"; }
+log_error() { log "ERROR" "$1" >&2; }
+log_warning() { log "WARNING" "$1" >&2; }
+log_success() { log "SUCCESS" "$1"; }
 
 # Display usage information
 usage() {
@@ -20,10 +34,10 @@ usage() {
 # Source the .env file
 if [ -f "$ENV_FILE" ]; then
     # Load API_TOKEN from .env - only export lines that are properly formatted key=value pairs
-    echo "Found .env file at $ENV_FILE"
+    log_info "Found .env file at $ENV_FILE"
     export $(grep -v '^#' "$ENV_FILE" | grep '=' | sed 's/ *#.*//g' | xargs)
 else
-    echo "Warning: .env file not found at $ENV_FILE"
+    log_warning "Warning: .env file not found at $ENV_FILE"
 fi
 
 # Parse command-line arguments
@@ -33,7 +47,7 @@ while [[ "$#" -gt 0 ]]; do
         -t|--token) token="$2"; shift ;;
         -f|--files) files="$2"; shift ;;
         -h|--help) usage ;;
-        *) echo "Unknown parameter: $1"; usage ;;
+        *) log_error "Unknown parameter: $1"; usage ;;
     esac
     shift
 done
@@ -43,30 +57,30 @@ if [ -z "$token" ]; then
     # Check if API_TOKEN was loaded from .env
     if [ -n "$API_TOKEN" ]; then
         token="$API_TOKEN"
-        echo "Using API token from .env file"
+        log_info "Using API token from .env file"
     else
-        echo "Error: No token provided and API_TOKEN not found in .env file."
+        log_error "Error: No token provided and API_TOKEN not found in .env file."
         usage
     fi
 fi
 
 # Verify required parameters
 if [ -z "$url" ] || [ -z "$files" ]; then
-    echo "Error: URL and files are required parameters."
+    log_error "Error: URL and files are required parameters."
     usage
 fi
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
-    echo "Warning: jq is not installed. Output will not be formatted."
+    log_warning "Warning: jq is not installed. Output will not be formatted."
     JQ_FLAG=""
 else
     JQ_FLAG="| jq"
 fi
 
 # Upload files
-echo "Starting upload to $url"
-echo "Using token: Bearer ${token:0:5}..."
+log_info "Starting upload to $url"
+log_info "Using token: Bearer ${token:0:5}..."
 
 # Detect if we need to use find for file matching (for complex patterns)
 if [[ "$files" == *"{"*"}"* ]]; then
@@ -98,18 +112,21 @@ else
 fi
 
 if [ "$matched_files" -eq 0 ]; then
-    echo "Error: No files matched the pattern '$files'"
+    log_error "Error: No files matched the pattern '$files'"
     exit 1
 fi
 
-echo "Found $matched_files files to upload"
+log_info "Found $matched_files files to upload"
+
+# Initialize counters
+uploaded=0
+failed=0
 
 # Upload each file - either from file list array or direct shell expansion
 if [[ ${#file_list[@]} -gt 0 ]]; then
     # Use the files from the file_list array
-    uploaded=0
     for file in "${file_list[@]}"; do
-        echo "Uploading $file..."
+        log_info "Uploading $file... ($((uploaded+1))/$matched_files)"
 
         # Handle JQ formatting conditionally
         if [ -n "$JQ_FLAG" ]; then
@@ -117,29 +134,38 @@ if [[ ${#file_list[@]} -gt 0 ]]; then
                 -H "Authorization: Bearer $token" \
                 --form "file=@$file" \
                 --silent | jq .)
+            http_code=$?
         else
             response=$(curl -X POST "$url" \
                 -H "Authorization: Bearer $token" \
                 --form "file=@$file" \
                 --silent)
+            http_code=$?
         fi
 
-        echo "$response"
-        echo ""
-        ((uploaded++))
-        echo "Progress: $uploaded/$matched_files"
+        # Check HTTP response and curl exit code
+        if [ $http_code -ne 0 ]; then
+            log_error "Failed to upload $file (HTTP error $http_code)"
+            ((failed++))
+        elif [[ "$response" == *"error"* ]] || [[ "$response" == *"Error"* ]]; then
+            log_error "Failed to upload $file: $response"
+            ((failed++))
+        else
+            log_success "Successfully uploaded $file"
+            echo "$response"
+            ((uploaded++))
+        fi
 
-        # Add delay between uploads
+        # Add delay between uploads to avoid overwhelming the server
         if [ "$uploaded" -lt "$matched_files" ]; then
             sleep 1
         fi
     done
 else
     # Use direct shell expansion
-    uploaded=0
     for file in $files; do
         if [ -f "$file" ]; then
-            echo "Uploading $file..."
+            log_info "Uploading $file... ($((uploaded+1))/$matched_files)"
 
             # Handle JQ formatting conditionally
             if [ -n "$JQ_FLAG" ]; then
@@ -147,26 +173,48 @@ else
                     -H "Authorization: Bearer $token" \
                     --form "file=@$file" \
                     --silent | jq .)
+                http_code=$?
             else
                 response=$(curl -X POST "$url" \
                     -H "Authorization: Bearer $token" \
                     --form "file=@$file" \
                     --silent)
+                http_code=$?
             fi
 
-            echo "$response"
-            echo ""
-            ((uploaded++))
-            echo "Progress: $uploaded/$matched_files"
+            # Check HTTP response and curl exit code
+            if [ $http_code -ne 0 ]; then
+                log_error "Failed to upload $file (HTTP error $http_code)"
+                ((failed++))
+            elif [[ "$response" == *"error"* ]] || [[ "$response" == *"Error"* ]]; then
+                log_error "Failed to upload $file: $response"
+                ((failed++))
+            else
+                log_success "Successfully uploaded $file"
+                echo "$response"
+                ((uploaded++))
+            fi
 
             # Add delay between uploads
             if [ "$uploaded" -lt "$matched_files" ]; then
                 sleep 1
             fi
         else
-            echo "Warning: $file not found or not a regular file. Skipping."
+            log_warning "Warning: $file not found or not a regular file. Skipping."
         fi
     done
 fi
 
-echo "Upload process completed. Uploaded $uploaded/$matched_files files."
+# Print summary
+log_info "Upload process completed."
+log_success "Successfully uploaded: $uploaded/$matched_files files"
+if [ "$failed" -gt 0 ]; then
+    log_error "Failed uploads: $failed/$matched_files files"
+fi
+
+# Return appropriate exit code
+if [ "$failed" -gt 0 ]; then
+    exit 1
+else
+    exit 0
+fi
