@@ -18,6 +18,7 @@ from app.core.struct_logger import log
 # Initialize Sentry as early as possible
 import logging
 import sys
+import signal
 
 import sentry_sdk
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
@@ -44,8 +45,9 @@ if not os.getenv("TESTING") == "true" and settings.SENTRY_DSN:
     integrations = [
         FastApiIntegration(),
         LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
-        AsyncioIntegration(),
         ThreadingIntegration(propagate_hub=True),
+        # Use AsyncioIntegration with lower traces_sample_rate for better shutdown behavior
+        AsyncioIntegration(),
     ]
 
     # Event filtering function
@@ -62,9 +64,9 @@ if not os.getenv("TESTING") == "true" and settings.SENTRY_DSN:
         integrations=integrations,
         enable_tracing=settings.SENTRY_ENABLE_TRACING,
         environment=settings.SENTRY_ENVIRONMENT,
-        traces_sample_rate=0.1
+        traces_sample_rate=0.05  # Reduced from previous values
         if settings.SENTRY_ENVIRONMENT.lower() == "production"
-        else 0.5,
+        else 0.1,  # Reduced from previous values
         profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
         debug=settings.DEBUG,
         send_default_pii=settings.SENTRY_SEND_PII,
@@ -87,6 +89,21 @@ else:
     log.info("Sentry disabled", reason="testing or no DSN configured")
     # Disable Sentry explicitly
     sentry_sdk.init(dsn="")
+
+
+# Setup graceful shutdown handler for Sentry
+def handle_exit(signum, frame):
+    """Handle shutdown signals gracefully."""
+    log.info("Shutting down gracefully...")
+    # Close Sentry client before exiting
+    sentry_sdk.flush()
+    # Exit with success status
+    sys.exit(0)
+
+
+# Register signal handlers
+signal.signal(signal.SIGINT, handle_exit)
+signal.signal(signal.SIGTERM, handle_exit)
 
 # Patch sys.modules to prevent OpenTelemetry imports from failing
 import types  # Add this import
@@ -214,4 +231,12 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")  # Default to localhost instead of 0.0.0.0
 
     log.info("Starting API server", host=host, port=port)
-    uvicorn.run("app.main:app", host=host, port=port, reload=True)
+    uvicorn.run(
+        "app.main:app",
+        host=host,
+        port=port,
+        reload=True,
+        reload_exclude=[".venv/*"],
+        timeout_keep_alive=30,  # Reduce keep-alive timeout
+        timeout_graceful_shutdown=10,  # Add graceful shutdown timeout
+    )
