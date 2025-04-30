@@ -1,5 +1,11 @@
 [project]
-name = "embeddings-service"
+name = "legalemb"
+version = "0.1.0"
+description = "A service for generating embeddings"
+authors = [
+    { name="Manon Jacquin", email="manon.jacquin@gmail.com" }
+]
+readme = "README.md"
 # We need a python version that is compatible with pytorch
 requires-python = ">= 3.11,<3.13"
 dependencies = ["runpod>=1.7.9,<2"]
@@ -23,3 +29,6 @@ sentence-transformers = ">=4.1.0, <4.2.0"
 [tool.pixi.environments]
 cpu = ["cpu"]
 default = ["gpu"]
+
+[tool.pixi.pypi-dependencies]
+legalemb = {path = "."}

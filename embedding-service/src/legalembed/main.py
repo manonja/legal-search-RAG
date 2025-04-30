@@ -1,5 +1,5 @@
 def main():
-    print("Hello from embedding-service!")
+    print("Hello from legalembed!")
 
 
 if __name__ == "__main__":
