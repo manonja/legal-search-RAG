@@ -107,6 +107,53 @@ curl -X POST "http://localhost:8000/api/search/api?collection_name=my_custom_col
   }'
 ```
 
+#### 4. Using RAG Search with Custom Collections
+
+The RAG (Retrieval Augmented Generation) endpoint provides AI-generated answers based on retrieved documents from your custom collection:
+
+```bash
+# RAG search with custom collection
+curl -X POST "http://localhost:8000/api/rag-search?collection_name=my_custom_collection" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_api_token" \
+  -d '{
+    "query": "What are the key provisions of GDPR?",
+    "max_results": 5,
+    "temperature": 0.3,
+    "max_tokens": 1000
+  }'
+```
+
+This endpoint:
+- Retrieves relevant documents from the specified collection
+- Passes these documents to an LLM (using the model specified in your settings)
+- Returns a generated answer with proper citations to the source documents
+- Includes confidence scores based on the relevance of the retrieved documents
+
+Response format:
+```json
+{
+  "answer": "According to the provided documents, the key provisions of GDPR include... (Source Document: gdpr_overview.pdf)",
+  "sources": [
+    {
+      "filename": "gdpr_overview.pdf",
+      "document_id": "12345678-1234-5678-abcd-1234567890ab"
+    },
+    {
+      "filename": "data_protection_guidelines.pdf",
+      "document_id": "87654321-4321-8765-dcba-0987654321fe"
+    }
+  ],
+  "confidence": 0.85
+}
+```
+
+Parameters:
+- `query`: Your question about the documents
+- `max_results`: Number of documents to retrieve (default: 5)
+- `temperature`: Controls randomness in the answer (0.0-1.0, lower = more deterministic)
+- `max_tokens`: Maximum length of the generated answer
+
 ## Deployment Process
 
 To use this in a deployed environment:
