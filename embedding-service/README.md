@@ -20,3 +20,31 @@ To run the embedding service:
 ```
 pixi run python src/embedding-service/main.py
 ```
+
+## Docker
+
+A Makefile is provided to simplify Docker operations for this project.
+
+### Makefile Usage
+
+The following commands are available:
+
+- `make build` - Builds the Docker image as `prae_legalemb:latest`
+- `make push` - Builds and pushes the Docker image
+- `make clean` - Removes the Docker image locally
+- `make help` - Shows all available targets with descriptions
+
+Examples:
+
+```bash
+# Build the Docker image
+make build
+
+# Build and push the Docker image
+make push
+
+# Remove the Docker image
+make clean
+```
+
+To configure a custom Docker registry, edit the `REGISTRY` variable in the Makefile.
