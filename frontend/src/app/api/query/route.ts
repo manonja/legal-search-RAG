@@ -11,13 +11,26 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
+    // Get collection_name from query parameters (if provided)
+    const url = new URL(request.url);
+    const collectionName = url.searchParams.get('collection_name');
+
+    // Parse the request body
     const requestData: QueryRequest = await request.json();
+
+    // Construct the endpoint URL with collection_name if provided
+    let endpoint = '/api/query';
+    if (collectionName) {
+      endpoint += `?collection_name=${encodeURIComponent(collectionName)}`;
+    }
+
     return await proxyApiRequest(request, {
-      endpoint: '/api/query',
+      endpoint,
       method: 'POST',
       body: requestData
     });
   } catch (error) {
+    console.error('Query API error:', error);
     return NextResponse.json(
       { error: 'Failed to query documents' },
       { status: 500 }

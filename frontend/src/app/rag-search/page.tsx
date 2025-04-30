@@ -34,6 +34,7 @@ interface ConversationTurn {
   isLoading: boolean;
   error: string | null;
   feedback?: "up" | "down"; // Placeholder for future feedback state
+  collectionName?: string; // Added collection name to track which collection was used
 }
 
 // Helper function to get initial state from localStorage
@@ -62,6 +63,8 @@ interface QueryInputFormProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
   isSticky?: boolean;
+  collectionName: string;
+  onCollectionChange: (event: ChangeEvent<HTMLSelectElement>) => void;
 }
 
 const QueryInputForm = ({
@@ -70,10 +73,12 @@ const QueryInputForm = ({
   onSubmit,
   isLoading,
   isSticky = false,
+  collectionName,
+  onCollectionChange,
 }: QueryInputFormProps) => (
   <form
     onSubmit={onSubmit} // Use passed onSubmit
-    className={`flex items-center gap-3 ${isSticky ? "p-4 md:p-6 border-t border-gray-200 bg-white sticky bottom-0 z-10" : "mb-8"}`}
+    className={`flex flex-col gap-3 ${isSticky ? "p-4 md:p-6 border-t border-gray-200 bg-white sticky bottom-0 z-10" : "mb-8"}`}
   >
     <div
       className={`flex-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${isSticky ? "" : "max-w-3xl mx-auto"}`}
@@ -107,11 +112,26 @@ const QueryInputForm = ({
         </button>
       </div>
     </div>
+
+    <div className={`flex justify-end text-sm ${isSticky ? "" : "max-w-3xl mx-auto"}`}>
+      <label htmlFor="collection" className="text-gray-600 mr-2">Collection:</label>
+      <select
+        id="collection"
+        value={collectionName}
+        onChange={onCollectionChange}
+        className="border border-gray-200 rounded-md p-1 text-sm"
+        disabled={isLoading}
+      >
+        <option value="demo_docs_collection">Demo Documents</option>
+        {/* Add other collection options as needed */}
+      </select>
+    </div>
   </form>
 );
 
 export default function RagSearchPage() {
   const [query, setQuery] = useState("");
+  const [collectionName, setCollectionName] = useState<string>("demo_docs_collection");
   const [conversationTurns, setConversationTurns] = useState<
     ConversationTurn[]
   >([]);
@@ -122,6 +142,12 @@ export default function RagSearchPage() {
   useEffect(() => {
     setIsClient(true);
     setConversationTurns(getInitialTurns());
+
+    // Load saved collection from localStorage
+    const savedCollection = localStorage.getItem('ragCollectionName');
+    if (savedCollection) {
+      setCollectionName(savedCollection);
+    }
   }, []);
 
   // Save to localStorage whenever turns change on the client
@@ -138,6 +164,13 @@ export default function RagSearchPage() {
       }
     }
   }, [conversationTurns, isClient]);
+
+  // Save collection selection to localStorage
+  useEffect(() => {
+    if (isClient && collectionName) {
+      localStorage.setItem('ragCollectionName', collectionName);
+    }
+  }, [collectionName, isClient]);
 
   // Auto-scroll to bottom when conversation turns update
   useEffect(() => {
@@ -159,6 +192,7 @@ export default function RagSearchPage() {
       assistantResponse: null,
       isLoading: true,
       error: null,
+      collectionName: collectionName, // Store the collection used for this query
     };
 
     setConversationTurns((prevTurns) => [...prevTurns, newTurn]);
@@ -172,8 +206,8 @@ export default function RagSearchPage() {
         max_tokens: 1000,
       };
 
-      // Type assert the response as our local QueryResponse
-      const result = (await api.ragSearch(request)) as unknown as QueryResponse;
+      // Type assert the response as our local QueryResponse and pass collection name
+      const result = (await api.ragSearch(request, collectionName)) as unknown as QueryResponse;
 
       // Now update with the properly typed result
       setConversationTurns((prevTurns) =>
@@ -237,6 +271,11 @@ export default function RagSearchPage() {
     setQuery(event.target.value);
   };
 
+  // Handler for collection change
+  const handleCollectionChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setCollectionName(event.target.value);
+  };
+
   if (!isClient) {
     // Initial server render or loading state before hydration
     return (
@@ -269,6 +308,8 @@ export default function RagSearchPage() {
           onChange={handleQueryChange}
           onSubmit={handleSearch}
           isLoading={false}
+          collectionName={collectionName}
+          onCollectionChange={handleCollectionChange}
         />
       </div>
     );
@@ -318,6 +359,9 @@ export default function RagSearchPage() {
                   >
                     <p className="text-sm font-medium mb-1">You</p>
                     <p>{turn.userQuery}</p>
+                    {turn.collectionName && (
+                      <p className="text-xs opacity-75 mt-1">Collection: {turn.collectionName}</p>
+                    )}
                   </div>
                 </div>
 
@@ -369,148 +413,63 @@ export default function RagSearchPage() {
                                   className="mt-4 pt-3 border-t border-gray-100"
                                   data-testid="sources-section"
                                 >
-                                  <h4 className="text-xs font-semibold text-gray-600 mb-2 uppercase">
-                                    Sources:
-                                  </h4>
-                                  <div className="space-y-2">
-                                    {(() => {
-                                      // Deduplicate sources by filename
-                                      const uniqueSources = [];
-                                      const seenFilenames = new Set();
-
-                                      for (const source of turn.assistantResponse
-                                        .sources) {
-                                        if (!seenFilenames.has(source.filename)) {
-                                          seenFilenames.add(source.filename);
-                                          uniqueSources.push(source);
-                                        }
-                                      }
-
-                                      return uniqueSources.map(
-                                        (source, index) => (
-                                          <div
-                                            key={index}
-                                            className="bg-gray-100 rounded p-2 text-xs flex items-center gap-1.5"
-                                            data-testid="source-item"
+                                  <p className="text-sm font-medium text-gray-500 mb-2">
+                                    Sources
+                                  </p>
+                                  <ul className="space-y-1">
+                                    {turn.assistantResponse.sources.map(
+                                      (source, idx) => (
+                                        <li
+                                          key={idx}
+                                          className="text-xs text-blue-600 hover:underline"
+                                          data-testid={`source-${idx}`}
+                                        >
+                                          <a
+                                            href={`/documents/${encodeURIComponent(
+                                              source.document_id
+                                            )}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
                                           >
-                                            <svg
-                                              xmlns="http://www.w3.org/2000/svg"
-                                              className="h-3.5 w-3.5 text-gray-500 flex-shrink-0"
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                              strokeWidth={2}
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                                              />
-                                            </svg>
-                                            <code className="text-gray-700 break-all">
-                                              {source.filename}
-                                            </code>
-                                          </div>
-                                        )
-                                      );
-                                    })()}
-                                  </div>
+                                            {source.filename ||
+                                              source.document_id ||
+                                              `Source ${idx + 1}`}
+                                          </a>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
                                 </div>
                               )}
-                            {/* Confidence */}
-                            {turn.assistantResponse.confidence !== null && (
-                              <div
-                                className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs"
-                                data-testid="confidence-section"
-                              >
-                                <span className="text-gray-500 font-medium">
-                                  Confidence:
-                                </span>
-                                <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                                  <div
-                                    className={`h-1.5 rounded-full ${turn.assistantResponse.confidence > 0.8 ? "bg-green-500" : turn.assistantResponse.confidence > 0.5 ? "bg-yellow-500" : "bg-red-500"}`}
-                                    style={{
-                                      width: `${turn.assistantResponse.confidence * 100}%`,
-                                    }}
-                                  ></div>
-                                </div>
-                                <span
-                                  className={`font-semibold ${turn.assistantResponse.confidence > 0.8 ? "text-green-600" : turn.assistantResponse.confidence > 0.5 ? "text-yellow-600" : "text-red-600"}`}
-                                  data-testid="confidence-label"
-                                >
-                                  {turn.assistantResponse.confidence > 0.8
-                                    ? "High"
-                                    : turn.assistantResponse.confidence > 0.5
-                                      ? "Medium"
-                                      : "Low"}{" "}
-                                  (
-                                  {(
-                                    turn.assistantResponse.confidence * 100
-                                  ).toFixed(0)}
-                                  %)
-                                </span>
-                              </div>
-                            )}
-                            {/* Feedback */}
+                            {/* Feedback UI placeholder */}
                             <div
-                              className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2"
-                              data-testid="feedback-section"
+                              className="mt-4 flex items-center justify-end gap-2"
+                              data-testid="feedback-buttons"
                             >
-                              <span className="text-xs text-gray-500">
-                                Was this helpful?
-                              </span>
                               <button
                                 onClick={() => handleFeedback(turn.id, "up")}
-                                className={`p-1 rounded hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed ${turn.feedback === "up" ? "bg-green-100" : ""}`}
-                                title="Good answer"
-                                disabled={!!turn.feedback}
-                                data-testid="feedback-up-button"
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  turn.feedback === "up"
+                                    ? "bg-green-100 text-green-800"
+                                    : "text-gray-500 hover:bg-gray-100"
+                                }`}
+                                title="This was helpful"
+                                data-testid="feedback-up"
                               >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className="h-4 w-4 text-green-600"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                                  />
-                                </svg>
+                                👍 Helpful
                               </button>
                               <button
                                 onClick={() => handleFeedback(turn.id, "down")}
-                                className={`p-1 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed ${turn.feedback === "down" ? "bg-red-100" : ""}`}
-                                title="Bad answer"
-                                disabled={!!turn.feedback}
-                                data-testid="feedback-down-button"
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  turn.feedback === "down"
+                                    ? "bg-red-100 text-red-800"
+                                    : "text-gray-500 hover:bg-gray-100"
+                                }`}
+                                title="This was not helpful"
+                                data-testid="feedback-down"
                               >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className="h-4 w-4 text-red-600"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 9V4m-7 10h2m-2 0H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                                  />
-                                </svg>
+                                👎 Not helpful
                               </button>
-                              {turn.feedback && (
-                                <span
-                                  className="text-xs text-gray-500 italic"
-                                  data-testid="feedback-confirmation"
-                                >
-                                  Thanks!
-                                </span>
-                              )}
                             </div>
                           </div>
                         )}
@@ -519,17 +478,18 @@ export default function RagSearchPage() {
                 )}
               </div>
             ))}
-            {/* Empty div at the end to scroll to */}
             <div ref={conversationEndRef} />
           </div>
 
-          {/* Input Area - Use shared component */}
+          {/* Sticky Input Form at Bottom */}
           <QueryInputForm
             isSticky={true}
             value={query}
             onChange={handleQueryChange}
             onSubmit={handleSearch}
             isLoading={isOverallLoading}
+            collectionName={collectionName}
+            onCollectionChange={handleCollectionChange}
           />
         </div>
       </AuthGuard>
