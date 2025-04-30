@@ -1,8 +1,9 @@
-FROM ghcr.io/prefix-dev/pixi:0.41.4 AS build
+FROM ghcr.io/prefix-dev/pixi:0.46.0-focal-cuda-12.6.3 AS build
+# FROM ghcr.io/prefix-dev/pixi:0.41.4 AS build
 
 
-ARG PIXI_ENVIRONMENT=cpu
-
+# ARG PIXI_ENVIRONMENT=cpu
+ARG PIXI_ENVIRONMENT=default
 # copy source code, pixi.toml and pixi.lock to the container
 WORKDIR /app
 COPY src /app/src
@@ -20,9 +21,12 @@ RUN cat /shell-hook >> /app/entrypoint.sh
 # extend the shell-hook script to run the command passed to the container
 RUN echo 'exec "$@"' >> /app/entrypoint.sh
 
-FROM ubuntu:24.04 AS production
+# FROM ubuntu:24.04 AS production
+FROM nvidia/cuda:12.6.3-runtime-ubuntu20.04 AS production
 
-ARG PIXI_ENVIRONMENT=cpu
+# ARG PIXI_ENVIRONMENT=cpu
+ARG PIXI_ENVIRONMENT=default
+
 WORKDIR /app
 # only copy the production environment into prod container
 # please note that the "prefix" (path) needs to stay the same as in the build container
