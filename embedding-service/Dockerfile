@@ -27,6 +27,8 @@ FROM nvidia/cuda:12.6.3-runtime-ubuntu20.04 AS production
 # ARG PIXI_ENVIRONMENT=cpu
 ARG PIXI_ENVIRONMENT=default
 
+ENV HF_EMBEDDING_MODEL=nlpaueb/legal-bert-base-uncased
+
 WORKDIR /app
 # only copy the production environment into prod container
 # please note that the "prefix" (path) needs to stay the same as in the build container
@@ -34,6 +36,15 @@ COPY --from=build /app/.pixi/envs/$PIXI_ENVIRONMENT /app/.pixi/envs/$PIXI_ENVIRO
 COPY --from=build /app/src /app/src
 COPY --from=build --chmod=0755 /app/entrypoint.sh /app/entrypoint.sh
 
+RUN mkdir -p /cache && chmod 777 /cache
+
+# Create a non-root user
+RUN useradd -m -u 1000 runpod
+RUN chown -R runpod:runpod /app /cache
+
+# Switch to non-root user
+USER runpod
+
 ENTRYPOINT [ "/app/entrypoint.sh" ]
 # run your app inside the pixi environment
-CMD [ "python", "-c", "import legalembed; print(legalembed.__VERSION__)"]
+CMD ["python", "-c", "import legalembed; import runpod; runpod.serverless.start({'handler': legalembed.handler.handler})"]
