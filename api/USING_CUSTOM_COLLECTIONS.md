@@ -113,7 +113,7 @@ The RAG (Retrieval Augmented Generation) endpoint provides AI-generated answers 
 
 ```bash
 # RAG search with custom collection
-curl -X POST "http://localhost:8000/api/rag-search?collection_name=my_custom_collection" \
+curl -X POST "http://localhost:8000/api/query/rag?collection_name=my_custom_collection" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_api_token" \
   -d '{

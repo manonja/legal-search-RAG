@@ -265,7 +265,7 @@ class RunPodTester:
 
         self.log(f"Testing RAG search with query: '{query}'", "info")
         response = requests.post(
-            f"{self.api_url}/rag-search",
+            f"{self.api_url}/query/rag",
             headers={**self.headers, "Content-Type": "application/json"},
             json=payload,
             timeout=self.timeout,

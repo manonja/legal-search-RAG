@@ -11,11 +11,11 @@ from pydantic import ValidationError
 from app.services.documents.query import process_query
 from app.models.query import QueryRequest, QueryResponse
 
-# Create router
-router = APIRouter(tags=["query"])
+# Create router with correct prefix - using "query" prefix to match the expected API structure
+router = APIRouter(prefix="/query", tags=["query"])
 
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("", response_model=QueryResponse)
 async def query_documents(
     request: QueryRequest,
     collection_name: Optional[str] = Query(
@@ -55,7 +55,7 @@ async def query_documents(
         ) from e
 
 
-@router.post("/rag-search", response_model=QueryResponse)
+@router.post("/rag", response_model=QueryResponse)
 async def rag_search(
     request: QueryRequest,
     collection_name: Optional[str] = Query(

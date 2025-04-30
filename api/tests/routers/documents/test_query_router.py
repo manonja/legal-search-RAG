@@ -105,7 +105,7 @@ def test_query_documents_error(mock_process_query_router):
 def test_rag_search_success(mock_process_query_router):
     """Test successfully performing RAG search."""
     response = client.post(
-        "/api/rag-search",
+        "/api/query/rag",
         json={
             "query": TEST_QUERY,
             "max_results": 5,
@@ -123,7 +123,7 @@ def test_rag_search_success(mock_process_query_router):
 def test_rag_search_empty_query(mock_process_query_router):
     """Test RAG search with an empty query."""
     response = client.post(
-        "/api/rag-search", json={"query": "", "max_results": 5, "temperature": 0.7}
+        "/api/query/rag", json={"query": "", "max_results": 5, "temperature": 0.7}
     )
     assert response.status_code == 422
 
@@ -145,7 +145,7 @@ def test_rag_search_empty_query(mock_process_query_router):
 def test_rag_search_with_custom_params(mock_process_query_router):
     """Test RAG search with custom parameters."""
     response = client.post(
-        "/api/rag-search",
+        "/api/query/rag",
         json={
             "query": TEST_QUERY,
             "max_results": 10,  # Custom value
@@ -167,7 +167,7 @@ def test_rag_search_error(mock_process_query_router):
     """Test RAG search with an error."""
     mock_process_query_router.side_effect = Exception("RAG search error")
     response = client.post(
-        "/api/rag-search",
+        "/api/query/rag",
         json={
             "query": TEST_QUERY,
             "max_results": 5,

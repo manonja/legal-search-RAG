@@ -142,6 +142,9 @@ The API provides the following endpoints:
   - Supports metadata filtering (e.g., by document_id)
   - Example: `{"query_text": "your search query", "n_results": 10, "metadata_filter": {"document_id": "your-doc-id"}, "min_similarity": 0.7}`
 - `POST /api/query`: RAG-based question answering using documents
+- `POST /api/query/rag`: RAG-based search providing AI-generated answers from retrieved documents
+  - Takes parameters like query, max_results, temperature, and max_tokens
+  - Example: `{"query": "What are the key provisions of GDPR?", "max_results": 5, "temperature": 0.3, "max_tokens": 1000}`
 
 ### API Documentation
 - `GET /api/docs`: Interactive Swagger UI documentation

@@ -48,7 +48,7 @@ You can verify the integration by:
 
 1. Setting `USE_RUNPOD=true` in your `.env` file
 2. Checking the logs - you should see "Using RunPod vLLM client for LLM inference"
-3. Making a request to the `/rag-search` endpoint
+3. Making a request to the `/query/rag` endpoint
 4. Confirming the response is from Mixtral-8x7B
 
 

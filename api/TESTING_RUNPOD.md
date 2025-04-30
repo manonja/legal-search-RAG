@@ -65,9 +65,9 @@ After confirming the client works, you can test the API integration:
    python api.py
    ```
 
-2. Send a test request to the `/rag-search` endpoint:
+2. Send a test request to the `/query/rag` endpoint:
    ```bash
-   curl -X POST "http://localhost:8000/rag-search" \
+   curl -X POST "http://localhost:8000/query/rag" \
      -H "Content-Type: application/json" \
      -d '{"query":"What does the law say about copyright?", "limit":3, "max_tokens":500, "temperature":0.7}'
    ```
