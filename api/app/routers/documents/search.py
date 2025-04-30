@@ -3,8 +3,8 @@
 This module provides endpoints for searching documents using vector similarity.
 """
 
-from typing import List
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, Query
 from pydantic import BaseModel, Field, ValidationError
 import asyncio
 
@@ -18,7 +18,12 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 @router.post("", response_model=List[SearchResult])
 async def search_documents_endpoint(
-    request: SearchQuery, background_tasks: BackgroundTasks, req: Request
+    request: SearchQuery,
+    background_tasks: BackgroundTasks,
+    req: Request,
+    collection_name: Optional[str] = Query(
+        None, description="Optional custom collection name to search in"
+    ),
 ):
     """Search for documents using vector similarity.
 
@@ -26,6 +31,7 @@ async def search_documents_endpoint(
         request: Search query parameters
         background_tasks: FastAPI background tasks
         req: FastAPI request object
+        collection_name: Optional custom collection name to search in
 
     Returns:
         List of document chunks and metadata
@@ -38,6 +44,7 @@ async def search_documents_endpoint(
         "Search request received",
         query=request.query,
         limit=request.limit,
+        collection=collection_name or "default",
         client_host=req.client.host if req.client else "unknown",
     )
 
@@ -48,23 +55,34 @@ async def search_documents_endpoint(
         # Increase timeout for this request
         # This is a workaround for the 307 redirect issue
         # The server is configured with timeout_keep_alive=30 in main.py
-        results = await search_documents(request)
+        results = await search_documents(request, collection_name)
 
         # Log success for debugging
         log.info(
             "Search completed successfully",
             query=request.query,
             num_results=len(results),
+            collection=collection_name or "default",
         )
 
         return results
     except HTTPException:
         raise
     except ValidationError as e:
-        log.error("Validation error during search", error=str(e), query=request.query)
+        log.error(
+            "Validation error during search",
+            error=str(e),
+            query=request.query,
+            collection=collection_name,
+        )
         raise HTTPException(status_code=400, detail=str(e)) from e
     except asyncio.TimeoutError as e:
-        log.error("Search request timed out", error=str(e), query=request.query)
+        log.error(
+            "Search request timed out",
+            error=str(e),
+            query=request.query,
+            collection=collection_name,
+        )
         raise HTTPException(
             status_code=504,
             detail="Search request timed out. The RunPod inference is taking too long.",
@@ -74,6 +92,7 @@ async def search_documents_endpoint(
             "Error during search request",
             error=str(e),
             query=request.query,
+            collection=collection_name,
             exc_info=True,
         )
         raise HTTPException(
@@ -82,13 +101,19 @@ async def search_documents_endpoint(
 
 
 @router.post("/api", response_model=QueryResponse)
-async def legacy_search_endpoint(request: QueryRequest) -> QueryResponse:
+async def legacy_search_endpoint(
+    request: QueryRequest,
+    collection_name: Optional[str] = Query(
+        None, description="Optional custom collection name to search in"
+    ),
+) -> QueryResponse:
     """Search for relevant document chunks using the old API format.
 
     This endpoint is preserved for backward compatibility.
 
     Args:
         request: Search parameters including query text and filters
+        collection_name: Optional custom collection name to search in
 
     Returns:
         QueryResponse containing matched chunks and their metadata
@@ -101,12 +126,20 @@ async def legacy_search_endpoint(request: QueryRequest) -> QueryResponse:
             raise HTTPException(status_code=400, detail="Missing request body")
         if not request.query_text.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
-        return await legacy_search_documents(request)
+        return await legacy_search_documents(request, collection_name)
     except HTTPException:
         raise
     except ValidationError as e:
+        log.error(
+            "Validation error during legacy search",
+            error=str(e),
+            collection=collection_name,
+        )
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
+        log.error(
+            "Error during legacy search", error=str(e), collection=collection_name
+        )
         raise HTTPException(
             status_code=500, detail=f"Failed to search documents: {str(e)}"
         ) from e

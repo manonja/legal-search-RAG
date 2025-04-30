@@ -4,9 +4,9 @@ This module provides endpoints for uploading and processing legal documents.
 """
 
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, Query
 
 from app.core.config import get_settings
 from app.core.struct_logger import log
@@ -18,7 +18,12 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 @router.post("/upload")
-async def upload_document(file: UploadFile) -> Dict[str, Any]:
+async def upload_document(
+    file: UploadFile,
+    collection_name: Optional[str] = Query(
+        None, description="Optional custom collection name to store embeddings in"
+    ),
+) -> Dict[str, Any]:
     """Upload and process a document.
 
     This endpoint:
@@ -31,6 +36,7 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
 
     Args:
         file: The document file to upload
+        collection_name: Optional custom collection name to store embeddings in
 
     Returns:
         Dict containing upload status and document ID
@@ -72,7 +78,7 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
         settings = get_settings()
 
         # Process the uploaded document
-        result = await process_uploaded_document(file, settings)
+        result = await process_uploaded_document(file, settings, collection_name)
 
         # Extract values safely, supporting both dict and Pydantic model access patterns
         document_id = (
@@ -90,6 +96,11 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
             if isinstance(result, dict)
             else getattr(result, "num_chunks", 0)
         )
+        collection = (
+            result.get("collection")
+            if isinstance(result, dict)
+            else getattr(result, "collection", None)
+        )
 
         if not document_id:
             raise HTTPException(
@@ -102,6 +113,7 @@ async def upload_document(file: UploadFile) -> Dict[str, Any]:
             "document_id": document_id,  # UUID-based ID
             "original_filename": original_filename,  # Return the original filename for reference
             "chunks": num_chunks,
+            "collection": collection,
             "status": "success",
         }
 

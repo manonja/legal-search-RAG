@@ -13,7 +13,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import semchunk
 import tiktoken
@@ -37,13 +37,14 @@ except ImportError:
 
 
 async def process_uploaded_document(
-    file: UploadFile, settings: Settings
+    file: UploadFile, settings: Settings, collection_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """Process an uploaded document through the RAG pipeline.
 
     Args:
         file: The uploaded file
         settings: Application settings
+        collection_name: Optional name of collection to use
 
     Returns:
         Dict containing processing results
@@ -142,11 +143,21 @@ async def process_uploaded_document(
             raise ValueError("Failed to split document text into chunks.") from e
         # --- End Semchunk Integration ---
 
+        # Log the target collection
+        target_collection = collection_name or settings.COLLECTION_NAME
+        logger.info(
+            "Processing document chunks",
+            document_id=document_metadata.document_id,
+            collection=target_collection,
+            num_chunks=len(chunks),
+        )
+
         # Process chunks and store embeddings
         process_chunks(
             chunks=chunks,
             chroma_dir=settings.CHROMA_DIR,
             document_metadata=document_metadata.model_dump(),
+            collection_name=collection_name,
         )
 
         # Return processing results including document ID and chunk count
@@ -155,4 +166,5 @@ async def process_uploaded_document(
             "document_id": document_metadata.document_id,
             "original_filename": document_metadata.original_filename,
             "num_chunks": len(chunks),
+            "collection": target_collection,
         }
