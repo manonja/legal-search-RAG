@@ -29,6 +29,11 @@ build:
 	@echo "Building Docker image $(FULL_IMAGE_NAME)..."
 	docker build -t $(FULL_IMAGE_NAME) -f Dockerfile .
 
+.PHONY: build-nocache
+build-nocache:
+	@echo "Building Docker image $(FULL_IMAGE_NAME)..."
+	docker build --no-cache -t $(FULL_IMAGE_NAME) -f Dockerfile .
+
 # Push the Docker image to registry
 .PHONY: push
 push: build
