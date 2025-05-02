@@ -49,6 +49,7 @@ class Settings(BaseSettings):
 
     # RunPod Settings
     RUNPOD_API_KEY: Optional[str] = None
+    RUNPOD_LLM_URL: str = "https://api.runpod.ai/v2/nlwx0t95z8sw2f"
     RUNPOD_MIXTRAL_ENDPOINT_ID: Optional[str] = None
     RUNPOD_MODEL_NAME: str = "runpod-llm-model"
     RUNPOD_EMBEDDING_ENDPOINT_ID: Optional[str] = None
