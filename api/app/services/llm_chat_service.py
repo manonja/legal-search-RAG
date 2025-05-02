@@ -36,6 +36,23 @@ class LlmChatService:
         """
 
         # Additional initialization could include setting up the client for specific LLM providers
+        log.info("LlmChatService initialization: Checking LLM Health")
+        health_response = requests.get(
+            f"{get_settings().RUNPOD_LLM_URL}/health",
+            headers=self._runpod_headers(),
+            timeout=REQUEST_TIMEOUT,
+        )
+        if health_response.status_code != 200:
+            raise HTTPException(
+                status_code=health_response.status_code, detail=health_response.text
+            )
+        log.info("LLM Chat Service initialized")
+
+    def _runpod_headers(self) -> Dict[str, str]:
+        return {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {get_settings().RUNPOD_API_KEY}",
+        }
 
     def prompt(
         self,
@@ -74,10 +91,7 @@ class LlmChatService:
             temperature=temperature,
         )
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {get_settings().RUNPOD_API_KEY}",
-        }
+        headers = self._runpod_headers()
 
         payload = {
             "input": {
@@ -100,12 +114,13 @@ User: {user_prompt}
                     "max_tokens": max_tokens,  # Explicit token limit
                     "stop_token_ids": [2],  # EOS token ID
                     "ignore_eos": False,  # Allow natural termination
+                    "temperature": temperature,
                 },
             }
         }
 
         response = requests.post(
-            "https://api.runpod.ai/v2/nlwx0t95z8sw2f/runsync",
+            f"{get_settings().RUNPOD_LLM_URL}/run",
             headers=headers,
             json=payload,
             timeout=REQUEST_TIMEOUT,
