@@ -13,8 +13,6 @@ os.environ["CHROMADB_TELEMETRY_ENABLED"] = "FALSE"
 os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
 
 # Import structured logger early
-from app.core.struct_logger import log
-
 # Initialize Sentry as early as possible
 import logging
 import sys
@@ -24,6 +22,8 @@ from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.threading import ThreadingIntegration
+
+from app.core.struct_logger import log
 
 # Basic logging is now configured via struct_logger.py
 # Legacy logger for compatibility
@@ -124,6 +124,7 @@ from app.routers.documents.upload import router as documents_router
 # Import the dependency from the health router
 from app.routers.health import auth_dependency
 from app.routers.health import router as health_router
+from app.routers.test_llm_chat_service import router as test_llm_chat_router
 from app.services.startup import initialize_application
 
 
@@ -207,6 +208,7 @@ app.include_router(
 app.include_router(
     document_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
 )
+app.include_router(test_llm_chat_router, prefix="/api")
 
 
 if __name__ == "__main__":
