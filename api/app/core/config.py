@@ -5,6 +5,7 @@ This module provides settings and configuration management for the application.
 
 import os
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
 
@@ -128,14 +129,11 @@ class Settings(BaseSettings):
 _settings: Optional[Settings] = None
 
 
+@lru_cache
 def get_settings() -> Settings:
     """Get application settings.
 
     Returns:
         Settings instance with current configuration
     """
-    global _settings
-    if _settings is None:
-        _settings = Settings()
-
-    return _settings
+    return Settings()
