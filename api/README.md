@@ -143,6 +143,19 @@ The API provides the following endpoints:
   - Example: `{"query_text": "your search query", "n_results": 10, "metadata_filter": {"document_id": "your-doc-id"}, "min_similarity": 0.7}`
 - `POST /api/query`: RAG-based question answering using documents
 
+### LLM Chat Testing
+- `POST /test/chat`: Test the LLM chat service directly
+  ```bash
+  curl -X POST http://localhost:8000/api/test/chat \
+    -H "Content-Type: application/json" \
+    -d '{
+      "system_prompt": "You are a helpful AI assistant.",
+      "user_prompt": "What is the capital of France?",
+      "max_tokens": 150,
+      "temperature": 0.5
+    }'
+  ```
+
 ### API Documentation
 - `GET /api/docs`: Interactive Swagger UI documentation
 - `GET /api/redoc`: ReDoc API documentation
