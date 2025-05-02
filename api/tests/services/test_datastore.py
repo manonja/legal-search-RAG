@@ -1,14 +1,15 @@
 """Tests for the datastore service."""
 
-import os
-import pytest
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-import uuid
+import asyncio
 import json
+import os
 import shutil
+import tempfile
+import uuid
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi import UploadFile
 
 from app.services.datastore import (
@@ -18,21 +19,7 @@ from app.services.datastore import (
 )
 from app.core.config import Settings, get_settings
 from tests.constants import MOCK_PDF_TEXT, MOCK_DOCX_TEXT
-
-
-@pytest.fixture
-def test_settings():
-    """Create test settings with a temporary data directory."""
-    settings = get_settings()
-    temp_dir = tempfile.mkdtemp(prefix="test_datastore_")
-    settings.DATA_DIR = Path(temp_dir)
-
-    # Yield settings for use in tests
-    yield settings
-
-    # Clean up temp directory after tests
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
+from tests.fixtures.shared_fixtures import test_settings  # Import the shared fixture
 
 
 @pytest.fixture

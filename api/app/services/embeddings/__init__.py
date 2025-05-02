@@ -1,7 +1,5 @@
-"""Handle document embeddings and vector store operations.
-
-This module provides functionality to generate embeddings using RunPod's serverless API
-with HuggingFace models and store them in a Chroma vector database for efficient retrieval.
+"""
+Embeddings service package for the legal-search-RAG application.
 """
 
 import json

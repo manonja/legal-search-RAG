@@ -9,10 +9,8 @@ from typing import Optional
 import chromadb
 from chromadb.config import Settings
 from chromadb.errors import InvalidCollectionException
-from chromadb.utils.embedding_functions.openai_embedding_function import (
-    OpenAIEmbeddingFunction,
-)
 from app.core.struct_logger import log
+from app.services.database.embedding_function import HuggingFaceEmbeddingFunction
 
 from app.core.config import get_settings
 
@@ -83,14 +81,11 @@ async def initialize_chroma_collection() -> chromadb.Collection:
 
     settings = get_settings()
 
-    # Initialize OpenAI embedding function
-    openai_ef = OpenAIEmbeddingFunction(
-        api_key=settings.OPENAI_API_KEY,
-        model_name=settings.EMBEDDING_MODEL,
-    )
+    # Initialize HuggingFace embedding function through RunPod
+    hf_ef = HuggingFaceEmbeddingFunction()
 
     # Initialize Chroma client and collection with a retry mechanism
-    log.info("Initializing Chroma client and collection")
+    log.info("Initializing Chroma client and collection with HuggingFace embeddings")
     attempt = 0
 
     while attempt < MAX_CHROMA_CONNECTION_ATTEMPTS:
@@ -119,7 +114,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
         if _client is None:
             raise ValueError("Chroma client not initialized")
         _collection = _client.get_collection(
-            settings.COLLECTION_NAME, embedding_function=openai_ef
+            settings.COLLECTION_NAME, embedding_function=hf_ef
         )
         log.info(
             "Collection exists",
@@ -133,7 +128,7 @@ async def initialize_chroma_collection() -> chromadb.Collection:
         log.info("Creating new collection", name=settings.COLLECTION_NAME)
         _collection = _client.create_collection(
             name=settings.COLLECTION_NAME,
-            embedding_function=openai_ef,
+            embedding_function=hf_ef,
             metadata={"hnsw:space": "cosine"},
         )
 
