@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from app.core.struct_logger import log
 
 # Required environment variables
@@ -43,6 +44,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
 
     # RunPod Settings
     RUNPOD_API_KEY: Optional[str] = None
