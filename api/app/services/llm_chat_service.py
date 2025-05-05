@@ -9,7 +9,7 @@ from app.core.struct_logger import log
 
 settings = get_settings()
 
-REQUEST_TIMEOUT = 20
+REQUEST_TIMEOUT = 60
 
 
 class ChatPromptResponse(BaseModel):
