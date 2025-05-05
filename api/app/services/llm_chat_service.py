@@ -120,7 +120,7 @@ User: {user_prompt}
         }
 
         response = requests.post(
-            f"{get_settings().RUNPOD_LLM_URL}/run",
+            f"{get_settings().RUNPOD_LLM_URL}/runsync",
             headers=headers,
             json=payload,
             timeout=REQUEST_TIMEOUT,
@@ -132,9 +132,22 @@ User: {user_prompt}
                 detail=response.text,
             )
 
-        our_response = ChatPromptResponse(
-            content=response.json()["output"]["text"], metadata=response.json()
-        )
+        if response.json()["status"] == "IN_QUEUE":
+            raise RuntimeError("LLM cound't process our response")
 
-        # TODO: Fix what we respond with
-        return our_response
+        log.info("Response received from LLM", response=response.json())
+
+        if (
+            "output" in response.json()
+            and len(response.json()["output"]) > 0
+            and "choices" in response.json()["output"][0]
+            and len(response.json()["output"][0]["choices"]) > 0
+            and "tokens" in response.json()["output"][0]["choices"][0]
+            and len(response.json()["output"][0]["choices"][0]["tokens"]) > 0
+        ):
+            return ChatPromptResponse(
+                content=response.json()["output"][0]["choices"][0]["tokens"][0],
+                metadata=response.json(),
+            )
+
+        raise RuntimeError("LLM returned an unexpected response")
