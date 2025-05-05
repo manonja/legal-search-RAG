@@ -3,7 +3,7 @@
 This module provides functionality for searching documents using vector similarity.
 """
 
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Optional, cast
 
 import chromadb
 from chromadb.api.models.Collection import Collection
@@ -15,25 +15,33 @@ from app.models.search import QueryRequest, QueryResponse, SearchQuery, SearchRe
 from app.services.database.chroma import get_collection
 
 
-async def search_documents(request: SearchQuery) -> List[SearchResult]:
+async def search_documents(
+    request: SearchQuery, collection_name: Optional[str] = None
+) -> List[SearchResult]:
     """Search for documents using vector similarity.
 
     Args:
         request: Search query parameters
+        collection_name: Optional name of collection to search in
 
     Returns:
         List of document chunks and metadata
     """
     try:
         # Log the request
-        log.info("Search query", query=request.query)
+        log.info(
+            "Search query", query=request.query, collection=collection_name or "default"
+        )
 
         # Get collection
-        collection = await get_collection()
+        collection = await get_collection(collection_name)
 
         # Check if collection exists
         if collection is None:
-            log.error("Failed to get Chroma collection - collection is None")
+            log.error(
+                "Failed to get Chroma collection - collection is None",
+                collection_name=collection_name,
+            )
             raise ValueError("Document collection not available")
 
         # Query the collection
@@ -68,15 +76,18 @@ async def search_documents(request: SearchQuery) -> List[SearchResult]:
         return search_results
 
     except Exception as e:
-        log.error("Error during search", error=str(e))
+        log.error("Error during search", error=str(e), collection=collection_name)
         raise
 
 
-async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
+async def legacy_search_documents(
+    request: QueryRequest, collection_name: Optional[str] = None
+) -> QueryResponse:
     """Search for relevant document chunks using the old API format.
 
     Args:
         request: Search parameters including query text and filters
+        collection_name: Optional name of collection to search in
 
     Returns:
         QueryResponse containing matched chunks and their metadata
@@ -85,14 +96,21 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         if not request:
             raise ValueError("Missing request body")
 
-        log.info("Processing search request", query=request.query_text)
+        log.info(
+            "Processing search request",
+            query=request.query_text,
+            collection=collection_name or "default",
+        )
 
         # Get collection
-        collection = await get_collection()
+        collection = await get_collection(collection_name)
 
         # Check if collection exists
         if collection is None:
-            log.error("Failed to get Chroma collection - collection is None")
+            log.error(
+                "Failed to get Chroma collection - collection is None",
+                collection_name=collection_name,
+            )
             raise ValueError("Document collection not available")
 
         # Query Chroma
@@ -108,7 +126,7 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         )
 
         if not results or not results.get("documents"):
-            log.warning("No results found for query")
+            log.warning("No results found for query", collection=collection_name)
             return QueryResponse(results=[], total_found=0)
 
         if (
@@ -123,7 +141,7 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         distances = results["distances"][0]
 
         if not documents:
-            log.warning("No documents found in results")
+            log.warning("No documents found in results", collection=collection_name)
             return QueryResponse(results=[], total_found=0)
 
         # Process results
@@ -150,6 +168,7 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
             "Search results found",
             count=len(formatted_results),
             threshold="above similarity threshold",
+            collection=collection_name,
         )
         return QueryResponse(
             results=formatted_results,
@@ -157,5 +176,5 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
         )
 
     except Exception as e:
-        log.error("Search failed", error=str(e))
+        log.error("Search failed", error=str(e), collection=collection_name)
         raise

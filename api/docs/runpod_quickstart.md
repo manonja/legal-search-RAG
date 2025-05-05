@@ -68,33 +68,6 @@ CHROMA_DIR=./data/chroma
 LOG_LEVEL=INFO
 ```
 
-## Testing the Implementation
-
-We've provided several test scripts to verify the implementation:
-
-### 1. Basic Integration Test
-
-```bash
-python test_privacy_integration.py
-```
-
-This script tests both embedding generation and LLM inference to ensure everything is working correctly.
-
-### 2. Network Isolation Test
-
-```bash
-python test_network_isolation.py
-```
-
-This script monitors network traffic to ensure no calls are made to external APIs like OpenAI.
-
-### 3. Performance Benchmark
-
-```bash
-python test_performance.py
-```
-
-This script benchmarks the performance of the RunPod implementation, measuring latency, throughput, and cost characteristics.
 
 ## Component Architecture
 

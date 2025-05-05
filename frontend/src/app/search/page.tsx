@@ -4,12 +4,13 @@ import SearchResultCard from "@/components/SearchResultCard";
 import { api, LegacyQueryRequest, LegacySearchResult, SearchResult } from "@/lib/api";
 import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthGuard from "@/components/auth/AuthGuard";
 
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [collectionName, setCollectionName] = useState<string>("demo_docs_collection");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [totalFound, setTotalFound] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,7 @@ export default function SearchPage() {
         min_similarity: 0.7,
       };
 
-      const response = await api.legacySearchDocuments(request);
+      const response = await api.legacySearchDocuments(request, collectionName);
 
       if (!response || !response.results) {
         throw new Error("Invalid response format from API");
@@ -76,6 +77,7 @@ export default function SearchPage() {
         },
         extra: {
           query,
+          collectionName,
           message: error.message || "No error message",
           stack: error.stack || "No stack trace"
         }
@@ -95,6 +97,19 @@ export default function SearchPage() {
     }
   };
 
+  useEffect(() => {
+    const savedCollection = localStorage.getItem('searchCollectionName');
+    if (savedCollection) {
+      setCollectionName(savedCollection);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (collectionName) {
+      localStorage.setItem('searchCollectionName', collectionName);
+    }
+  }, [collectionName]);
+
   return (
     <AuthGuard>
       <div className="container mx-auto px-4 max-w-4xl pt-16">
@@ -110,7 +125,7 @@ export default function SearchPage() {
 
         <form onSubmit={handleSearch} className="mb-8">
           <div className="max-w-3xl mx-auto">
-            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow mb-3">
               <div className="flex items-center p-3">
                 <span className="mr-3 text-gray-400">🔍</span>
                 <input
@@ -134,6 +149,19 @@ export default function SearchPage() {
                 </button>
               </div>
             </div>
+
+            <div className="flex items-center justify-end mb-2">
+              <label htmlFor="collection" className="text-sm text-gray-600 mr-2">Collection:</label>
+              <select
+                id="collection"
+                value={collectionName}
+                onChange={(e) => setCollectionName(e.target.value)}
+                className="border border-gray-200 rounded-md p-1 text-sm"
+                disabled={isLoading}
+              >
+                <option value="demo_docs_collection">Demo Documents</option>
+              </select>
+            </div>
           </div>
         </form>
 
@@ -147,7 +175,7 @@ export default function SearchPage() {
           <section className="border border-gray-200 rounded-xl overflow-hidden my-10 shadow-sm">
             <div className="p-5">
               <div className="flex justify-between items-center mb-5 text-sm text-gray-500">
-                <span>Found {totalFound} results</span>
+                <span>Found {totalFound} results in <strong>{collectionName}</strong></span>
                 <div className="flex items-center gap-1">
                   <span>Sort by: Relevance</span>
                   <span className="text-gray-400">▼</span>
@@ -171,7 +199,7 @@ export default function SearchPage() {
           hasSearched && (
             <div className="text-center py-10">
               <p className="text-gray-600 text-lg">
-                No results found. Try a different search term.
+                No results found. Try a different search term or collection.
               </p>
             </div>
           )
@@ -180,7 +208,7 @@ export default function SearchPage() {
         {isLoading && (
           <div className="text-center py-10">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-800"></div>
-            <p className="mt-4 text-gray-600">Searching documents...</p>
+            <p className="mt-4 text-gray-600">Searching documents in <strong>{collectionName}</strong>...</p>
           </div>
         )}
       </div>

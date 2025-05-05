@@ -24,6 +24,7 @@ def process_chunks(
     chunks: List[str],
     chroma_dir: Path,
     document_metadata: Dict[str, Any],
+    collection_name: Optional[str] = None,
 ) -> None:
     """Process document chunks and store their embeddings in Chroma.
 
@@ -32,14 +33,18 @@ def process_chunks(
         chroma_dir: Directory containing ChromaDB database (may become redundant)
         document_metadata: Required metadata dictionary for the document,
                            must contain 'document_id' and 'original_filename'.
+        collection_name: Optional name of collection to use. Defaults to settings.COLLECTION_NAME
     """
 
     # Use the shared Chroma client
     chroma_client = get_chroma_client()
 
+    # Use provided collection_name or default to settings
+    target_collection_name = collection_name or settings.COLLECTION_NAME
+
     # Create or get collection with HuggingFace embedding function
     collection = chroma_client.get_or_create_collection(
-        name=settings.COLLECTION_NAME,
+        name=target_collection_name,
         metadata={"description": "Legal document embeddings"},
         embedding_function=HuggingFaceEmbeddingFunction(),
     )
@@ -98,12 +103,14 @@ def process_chunks(
                 "Added batch of chunks to ChromaDB",
                 batch_size=len(batch),
                 document_id=doc_id,
+                collection=target_collection_name,
             )
         except Exception as e:
             log.error(
                 "Failed to add chunk batch to ChromaDB",
                 document_id=doc_id,
                 batch_start_index=i,
+                collection=target_collection_name,
                 error=str(e),
             )
             # Depending on requirements, might want to raise or continue to next batch
@@ -113,5 +120,5 @@ def process_chunks(
         "Chunk processing complete for document",
         document_id=doc_id,
         total_chunks=len(chunks),
-        chroma_collection=settings.COLLECTION_NAME,
+        chroma_collection=target_collection_name,
     )

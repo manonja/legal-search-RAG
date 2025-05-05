@@ -1,0 +1,34 @@
+[project]
+name = "legalemb"
+version = "0.1.0"
+description = "A service for generating embeddings"
+authors = [
+    { name="Manon Jacquin", email="manon.jacquin@gmail.com" }
+]
+readme = "README.md"
+# We need a python version that is compatible with pytorch
+requires-python = ">= 3.11,<3.13"
+dependencies = ["runpod>=1.7.9,<2"]
+
+[tool.pixi.project]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.gpu.system-requirements]
+cuda = "12.6"
+
+[tool.pixi.feature.gpu.dependencies]
+cuda-version = "12.6.*"
+pytorch-gpu = ">=2.6.0, <2.7.0"
+sentence-transformers = ">=4.1.0, <4.2.0"
+
+[tool.pixi.feature.cpu.dependencies]
+pytorch-cpu = ">=2.6.0, <2.7.0"
+sentence-transformers = ">=4.1.0, <4.2.0"
+
+[tool.pixi.environments]
+cpu = ["cpu"]
+default = ["gpu"]
+
+[tool.pixi.pypi-dependencies]
+legalemb = {path = "."}

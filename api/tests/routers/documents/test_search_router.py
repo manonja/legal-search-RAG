@@ -142,7 +142,7 @@ def test_query_documents_error(mock_process_query_router):
 def test_rag_search_success(mock_process_query_router):
     """Test successfully performing RAG search."""
     response = client.post(
-        "/api/rag-search",
+        "/api/query/rag",
         json={
             "query": TEST_QUERY,
             "max_results": 5,
