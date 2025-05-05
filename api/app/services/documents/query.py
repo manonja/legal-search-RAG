@@ -1,25 +1,20 @@
 """Query service for document search and retrieval.
 
 This module provides functionality to query documents using vector similarity search
-and generate responses using OpenAI's API.
+and generate responses using the LLM chat service.
 """
 
 from typing import Optional, List
 import os
 
-import openai
 from app.core.struct_logger import log
 
 from app.core.config import get_settings
 from app.models.query import QueryResponse, SourceInfo
 from app.models.search import SearchQuery
 from app.services.documents.search import search_documents
-
-
-def get_openai_client():
-    """Create and return an OpenAI client with the API key from settings."""
-    settings = get_settings()
-    return openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+from app.services.llm_chat_service import LlmChatService
+from app.models.llm_chat_service import ChatPromptRequest
 
 
 async def process_query(
@@ -110,54 +105,50 @@ async def process_query(
                 )
                 seen_document_ids.add(doc_id)
 
-        # Generate prompt for OpenAI - Enhanced for clarity and citation
-        system_message = "You are a highly proficient legal assistant AI specializing in analyzing provided legal document excerpts and providing accurate, cited answers."
-
         # Define the main prompt using a standard f-string for clarity
         prompt = f"""
-        You are a highly proficient legal assistant AI. Your task is to answer the user's question based *solely* on the provided document excerpts.
+        You are a highly proficient legal assistant specializing in analysing legal documents and providing answers based on the content of the documents.
 
-        Follow these instructions precisely:
-        1.  Analyze the user's QUESTION carefully.
-        2.  Review the DOCUMENT EXCERPTS provided below. Each excerpt is clearly marked with its 'Source Document' and potentially a 'Page'.
-        3.  Synthesize a comprehensive and accurate answer to the QUESTION using *only* information found in the excerpts.
-        4.  Structure your answer clearly. Use headings, lists, or paragraphs as appropriate for readability.
-        5.  **Crucially, whenever you state a fact or principle derived from an excerpt, you MUST cite the source. Use the format (Source Document: [Document Name], Page: [Page Number]) if the page number is provided for that excerpt. If the page number is NOT provided for an excerpt, use the format (Source Document: [Document Name]).** Do not invent citations or cite generally. Use the exact 'Source Document' and 'Page' values provided.
-        6.  If the excerpts do not contain the information needed to answer the question, state clearly: "Based on the provided documents, I cannot answer this question." Do not use external knowledge.
-        7.  Keep the tone professional and objective.
+        ### Instructions ###
+        Answer the user's question based ONLY on the provided document excerpts.
+        1.  Analyze the QUESTION carefully.
+        2.  Use ONLY information from the provided excerpts
+        3.  Structure answers with headings or lists for readability
+        4.  **Crucially, whenever you state a fact or principle derived from an excerpt, you MUST cite the source. Use the format (Source Document: [Document Name]).
+        5.  If the excerpts do not contain the information needed to answer the question, state clearly: "Based on the provided documents, I cannot answer this question."
+        6.  Maintain a professional, objective tone.
 
-        DOCUMENT EXCERPTS:
-        ---
+        ### Document Excerpts ###
+        <<<
         {context}
-        ---
+        >>>
 
-        QUESTION: {query}
-
-        Answer:
+        ### Question ###
+        {query}
         """
 
-        # Get OpenAI client
-        client = get_openai_client()
+        # Initialize LlmChatService
+        llm_service = LlmChatService()
 
-        # Call OpenAI API for response generation
-        log.info("Generating response with OpenAI", model=settings.OPENAI_MODEL)
-        response = client.chat.completions.create(
-            model=settings.OPENAI_MODEL,  # Ensure this uses a capable model like gpt-4-turbo
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_message,  # Use updated system message
-                },
-                {"role": "user", "content": prompt},  # Use updated prompt
-            ],
-            # Consider lower temp (e.g., 0.2) for more factual/cited answers
-            temperature=temperature,
+        # Prepare request
+        request = ChatPromptRequest(
+            system_prompt="You are a highly proficient legal assistant specializing in analysing legal documents.",
+            user_prompt=prompt,
             max_tokens=max_tokens,
+            temperature=temperature,
         )
 
-        # Extract answer, handling potential None
-        raw_answer = response.choices[0].message.content
-        answer = raw_answer.strip() if raw_answer else ""
+        # Get response using LlmChatService
+        log.info("Generating response with LlmChatService")
+        service_response = llm_service.prompt(
+            system_prompt=request.system_prompt,
+            user_prompt=request.user_prompt,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+        )
+
+        # Extract answer
+        answer = service_response.content.strip() if service_response.content else ""
 
         # Calculate confidence based on similarity scores
         # Higher similarity (lower distance) = higher confidence
