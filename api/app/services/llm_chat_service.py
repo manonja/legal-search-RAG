@@ -95,21 +95,8 @@ class LlmChatService:
 
         payload = {
             "input": {
-                "prompt": f"""
-<s> [INST]
-{system_prompt}
-[/INST]
-User: {user_prompt}
-
-<s>
-
-{user_prompt}
-
-[/INST]
-
-<s>
-
-""",
+                "prompt": f"""<s>[INST] {system_prompt} [/INST]
+{user_prompt}</s>""",
                 "sampling_params": {
                     "max_tokens": max_tokens,  # Explicit token limit
                     "stop_token_ids": [2],  # EOS token ID
@@ -145,9 +132,31 @@ User: {user_prompt}
             and "tokens" in response.json()["output"][0]["choices"][0]
             and len(response.json()["output"][0]["choices"][0]["tokens"]) > 0
         ):
+            content = response.json()["output"][0]["choices"][0]["tokens"][0]
+            clean_content = self._clean_response_text(content)
             return ChatPromptResponse(
-                content=response.json()["output"][0]["choices"][0]["tokens"][0],
+                content=clean_content,
                 metadata=response.json(),
             )
 
         raise RuntimeError("LLM returned an unexpected response")
+
+    def _clean_response_text(self, response: str) -> str:
+        """Remove instruction tokens and normalise repetitive content."""
+        clean_text = response.replace("[INST]", "").replace("[/INST]", "")
+
+        # SPlit into lines and remove duplicates while preserving order
+        lines = clean_text.strip().split("\n")
+        unique_lines = []
+        seen = set()
+        for line in lines:
+            line_stripped = line.strip()
+            if (
+                line_stripped
+                and line_stripped not in seen
+                and not line_stripped.isspace()
+            ):
+                seen.add(line_stripped)
+                unique_lines.append(line)
+
+        return "\n".join(unique_lines)
