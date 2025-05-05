@@ -142,6 +142,7 @@ from app.routers.documents.upload import router as documents_router
 from app.routers.health import auth_dependency
 from app.routers.health import router as health_router
 from app.routers.test_llm_chat_service import router as test_llm_chat_router
+from app.routers.embedding_service import router as embedding_service_router
 from app.services.startup import initialize_application
 
 
@@ -226,7 +227,7 @@ app.include_router(
     document_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
 )
 app.include_router(test_llm_chat_router, prefix="/api")
-
+app.include_router(embedding_service_router, prefix="/api")
 
 if __name__ == "__main__":
     port = int(os.getenv("API_PORT", 8000))
