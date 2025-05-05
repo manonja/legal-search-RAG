@@ -40,4 +40,4 @@ USER runpod
 
 ENTRYPOINT [ "/app/entrypoint.sh" ]
 # run your app inside the pixi environment
-CMD ["python", "-c", "import legalembed; import runpod; runpod.serverless.start({'handler': legalembed.handler.handler})"]
+CMD ["python", "-c", "import legalembed.handler as legalembed_handler; import runpod; runpod.serverless.start({'handler': legalembed_handler.handler})"]
