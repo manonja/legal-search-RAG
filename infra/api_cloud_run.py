@@ -97,6 +97,33 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                             ),
                         ),
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="RUNPOD_API_KEY",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret=f"projects/{project_id}/secrets/runpod-api-key",
+                                    version="latest",
+                                )
+                            ),
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="RUNPOD_EMBEDDING_ENDPOINT_ID",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret=f"projects/{project_id}/secrets/runpod-embedding-endpoint",
+                                    version="latest",
+                                )
+                            ),
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="HUGGING_FACE_HUB_TOKEN",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret=f"projects/{project_id}/secrets/hugging-face-hub-token",
+                                    version="latest",
+                                )
+                            ),
+                        ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="SENTRY_DSN",
                             value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
@@ -233,6 +260,30 @@ def grant_secret_access(sa):
     secretmanager.SecretIamMember(
         f"sentry-dsn-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/sentry-dsn",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access to Hugging Face Hub token secret
+    secretmanager.SecretIamMember(
+        f"hugging-face-hub-token-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/hugging-face-hub-token",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access to RunPod embedding endpoint secret
+    secretmanager.SecretIamMember(
+        f"runpod-embedding-endpoint-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/runpod-embedding-endpoint",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access to RunPod API key secret
+    secretmanager.SecretIamMember(
+        f"runpod-api-key-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/runpod-api-key",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )

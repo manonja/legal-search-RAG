@@ -366,7 +366,7 @@ def test_rag_search(
 ) -> None:
     """Test the RAG search endpoint."""
     response = test_client.post(
-        "/api/rag-search",
+        "/api/query/rag",
         json={
             "query": TEST_QUERY,
             "max_results": 5,

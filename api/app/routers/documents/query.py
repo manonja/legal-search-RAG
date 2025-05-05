@@ -4,23 +4,29 @@ This module provides endpoints for querying documents using vector similarity
 search and generating responses with OpenAI's API.
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Query
+from typing import Dict, Any, Optional
 from pydantic import ValidationError
 
 from app.services.documents.query import process_query
 from app.models.query import QueryRequest, QueryResponse
 
-# Create router
-router = APIRouter(tags=["query"])
+# Create router with correct prefix - using "query" prefix to match the expected API structure
+router = APIRouter(prefix="/query", tags=["query"])
 
 
-@router.post("/query", response_model=QueryResponse)
-async def query_documents(request: QueryRequest) -> QueryResponse:
+@router.post("", response_model=QueryResponse)
+async def query_documents(
+    request: QueryRequest,
+    collection_name: Optional[str] = Query(
+        None, description="Optional custom collection name to search in"
+    ),
+) -> QueryResponse:
     """Process a query against the document collection.
 
     Args:
         request: Query parameters including query text, max results and temperature
+        collection_name: Optional custom collection name to search in
 
     Returns:
         QueryResponse containing the answer and sources
@@ -37,6 +43,7 @@ async def query_documents(request: QueryRequest) -> QueryResponse:
             max_results=request.max_results,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
+            collection_name=collection_name,
         )
     except HTTPException:
         raise
@@ -48,8 +55,13 @@ async def query_documents(request: QueryRequest) -> QueryResponse:
         ) from e
 
 
-@router.post("/rag-search", response_model=QueryResponse)
-async def rag_search(request: QueryRequest) -> QueryResponse:
+@router.post("/rag", response_model=QueryResponse)
+async def rag_search(
+    request: QueryRequest,
+    collection_name: Optional[str] = Query(
+        None, description="Optional custom collection name to search in"
+    ),
+) -> QueryResponse:
     """Process a RAG (Retrieval Augmented Generation) search request.
 
     This endpoint retrieves relevant document chunks and generates
@@ -57,6 +69,7 @@ async def rag_search(request: QueryRequest) -> QueryResponse:
 
     Args:
         request: Query parameters including query text and generation settings
+        collection_name: Optional custom collection name to search in
 
     Returns:
         QueryResponse containing the AI-generated answer, sources, and confidence
@@ -73,6 +86,7 @@ async def rag_search(request: QueryRequest) -> QueryResponse:
             max_results=request.max_results,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
+            collection_name=collection_name,
         )
     except HTTPException:
         raise

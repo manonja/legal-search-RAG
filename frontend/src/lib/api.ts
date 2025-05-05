@@ -169,10 +169,18 @@ export const api = {
 
   // Legacy search endpoint - for backward compatibility
   async legacySearchDocuments(
-    request: LegacyQueryRequest
+    request: LegacyQueryRequest,
+    collectionName?: string
   ): Promise<LegacyQueryResponse> {
     try {
-      const response = await apiClient.post("/api/search/api", request);
+      let url = "/api/search/api";
+
+      // Add collection_name as a query parameter if provided
+      if (collectionName) {
+        url += `?collection_name=${encodeURIComponent(collectionName)}`;
+      }
+
+      const response = await apiClient.post(url, request);
       return response.data;
     } catch (error) {
       // Error is already captured by interceptor
@@ -181,9 +189,16 @@ export const api = {
   },
 
   // RAG search
-  async ragSearch(request: QueryRequest): Promise<QueryResponse> {
+  async ragSearch(request: QueryRequest, collectionName?: string): Promise<QueryResponse> {
     try {
-      const response = await apiClient.post("/api/rag-search", request);
+      let url = "/api/rag-search";
+
+      // Add collection_name as a query parameter if provided
+      if (collectionName) {
+        url += `?collection_name=${encodeURIComponent(collectionName)}`;
+      }
+
+      const response = await apiClient.post(url, request);
       return response.data;
     } catch (error) {
       // Error is already captured by interceptor
@@ -192,9 +207,16 @@ export const api = {
   },
 
   // Query documents
-  async queryDocuments(request: QueryRequest): Promise<QueryResponse> {
+  async queryDocuments(request: QueryRequest, collectionName?: string): Promise<QueryResponse> {
     try {
-      const response = await apiClient.post("/api/query", request);
+      let url = "/api/query";
+
+      // Add collection_name as a query parameter if provided
+      if (collectionName) {
+        url += `?collection_name=${encodeURIComponent(collectionName)}`;
+      }
+
+      const response = await apiClient.post(url, request);
       return response.data;
     } catch (error) {
       // Error is already captured by interceptor

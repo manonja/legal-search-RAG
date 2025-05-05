@@ -22,6 +22,7 @@ async def process_query(
     max_results: Optional[int] = 5,
     temperature: Optional[float] = 0.7,
     max_tokens: Optional[int] = 1000,
+    collection_name: Optional[str] = None,
 ) -> QueryResponse:
     """Process a query and generate a response using RAG.
 
@@ -30,12 +31,13 @@ async def process_query(
         max_results: Maximum number of results to return
         temperature: Temperature for response generation
         max_tokens: Maximum tokens in the response
+        collection_name: Optional name of collection to search in
 
     Returns:
         QueryResponse containing the answer, sources, and confidence
     """
     settings = get_settings()
-    log.info("Processing query", query=query)
+    log.info("Processing query", query=query, collection=collection_name or "default")
 
     try:
         # First, search for relevant documents
@@ -43,11 +45,12 @@ async def process_query(
             max_results if max_results is not None else 5
         )  # Use default if None
         search_results = await search_documents(
-            SearchQuery(query=query, limit=search_limit)
+            SearchQuery(query=query, limit=search_limit),
+            collection_name=collection_name,
         )
 
         if not search_results:
-            log.warning("No search results found for query")
+            log.warning("No search results found for query", collection=collection_name)
             return QueryResponse(
                 answer="I couldn't find any relevant information to answer your question.",
                 sources=[],
@@ -158,7 +161,11 @@ async def process_query(
         # Convert to confidence (1.0 - normalized distance)
         confidence = max(0.0, min(1.0, 1.0 - (avg_distance / 2.0)))
 
-        log.info("Query processed successfully", confidence=round(confidence, 2))
+        log.info(
+            "Query processed successfully",
+            confidence=round(confidence, 2),
+            collection=collection_name,
+        )
 
         return QueryResponse(
             answer=answer,
@@ -167,5 +174,5 @@ async def process_query(
         )
 
     except Exception as e:
-        log.error("Error processing query", error=str(e))
+        log.error("Error processing query", error=str(e), collection=collection_name)
         raise
