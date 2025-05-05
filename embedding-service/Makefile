@@ -6,8 +6,8 @@ IMAGE_TAG = latest
 FULL_IMAGE_NAME = $(IMAGE_NAME):$(IMAGE_TAG)
 
 # Registry details (replace with your registry if needed)
-# REGISTRY = your-registry.com
-# REGISTRY_IMAGE = $(REGISTRY)/$(FULL_IMAGE_NAME)
+REGISTRY = manonja
+REGISTRY_IMAGE = $(REGISTRY)/$(FULL_IMAGE_NAME)
 
 # Default target
 .PHONY: all
@@ -39,9 +39,8 @@ build-nocache:
 push: build
 	@echo "Pushing Docker image $(FULL_IMAGE_NAME)..."
 	# Uncomment and modify the following lines if using a registry
-	# docker tag $(FULL_IMAGE_NAME) $(REGISTRY_IMAGE)
-	# docker push $(REGISTRY_IMAGE)
-	docker push $(FULL_IMAGE_NAME)
+	docker tag $(FULL_IMAGE_NAME) $(REGISTRY_IMAGE)
+	docker push $(REGISTRY_IMAGE)
 
 # Clean Docker images
 .PHONY: clean
