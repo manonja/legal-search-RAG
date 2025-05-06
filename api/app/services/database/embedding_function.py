@@ -1,46 +1,52 @@
 """
-Custom embedding function using RunPod serverless for ChromaDB.
+Custom embedding function for ChromaDB using the app's EmbeddingService.
+
+This provides a ChromaDB-compatible embedding function that leverages
+the application's embedding service with advanced features like
+caching, batching, and robust error handling.
 """
 
 import asyncio
-from typing import List, Any
+from typing import List, Optional, Dict, Any, Union
 
 from chromadb.api.types import Documents, EmbeddingFunction
 
 from app.core.struct_logger import log
-
-# Removing the circular import:
-# from app.services.embeddings.factory import get_embedding_client
+from app.services.embedding_service import EmbeddingService
 
 
-class HuggingFaceEmbeddingFunction(EmbeddingFunction):
-    """Custom embedding function using RunPod for HuggingFace models."""
+class AppEmbeddingFunction(EmbeddingFunction):
+    """ChromaDB-compatible embedding function using the application's EmbeddingService.
 
-    def __init__(self, batch_size=32, client=None):
-        """Initialize the embedding function with a RunPod client.
+    Features:
+    - Embedding result caching to avoid redundant API calls
+    - Batch processing for efficient handling of large document sets
+    - Comprehensive error handling and fallback mechanisms
+    - Bridging between ChromaDB's synchronous API and our async EmbeddingService
+    """
+
+    def __init__(self, batch_size: int = 32):
+        """Initialize the embedding function with application's EmbeddingService.
 
         Args:
             batch_size: Maximum number of texts to embed in a single API call.
-            client: Optional embedding client. If None, a client will be created.
         """
-        # Use the provided client or get a new one
-        self.client = client or _get_embedding_client()
+        # Create the embedding service
+        self.embedding_service = EmbeddingService()
         self.batch_size = batch_size
-        self.embedding_dim = 768  # Default for legal-bert
+        self._dimensionality: Optional[int] = None
+        self._embeddings_cache: Dict[int, List[List[float]]] = {}
+
         log.info(
-            "HuggingFaceEmbeddingFunction initialized",
-            model=self.client.model_name,
+            "AppEmbeddingFunction initialized",
             batch_size=self.batch_size,
         )
-
-        # Create a cache for embeddings
-        self._embeddings_cache = {}
 
     def __call__(self, texts: Documents) -> List[List[float]]:
         """Generate embeddings for the provided texts.
 
         This is the main entry point called by ChromaDB, which expects a synchronous function.
-        We need to handle the async nature of the RunPod client properly.
+        We handle the async nature of the EmbeddingService by running it in a new event loop.
 
         Args:
             texts: List of text documents to embed.
@@ -91,7 +97,7 @@ class HuggingFaceEmbeddingFunction(EmbeddingFunction):
             )
             # In case of error, return placeholder embeddings
             return [
-                [0.0] * self.embedding_dim
+                [0.0] * self.dimensionality
                 for _ in range(
                     len(args[0]) if args and isinstance(args[0], list) else 1
                 )
@@ -116,7 +122,9 @@ class HuggingFaceEmbeddingFunction(EmbeddingFunction):
             batch = texts[i : i + self.batch_size]
             try:
                 log.debug(f"Processing batch {i // self.batch_size + 1}")
-                batch_embeddings = await self.client.create_embeddings(batch)
+                batch_embeddings = await self.embedding_service.generate_embeddings(
+                    batch
+                )
 
                 # Validate the batch embeddings
                 if not isinstance(batch_embeddings, list):
@@ -125,16 +133,15 @@ class HuggingFaceEmbeddingFunction(EmbeddingFunction):
                         batch_idx=i // self.batch_size + 1,
                     )
                     # Return placeholder embeddings of the correct dimension
-                    return [[0.0] * self.embedding_dim for _ in range(len(texts))]
+                    return [[0.0] * self.dimensionality for _ in range(len(texts))]
 
-                # If this is an asyncio.Task, that's a problem
-                if isinstance(batch_embeddings, asyncio.Task):
-                    log.error(
-                        "create_embeddings returned an asyncio.Task instead of embeddings",
-                        batch_idx=i // self.batch_size + 1,
-                    )
-                    # Return placeholder embeddings of the correct dimension
-                    return [[0.0] * self.embedding_dim for _ in range(len(texts))]
+                # Save dimensionality for future reference
+                if (
+                    batch_embeddings
+                    and len(batch_embeddings) > 0
+                    and self._dimensionality is None
+                ):
+                    self._dimensionality = len(batch_embeddings[0])
 
                 all_embeddings.extend(batch_embeddings)
             except Exception as e:
@@ -146,19 +153,18 @@ class HuggingFaceEmbeddingFunction(EmbeddingFunction):
                     exc_info=True,
                 )
                 # If we fail, return placeholder embeddings
-                return [[0.0] * self.embedding_dim for _ in range(len(texts))]
+                return [[0.0] * self.dimensionality for _ in range(len(texts))]
 
         return all_embeddings
 
+    @property
+    def dimensionality(self) -> int:
+        """Get the dimensionality of the embedding vectors.
 
-def _get_embedding_client():
-    """Get the embedding client singleton.
-
-    This function avoids circular imports.
-
-    Returns:
-        The embedding client instance.
-    """
-    from app.services.embeddings.factory import get_embedding_client
-
-    return get_embedding_client()
+        Returns:
+            int: The dimensionality of the embedding vectors
+        """
+        if self._dimensionality is None:
+            # Default dimensionality (e.g., for OpenAI embeddings or legal-bert)
+            return 768
+        return self._dimensionality
