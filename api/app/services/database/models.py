@@ -3,9 +3,7 @@
 This module contains SQLAlchemy ORM models for document storage with vector embeddings.
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Text, ForeignKey, VARCHAR, BIGINT, BIGSERIAL
 import pgvector.sqlalchemy as pgvector
 
 from app.services.database.database import Base
@@ -16,31 +14,21 @@ class Document(Base):
 
     __tablename__ = "documents"
 
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(255), nullable=False, index=True)
-    content = Column(Text, nullable=False)
-    source = Column(String(255), nullable=False)
-    metadata = Column(JSON, nullable=True)
-    file_path = Column(String(1024), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # One-to-many relationship with document chunks
-    chunks = relationship(
-        "DocumentChunk", back_populates="document", cascade="all, delete-orphan"
-    )
+    document_id = Column(BIGSERIAL, primary_key=True, index=True)
+    document_text = Column(Text, nullable=False)
+    document_source = Column(VARCHAR(104), nullable=False)
+    document_file_path = Column(VARCHAR(1024), nullable=True)
 
 
-class DocumentChunk(Base):
+class Chunk(Base):
     """Document chunk model for storing document segments with embeddings."""
 
-    __tablename__ = "document_chunks"
+    __tablename__ = "chunks"
 
-    id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
-    chunk_index = Column(Integer, nullable=False)
+    chunk_id = Column(BIGSERIAL, primary_key=True, index=True)
     content = Column(Text, nullable=False)
-    metadata = Column(JSON, nullable=True)
+    document_id = Column(BIGINT, ForeignKey("documents.document_id"), nullable=False)
+    chunk_index = Column(BIGINT, nullable=False)
 
     # Vector embedding column using pgvector - 768 dimensions for legal-bert-base-uncased
     embedding = Column(pgvector.Vector(768), nullable=True)
@@ -52,8 +40,3 @@ class DocumentChunk(Base):
             lists=100,  # Number of lists to create, can be tuned based on data size
         ),
     )
-
-    # Many-to-one relationship with document
-    document = relationship("Document", back_populates="chunks")
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
