@@ -142,6 +142,15 @@ def create_api_service(stack: str, docker_repository, chroma_bucket, dependencie
                                 )
                             ),
                         ),
+                        cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name="DATABASE_URI",
+                            value_source=cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret=f"projects/{project_id}/secrets/supabase-vector-db",
+                                    version="latest",
+                                )
+                            ),
+                        ),
                         # Data directories
                         cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name="DATA_DIR", value="/data/data"
@@ -284,6 +293,14 @@ def grant_secret_access(sa):
     secretmanager.SecretIamMember(
         f"runpod-api-key-access-{stack}",
         secret_id=f"projects/{secret_project_id}/secrets/runpod-api-key",
+        role="roles/secretmanager.secretAccessor",
+        member=pulumi.Output.concat("serviceAccount:", sa.email),
+    )
+
+    # Grant access to Supabase vector DB secret
+    secretmanager.SecretIamMember(
+        f"supabase-vector-db-access-{stack}",
+        secret_id=f"projects/{secret_project_id}/secrets/supabase-vector-db",
         role="roles/secretmanager.secretAccessor",
         member=pulumi.Output.concat("serviceAccount:", sa.email),
     )
