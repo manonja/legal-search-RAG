@@ -35,6 +35,9 @@ dependencies = [
     "antiword>=0.1.0",
     "sentence-transformers>=2.2.0",
     "torch==2.2.2",
+    "psycopg[binary]~=3.2.7",
+    "sqlalchemy>=2.0.40",
+    "pgvector>=0.4.1",
 ]
 
 
