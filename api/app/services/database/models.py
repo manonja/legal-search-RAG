@@ -1,14 +1,12 @@
 """Database ORM models.
 
-This module contains SQLAlchemy ORM models for database operations.
-Using pgvector for vector storage and retrieval.
+This module contains SQLAlchemy ORM models for document storage with vector embeddings.
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import pgvector.sqlalchemy as pgvector
-from typing import List, Optional
 
 from app.services.database.database import Base
 
@@ -47,7 +45,7 @@ class DocumentChunk(Base):
     # Vector embedding column using pgvector - 768 dimensions for legal-bert-base-uncased
     embedding = Column(pgvector.Vector(768), nullable=True)
 
-    # Add index on the embedding column for similarity search (this will be used for vector similarity search)
+    # Add index on the embedding column for similarity search
     __table_args__ = (
         pgvector.IvfflatIndex(
             "embedding",
