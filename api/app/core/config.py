@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # ChromaDB Settings
     COLLECTION_NAME: str = "legal_docs"
 
+    # Supabase Settings
+    DATABASE_URI: str = Path(os.getenv("DATABASE_URI"))
+
     # Google Settings
     GOOGLE_API_KEY: Optional[str] = None
     GOOGLE_MODEL: str = "gemini-pro"

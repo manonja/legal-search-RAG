@@ -1,5 +1,8 @@
 .PHONY: install install-dev lint format check-format process-docs chunk-docs embed-docs serve-api lock docker-build docker-push minor patch get-version
 
+# Database URI for local development
+DATABASE_URI ?= $(shell grep DATABASE_URI .env | cut -d '=' -f2)
+
 # Install dependencies using uv
 install:
 	uv pip install -e .
@@ -38,7 +41,7 @@ embed-docs:
 
 # Start the API server
 serve-api:
-	uvicorn app.main:app --reload --reload-exclude=.venv/* --host 0.0.0.0 --port 8000 --timeout-keep-alive 30 --timeout-graceful-shutdown 10
+	uvicorn app.main:app --reload --reload-exclude=.venv/* --host 0.0.0.0 --port 8000 --timeout-keep-alive 30 --timeout-graceful-shutdown 10 --env-file .env
 
 # Version management
 get-version:
