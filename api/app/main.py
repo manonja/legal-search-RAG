@@ -137,6 +137,7 @@ from app.routers.documents.document import router as document_router
 from app.routers.documents.query import router as query_router
 from app.routers.documents.search import router as search_router
 from app.routers.documents.upload import router as documents_router
+from app.routers.document_processor import router as document_processor_router
 
 # Import the dependency from the health router
 from app.routers.health import auth_dependency
@@ -225,6 +226,11 @@ app.include_router(
 )
 app.include_router(
     document_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
+)
+app.include_router(
+    document_processor_router,
+    prefix=settings.API_PREFIX,
+    dependencies=[Depends(auth_dependency)],
 )
 app.include_router(test_llm_chat_router, prefix="/api")
 app.include_router(embedding_service_router, prefix="/api")
