@@ -2,6 +2,11 @@
 
 This module provides functionality to generate embeddings using RunPod's serverless API
 with HuggingFace models and store them in a Chroma vector database for efficient retrieval.
+
+DEPRECATED: This module is deprecated and will be replaced by a dedicated VectorDBService.
+Future code should not directly use the functions in this module.
+Instead, use app.services.document_processor for document processing and
+the planned app.services.vector_db service for embedding storage.
 """
 
 import json
@@ -28,6 +33,9 @@ def process_chunks(
     document_metadata: Dict[str, Any],
 ) -> None:
     """Process document chunks and store their embeddings in Chroma.
+
+    DEPRECATED: This function is deprecated. In the future, use VectorDBService for
+    embedding generation and storage instead of calling this function directly.
 
     Args:
         chunks: List of text chunks for the document

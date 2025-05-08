@@ -10,18 +10,50 @@ from tests.constants import MOCK_PDF_TEXT, MOCK_DOCX_TEXT, MOCK_DOCUMENT_CHUNKS
 
 @pytest.fixture
 def mock_extract_pdf_text(mocker):
-    """Mock the PDF text extraction function."""
-    mock_extract = mocker.MagicMock(return_value=MOCK_PDF_TEXT)
+    """Mock PDF text extraction.
+
+    DEPRECATED: Use mock_pdf_loader instead.
+    """
+    mock_extract = mocker.MagicMock(return_value="Mocked PDF text")
     mocker.patch("app.services.documents.upload.extract_pdf_text", new=mock_extract)
     return mock_extract
 
 
 @pytest.fixture
 def mock_extract_docx_text(mocker):
-    """Mock the DOCX text extraction function."""
-    mock_extract = mocker.MagicMock(return_value=MOCK_DOCX_TEXT)
+    """Mock DOCX text extraction.
+
+    DEPRECATED: Use mock_docx_loader instead.
+    """
+    mock_extract = mocker.MagicMock(return_value="Mocked DOCX text")
     mocker.patch("app.services.documents.upload.extract_docx_text", new=mock_extract)
     return mock_extract
+
+
+@pytest.fixture
+def mock_pdf_loader(mocker):
+    """Mock PDF loader."""
+    mock_load = mocker.MagicMock(return_value=("Mocked PDF text", {}))
+    mock_loader = mocker.MagicMock()
+    mock_loader.load = mock_load
+    mocker.patch(
+        "app.services.documents.upload.PDFLoader",
+        return_value=mock_loader,
+    )
+    return mock_load
+
+
+@pytest.fixture
+def mock_docx_loader(mocker):
+    """Mock DOCX loader."""
+    mock_load = mocker.MagicMock(return_value=("Mocked DOCX text", {}))
+    mock_loader = mocker.MagicMock()
+    mock_loader.load = mock_load
+    mocker.patch(
+        "app.services.documents.upload.DOCXLoader",
+        return_value=mock_loader,
+    )
+    return mock_load
 
 
 # Fixture is no longer needed as create_text_splitter was removed

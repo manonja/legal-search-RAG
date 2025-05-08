@@ -1,27 +1,24 @@
-"""Fixtures package for tests."""
+"""Common fixtures for tests."""
 
-from tests.fixtures.document_fixtures import (
-    mock_datastore_service,
-    mock_document_not_found,
-    mock_document_service,
-    mock_extract_docx_text,
-    mock_extract_pdf_text,
-    mock_process_chunks,
-    mock_process_uploaded_document,
-)
-
-from tests.fixtures.router_fixtures import (
-    test_dir,
-    sample_document_content,
-    sample_pdf_content,
-    sample_docx_content,
-    sample_txt_content,
-    test_document_file,
-    test_pdf_file,
-    test_docx_file,
-    test_txt_file,
-    mock_get_document_content,
-    mock_search_documents_router,
-    mock_process_query_router,
+from .document_fixtures import (
     mock_process_uploaded_document_router,
+    mock_process_chunks,
+    mock_extract_pdf_text,
+    mock_extract_docx_text,
+    mock_pdf_loader,
+    mock_docx_loader,
 )
+from .file_fixtures import test_dir, test_pdf_file, test_docx_file, test_txt_file
+
+__all__ = [
+    "mock_process_uploaded_document_router",
+    "mock_process_chunks",
+    "mock_extract_pdf_text",
+    "mock_extract_docx_text",
+    "mock_pdf_loader",
+    "mock_docx_loader",
+    "test_dir",
+    "test_pdf_file",
+    "test_docx_file",
+    "test_txt_file",
+]
