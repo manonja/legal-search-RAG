@@ -135,7 +135,6 @@ from app.core.config import get_settings as app_get_settings
 from app.routers.documents.document import router as document_router
 from app.routers.documents.query import router as query_router
 from app.routers.documents.search import router as search_router
-from app.routers.documents.upload import router as documents_router
 from app.routers.document_processor import router as document_processor_router
 
 # Import the dependency from the health router
@@ -187,11 +186,7 @@ app.add_middleware(
 
 # Mount routers using the correct dependency
 app.include_router(health_router, prefix=settings.API_PREFIX)
-app.include_router(
-    documents_router,
-    prefix=settings.API_PREFIX,
-    dependencies=[Depends(auth_dependency)],
-)
+
 app.include_router(
     query_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
 )
@@ -206,8 +201,8 @@ app.include_router(
     prefix=settings.API_PREFIX,
     dependencies=[Depends(auth_dependency)],
 )
-app.include_router(test_llm_chat_router, prefix="/api")
-app.include_router(embedding_service_router, prefix="/api")
+app.include_router(test_llm_chat_router, prefix=settings.API_PREFIX)
+app.include_router(embedding_service_router, prefix=settings.API_PREFIX)
 
 if __name__ == "__main__":
     port = int(os.getenv("API_PORT", 8000))
