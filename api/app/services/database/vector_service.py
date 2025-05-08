@@ -40,36 +40,62 @@ class VectorService:
             f"Inserting document: {processed_document.document_id} with {processed_document.total_chunks} chunks"
         )
 
+        # Handle document_id - support both string and integer IDs
+        input_doc_id = None
+        try:
+            # Try to convert the document_id to an integer if it's a string with numeric content
+            if (
+                processed_document.document_id
+                and processed_document.document_id.isdigit()
+            ):
+                input_doc_id = int(processed_document.document_id)
+                logger.info(
+                    f"Converting string document_id '{processed_document.document_id}' to integer: {input_doc_id}"
+                )
+        except (ValueError, AttributeError) as e:
+            # If conversion fails, log it but proceed with auto-generated ID
+            logger.warning(
+                f"Could not convert document_id to integer: {e}. Will use auto-generated ID."
+            )
+            input_doc_id = None
+
         # Create document record
         db_document = Document(
+            document_id=input_doc_id,  # Will be None if conversion failed, allowing auto-generation
             document_text=" ".join([chunk.text for chunk in processed_document.chunks]),
             document_source=processed_document.metadata.get("source", "upload"),
             document_file_path=processed_document.original_filename,
         )
-        db.add(db_document)
-        db.flush()  # Flush to get the document_id
 
-        document_id = db_document.document_id
-        logger.info(f"Document inserted with ID: {document_id}")
+        try:
+            db.add(db_document)
+            db.flush()  # Flush to get the document_id
 
-        # Generate embeddings for all chunks
-        chunk_texts = [chunk.text for chunk in processed_document.chunks]
-        embeddings = await self.embedding_service.generate_embeddings(chunk_texts)
+            document_id = db_document.document_id
+            logger.info(f"Document inserted with ID: {document_id}")
 
-        # Create chunks with embeddings
-        for i, (chunk, embedding) in enumerate(
-            zip(processed_document.chunks, embeddings, strict=False)
-        ):
-            db_chunk = Chunk(
-                content=chunk.text,
-                document_id=document_id,
-                chunk_sequence_in_document=i,
-                embedding=embedding,
-            )
-            db.add(db_chunk)
+            # Generate embeddings for all chunks
+            chunk_texts = [chunk.text for chunk in processed_document.chunks]
+            embeddings = await self.embedding_service.generate_embeddings(chunk_texts)
 
-        db.commit()
-        return document_id
+            # Create chunks with embeddings
+            for i, (chunk, embedding) in enumerate(
+                zip(processed_document.chunks, embeddings, strict=False)
+            ):
+                db_chunk = Chunk(
+                    content=chunk.text,
+                    document_id=document_id,
+                    chunk_sequence_in_document=i,
+                    embedding=embedding,
+                )
+                db.add(db_chunk)
+
+            db.commit()
+            return document_id
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error inserting document: {e}")
+            raise
 
     async def store_document_vectors(
         self,
