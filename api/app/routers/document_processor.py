@@ -10,7 +10,6 @@ from app.core.config import get_settings, Settings
 from app.core.struct_logger import log
 from app.models.document_processor import ProcessedDocument
 from app.services.document_processor import DocumentProcessor
-from app.services.embeddings import process_chunks
 from app.services.database.vector_service import vector_service
 from app.services.database.database import get_db
 
@@ -125,16 +124,18 @@ async def process_and_save_document(
     response_model=ProcessedDocument,
     status_code=status.HTTP_201_CREATED,
     summary="Process a document and store embeddings",
-    description="Upload, process, and store embeddings for a document in the RAG pipeline",
+    description="Upload, process, and store embeddings for a document in PostgreSQL with pgvector",
 )
 async def process_and_embed_document(
     file: UploadFile,
+    db: Session = db_dependency,
     settings: Settings = settings_dependency,
 ) -> ProcessedDocument:
-    """Process an uploaded document and store embeddings.
+    """Process an uploaded document and store embeddings in PostgreSQL.
 
     Args:
         file: The file to process
+        db: Database session
         settings: Application settings
 
     Returns:
@@ -149,27 +150,13 @@ async def process_and_embed_document(
         # Process document first
         processed_doc = await processor.process_file(file)
 
-        # Then handle embedding storage separately
-        # Extract chunk texts
-        chunk_texts = [chunk.text for chunk in processed_doc.chunks]
-
-        # Create document metadata dict
-        document_metadata = {
-            "document_id": processed_doc.document_id,
-            "original_filename": processed_doc.original_filename,
-            # Include any other metadata from processed_doc.metadata you need
-        }
-
-        # Store embeddings
-        process_chunks(
-            chunks=chunk_texts,
-            chroma_dir=settings.CHROMA_DIR,
-            document_metadata=document_metadata,
-        )
+        # Store document and generate embeddings in one operation
+        # This is functionally the same as process-and-save, but kept for backwards compatibility
+        document_id = await vector_service.insert_document(db, processed_doc)
 
         log.info(
-            "Stored embeddings for document chunks",
-            document_id=processed_doc.document_id,
+            "Document stored in PostgreSQL with embeddings using pgvector",
+            document_id=document_id,
             chunk_count=len(processed_doc.chunks),
         )
 

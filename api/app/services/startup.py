@@ -10,7 +10,6 @@ from pathlib import Path
 from app.core.struct_logger import log
 
 from app.core.config import get_settings
-from app.services.database.chroma import initialize_chroma_collection
 from app.services.database.init_db import init_vector_db
 
 
@@ -19,9 +18,8 @@ async def initialize_application():
 
     This function:
     1. Creates necessary directories
-    2. Initializes ChromaDB collection
-    3. Initializes pgvector database
-    4. Sets up other application components
+    2. Initializes pgvector database
+    3. Sets up other application components
 
     Raises:
         Exception: If initialization fails
@@ -32,15 +30,10 @@ async def initialize_application():
 
         # Create necessary directories
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        settings.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
         log.info(
             "Created necessary directories",
             data_dir=str(settings.DATA_DIR),
-            chroma_dir=str(settings.CHROMA_DIR),
         )
-
-        # Initialize ChromaDB collection
-        await initialize_chroma_collection()
 
         # Initialize pgvector database
         try:
