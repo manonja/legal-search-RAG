@@ -141,7 +141,9 @@ The API provides the following endpoints:
 - `GET /api/health/auth-test`: Test endpoint for authentication (requires token)
 
 ### Document Management
-- `POST /api/documents/upload`: Upload and process documents (PDF, DOCX) with vector embeddings
+- `POST /api/documents/upload`: (Legacy) Upload and process documents (PDF, DOCX) with vector embeddings
+- `POST /api/documents/process`: Process uploaded documents through the RAG pipeline without storing embeddings
+- `POST /api/documents/process-and-save`: Process documents and store with vector embeddings in PostgreSQL/pgvector
 - `GET /api/documents/{document_id}`: Retrieve document content by ID
 - `GET /api/documents/{document_id}/download`: Download the original document file by ID
 - `GET /api/documents`: List all available document IDs
@@ -179,6 +181,57 @@ The API provides the following endpoints:
 - `GET /api/openapi.json`: OpenAPI specification
 
 Visit the documentation at `/api/docs` for complete API details and interactive testing.
+
+### Bulk Document Upload
+
+A utility script is provided for batch uploading documents to the API:
+
+```bash
+# Make the script executable
+chmod +x scripts/upload_docs.sh
+
+# Usage
+./scripts/upload_docs.sh -u URL -t TOKEN -f FILES
+
+# Example: Upload documents using the new process-and-save endpoint
+./scripts/upload_docs.sh \
+  -u "http://localhost:8000/api/documents/process-and-save" \
+  -t "your-api-token" \
+  -f "/path/to/documents/*.{pdf,docx}"
+
+# Legacy: Using the old upload endpoint
+./scripts/upload_docs.sh \
+  -u "http://localhost:8000/api/documents/upload" \
+  -t "your-api-token" \
+  -f "/path/to/documents/*.pdf"
+```
+
+Parameters:
+- `-u, --url`: API endpoint URL (use `/documents/process-and-save` for new processing pipeline)
+- `-t, --token`: Authorization token
+- `-f, --files`: Files to upload (supports wildcards in quotes)
+- `-h, --help`: Display help message
+
+### Document Processing Script
+
+For offline document processing without uploading to the API, use the docs_processor.sh script:
+
+```bash
+# Make the script executable
+chmod +x scripts/docs_processor.sh
+
+# Process documents with chunking
+./scripts/docs_processor.sh -f "/path/to/documents/*.{pdf,docx}" -c -o ./results
+
+# Process documents without chunking
+./scripts/docs_processor.sh -f "/path/to/documents/*.pdf" -o ./results
+```
+
+Parameters:
+- `-f, --files`: Files to process (supports wildcards in quotes)
+- `-c, --chunk`: Enable chunking after loading (default: false)
+- `-o, --output`: Output directory for results (default: ./results)
+- `-h, --help`: Display help message
 
 ## Configuration
 
@@ -255,30 +308,6 @@ GCP_PROJECT_ID=952577461734
 API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/versions/1
 API_TOKEN=your-api-token  # Optional: Set token directly for local development
 ```
-
-### Bulk Document Upload
-
-A utility script is provided for batch uploading documents to the API:
-
-```bash
-# Make the script executable
-chmod +x api/upload_docs.sh
-
-# Usage
-./api/upload_docs.sh -u URL -t TOKEN -f FILES
-
-# Example with real values
-./api/upload_docs.sh \
-  -u "https://maja-legal-api-dev-8aad8c9-y52ot74ira-uc.a.run.app/api/documents/upload" \
-  -t "3a57087a8ae7718065992975415fe119e1879f08e9cde4a39379f25f00a9f033" \
-  -f "/path/to/documents/*.docx"
-```
-
-Parameters:
-- `-u, --url`: API endpoint URL
-- `-t, --token`: Authorization token
-- `-f, --files`: Files to upload (supports wildcards in quotes)
-- `-h, --help`: Display help message
 
 ### Reading the Token
 
