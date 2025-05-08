@@ -8,7 +8,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.database.database import Base, engine
-from app.services.database.models import Document, DocumentChunk
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,11 @@
 # Legal Search RAG API
 
-The API backend for the Legal Document Search RAG system, built with FastAPI, ChromaDB, and LangChain.
+The API backend for the Legal Document Search RAG system, built with FastAPI, PostgreSQL/pgvector, and SQLAlchemy.
 
 ## Features
 
 - **Document Processing**: Extract, chunk, and embed documents
-- **Vector Search**: Semantic search using ChromaDB
+- **Vector Search**: Semantic search using PostgreSQL/pgvector
 - **RAG Implementation**: LLM-powered question answering
 - **Cost Control**: Token counting and usage monitoring
 
@@ -30,7 +30,7 @@ The API backend for the Legal Document Search RAG system, built with FastAPI, Ch
 3. Set up environment variables:
    ```bash
    cp .env.example .env
-   # Edit .env to add your API keys
+   # Edit .env to add your API keys and DATABASE_URI
    ```
 
 4. Process documents:
@@ -55,10 +55,10 @@ docker build -t legal-search-api .
 
 # Run the container with proper volume mounting for data persistence
 docker run -p 8000:8000 \
-  -v $(pwd)/data/chroma:/data/chroma \
   -v $(pwd)/data/data:/data/data \
   -e OPENAI_API_KEY=your_openai_key \
   -e GOOGLE_API_KEY=your_google_key \
+  -e DATABASE_URI=postgresql://postgres:postgres@host.docker.internal:5432/legal_search \
   --env-file .env \
   legal-search-api
 ```
@@ -111,6 +111,20 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  db:
+    image: ankane/pgvector:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=legal_search
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
 ```
 
 Start services with:
@@ -127,7 +141,9 @@ The API provides the following endpoints:
 - `GET /api/health/auth-test`: Test endpoint for authentication (requires token)
 
 ### Document Management
-- `POST /api/documents/upload`: Upload and process documents (PDF, DOCX)
+- `POST /api/documents/upload`: (Legacy) Upload and process documents (PDF, DOCX) with vector embeddings
+- `POST /api/documents/process`: Process uploaded documents through the RAG pipeline without storing embeddings
+- `POST /api/documents/process-and-save`: Process documents and store with vector embeddings in PostgreSQL/pgvector
 - `GET /api/documents/{document_id}`: Retrieve document content by ID
 - `GET /api/documents/{document_id}/download`: Download the original document file by ID
 - `GET /api/documents`: List all available document IDs
@@ -166,6 +182,57 @@ The API provides the following endpoints:
 
 Visit the documentation at `/api/docs` for complete API details and interactive testing.
 
+### Bulk Document Upload
+
+A utility script is provided for batch uploading documents to the API:
+
+```bash
+# Make the script executable
+chmod +x scripts/upload_docs.sh
+
+# Usage
+./scripts/upload_docs.sh -u URL -t TOKEN -f FILES
+
+# Example: Upload documents using the new process-and-save endpoint
+./scripts/upload_docs.sh \
+  -u "http://localhost:8000/api/documents/process-and-save" \
+  -t "your-api-token" \
+  -f "/path/to/documents/*.{pdf,docx}"
+
+# Legacy: Using the old upload endpoint
+./scripts/upload_docs.sh \
+  -u "http://localhost:8000/api/documents/upload" \
+  -t "your-api-token" \
+  -f "/path/to/documents/*.pdf"
+```
+
+Parameters:
+- `-u, --url`: API endpoint URL (use `/documents/process-and-save` for new processing pipeline)
+- `-t, --token`: Authorization token
+- `-f, --files`: Files to upload (supports wildcards in quotes)
+- `-h, --help`: Display help message
+
+### Document Processing Script
+
+For offline document processing without uploading to the API, use the docs_processor.sh script:
+
+```bash
+# Make the script executable
+chmod +x scripts/docs_processor.sh
+
+# Process documents with chunking
+./scripts/docs_processor.sh -f "/path/to/documents/*.{pdf,docx}" -c -o ./results
+
+# Process documents without chunking
+./scripts/docs_processor.sh -f "/path/to/documents/*.pdf" -o ./results
+```
+
+Parameters:
+- `-f, --files`: Files to process (supports wildcards in quotes)
+- `-c, --chunk`: Enable chunking after loading (default: false)
+- `-o, --output`: Output directory for results (default: ./results)
+- `-h, --help`: Display help message
+
 ## Configuration
 
 Key environment variables:
@@ -175,8 +242,8 @@ Key environment variables:
 OPENAI_API_KEY=your_openai_api_key
 GOOGLE_API_KEY=your_google_api_key
 
-# Vector DB Configuration
-CHROMA_DB_PATH=/data/chroma
+# Database Configuration
+DATABASE_URI=postgresql://postgres:postgres@localhost:5432/legal_search
 EMBEDDING_MODEL=text-embedding-3-small
 
 # Document Processing
@@ -241,30 +308,6 @@ GCP_PROJECT_ID=952577461734
 API_TOKEN_SECRET_NAME=projects/952577461734/secrets/maja-legal-api-token/versions/1
 API_TOKEN=your-api-token  # Optional: Set token directly for local development
 ```
-
-### Bulk Document Upload
-
-A utility script is provided for batch uploading documents to the API:
-
-```bash
-# Make the script executable
-chmod +x api/upload_docs.sh
-
-# Usage
-./api/upload_docs.sh -u URL -t TOKEN -f FILES
-
-# Example with real values
-./api/upload_docs.sh \
-  -u "https://maja-legal-api-dev-8aad8c9-y52ot74ira-uc.a.run.app/api/documents/upload" \
-  -t "3a57087a8ae7718065992975415fe119e1879f08e9cde4a39379f25f00a9f033" \
-  -f "/path/to/documents/*.docx"
-```
-
-Parameters:
-- `-u, --url`: API endpoint URL
-- `-t, --token`: Authorization token
-- `-f, --files`: Files to upload (supports wildcards in quotes)
-- `-h, --help`: Display help message
 
 ### Reading the Token
 

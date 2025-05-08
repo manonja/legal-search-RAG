@@ -3,7 +3,7 @@ Factory for creating the embedding client.
 """
 
 from app.core.config import get_settings
-from app.services.embeddings.clients.runpod import RunPodEmbeddingClient
+from app.services.embeddings_service.clients.runpod import RunPodEmbeddingClient
 from app.core.struct_logger import log
 from typing import Optional
 

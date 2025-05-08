@@ -1,15 +1,14 @@
 """FastAPI service for legal document RAG system.
 
 This module provides REST API endpoints to interact with the
-Chroma vector database.
+PostgreSQL database with pgvector.
 """
 
-# Disable ChromaDB telemetry before any imports
+# Disable telemetry before any imports
 import os
 
 # Set environment variables to disable telemetry
 os.environ["ANONYMIZED_TELEMETRY"] = "FALSE"
-os.environ["CHROMADB_TELEMETRY_ENABLED"] = "FALSE"
 os.environ["OPENTELEMETRY_ENABLED"] = "FALSE"
 
 # Import structured logger early
@@ -136,7 +135,7 @@ from app.core.config import get_settings as app_get_settings
 from app.routers.documents.document import router as document_router
 from app.routers.documents.query import router as query_router
 from app.routers.documents.search import router as search_router
-from app.routers.documents.upload import router as documents_router
+from app.routers.document_processor import router as document_processor_router
 
 # Import the dependency from the health router
 from app.routers.health import auth_dependency
@@ -144,31 +143,6 @@ from app.routers.health import router as health_router
 from app.routers.test_llm_chat_service import router as test_llm_chat_router
 from app.routers.embedding_service import router as embedding_service_router
 from app.services.startup import initialize_application
-
-
-# Add a filter to suppress ChromaDB warnings about existing embedding IDs
-class ChromaWarningFilter(logging.Filter):
-    """A filter to remove specific ChromaDB warnings."""
-
-    def filter(self, record):
-        """Filter out warnings about adding existing embedding IDs.
-
-        Args:
-            record: The log record to check
-
-        Returns:
-            bool: False for messages to be filtered out, True otherwise
-        """
-        # Filter out the specific warning about adding existing embedding IDs
-        return not (
-            record.levelname == "WARNING"
-            and "Add of existing embedding ID:" in record.getMessage()
-        )
-
-
-# Apply the filter to the ChromaDB logger
-chroma_logger = logging.getLogger("chromadb.segment.impl.vector.local_persistent_hnsw")
-chroma_logger.addFilter(ChromaWarningFilter())
 
 # Ensure we're using the same settings
 settings = app_get_settings()
@@ -212,11 +186,7 @@ app.add_middleware(
 
 # Mount routers using the correct dependency
 app.include_router(health_router, prefix=settings.API_PREFIX)
-app.include_router(
-    documents_router,
-    prefix=settings.API_PREFIX,
-    dependencies=[Depends(auth_dependency)],
-)
+
 app.include_router(
     query_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
 )
@@ -226,8 +196,13 @@ app.include_router(
 app.include_router(
     document_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
 )
-app.include_router(test_llm_chat_router, prefix="/api")
-app.include_router(embedding_service_router, prefix="/api")
+app.include_router(
+    document_processor_router,
+    prefix=settings.API_PREFIX,
+    dependencies=[Depends(auth_dependency)],
+)
+app.include_router(test_llm_chat_router, prefix=settings.API_PREFIX)
+app.include_router(embedding_service_router, prefix=settings.API_PREFIX)
 
 if __name__ == "__main__":
     port = int(os.getenv("API_PORT", 8000))

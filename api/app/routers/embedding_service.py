@@ -1,7 +1,7 @@
 # app/routers/embedding_service.py
 from fastapi import APIRouter, Depends
 from app.models.embedding_service import EmbeddingRequest, EmbeddingResponse
-from app.services.embedding_service import EmbeddingService
+from app.services.embeddings_service import EmbeddingService
 
 router = APIRouter(prefix="/embeddings", tags=["embeddings"])
 
