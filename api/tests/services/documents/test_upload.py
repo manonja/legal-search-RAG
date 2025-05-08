@@ -14,7 +14,8 @@ from app.core.config import get_settings
 from app.services.datastore import DocumentMetadata
 from app.services.documents.upload import process_uploaded_document
 from app.services.embeddings import process_chunks
-from app.services.process_docs import extract_docx_text, extract_pdf_text
+from app.services.document_processor.loaders.pdf_loader import PDFLoader
+from app.services.document_processor.loaders.docx_loader import DOCXLoader
 
 # Get settings
 settings = get_settings()
@@ -152,21 +153,29 @@ def mock_process_chunks(mocker):
 
 
 @pytest.fixture
-def mock_extract_pdf(mocker):
+def mock_pdf_loader(mocker):
     """Mock PDF text extraction."""
-    return mocker.patch(
-        "app.services.documents.upload.extract_pdf_text",
-        return_value=MOCK_PDF_TEXT,
+    mock_load = mocker.MagicMock(return_value=(MOCK_PDF_TEXT, {}))
+    mock_loader = mocker.MagicMock()
+    mock_loader.load = mock_load
+    mocker.patch(
+        "app.services.documents.upload.PDFLoader",
+        return_value=mock_loader,
     )
+    return mock_load
 
 
 @pytest.fixture
-def mock_extract_docx(mocker):
+def mock_docx_loader(mocker):
     """Mock DOCX text extraction."""
-    return mocker.patch(
-        "app.services.documents.upload.extract_docx_text",
-        return_value=MOCK_DOCX_TEXT,
+    mock_load = mocker.MagicMock(return_value=(MOCK_DOCX_TEXT, {}))
+    mock_loader = mocker.MagicMock()
+    mock_loader.load = mock_load
+    mocker.patch(
+        "app.services.documents.upload.DOCXLoader",
+        return_value=mock_loader,
     )
+    return mock_load
 
 
 @pytest.fixture
@@ -198,7 +207,7 @@ async def test_process_uploaded_document_success(
     mock_openai_client,
     mock_text_splitter,
     mock_process_chunks,
-    mock_extract_pdf,
+    mock_pdf_loader,
     mock_datastore_service,
 ):
     """Test successful processing of an uploaded document."""
@@ -223,7 +232,7 @@ async def test_process_uploaded_document_success(
     result = await process_uploaded_document(mock_file, settings)
 
     # Verify calls
-    mock_extract_pdf.assert_called_once()
+    mock_pdf_loader.assert_called_once()
     mock_datastore_service.save_document.assert_called_once()
     # Check that save_document was called with the file and extracted text
     call_args, _ = mock_datastore_service.save_document.call_args
@@ -257,7 +266,7 @@ async def test_process_uploaded_document_docx(
     mock_openai_client,
     mock_text_splitter,
     mock_process_chunks,
-    mock_extract_docx,
+    mock_docx_loader,
     mock_datastore_service,
 ):
     """Test successful processing of a DOCX document."""
@@ -280,7 +289,7 @@ async def test_process_uploaded_document_docx(
 
     result = await process_uploaded_document(mock_file, settings)
 
-    mock_extract_docx.assert_called_once()
+    mock_docx_loader.assert_called_once()
     mock_datastore_service.save_document.assert_called_once()
     call_args, _ = mock_datastore_service.save_document.call_args
     assert call_args[0] == mock_file
@@ -311,7 +320,7 @@ async def test_process_document_no_text(
     mock_openai_client,
     mock_text_splitter,
     mock_process_chunks,
-    mock_extract_pdf,
+    mock_pdf_loader,
     mock_datastore_service,
 ):
     """Test processing a document with no content."""
@@ -325,7 +334,7 @@ async def test_process_document_no_text(
     mock_file.read = AsyncMock()
     mock_file.read.return_value = test_pdf_file.read_bytes()
 
-    mock_extract_pdf.return_value = ""
+    mock_pdf_loader.return_value = ("", {})
     with pytest.raises(ValueError) as exc_info:
         await process_uploaded_document(mock_file, settings)
     assert "No text extracted from document" in str(exc_info.value)
@@ -341,7 +350,7 @@ async def test_process_document_with_error(
     mock_openai_client,
     mock_text_splitter,
     mock_process_chunks,
-    mock_extract_pdf,
+    mock_pdf_loader,
     mock_datastore_service,
 ):
     """Test processing a document with an error."""
@@ -355,10 +364,10 @@ async def test_process_document_with_error(
     mock_file.read = AsyncMock()
     mock_file.read.return_value = test_pdf_file.read_bytes()
 
-    mock_extract_pdf.side_effect = Exception("Test error")
+    mock_text_splitter.side_effect = Exception("Chunking error")
     with pytest.raises(Exception) as exc_info:
         await process_uploaded_document(mock_file, settings)
-    assert "Test error" in str(exc_info.value)
+    assert "Chunking error" in str(exc_info.value)
     mock_text_splitter.split_text.assert_not_called()
     mock_process_chunks.assert_not_called()
     mock_datastore_service.save_document.assert_not_called()
