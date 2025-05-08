@@ -8,8 +8,9 @@ from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, update, text
 
-from app.services.database.models import Document, DocumentChunk
+from app.services.database.models import Document, Chunk
 from app.services.embedding_service import EmbeddingService
+from app.models.document_processor import ProcessedDocument
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,55 @@ class VectorService:
     def __init__(self, embedding_service: Optional[EmbeddingService] = None):
         """Initialize the vector service."""
         self.embedding_service = embedding_service or EmbeddingService()
+
+    async def insert_document(
+        self,
+        db: Session,
+        processed_document: ProcessedDocument,
+    ) -> int:
+        """Insert a processed document and its chunks into the database.
+
+        Args:
+            db: Database session
+            processed_document: The processed document with chunks
+
+        Returns:
+            The document ID of the inserted document
+        """
+        logger.info(
+            f"Inserting document: {processed_document.document_id} with {processed_document.total_chunks} chunks"
+        )
+
+        # Create document record
+        db_document = Document(
+            document_text=" ".join([chunk.text for chunk in processed_document.chunks]),
+            document_source=processed_document.metadata.get("source", "upload"),
+            document_file_path=processed_document.original_filename,
+        )
+        db.add(db_document)
+        db.flush()  # Flush to get the document_id
+
+        document_id = db_document.document_id
+        logger.info(f"Document inserted with ID: {document_id}")
+
+        # Generate embeddings for all chunks
+        chunk_texts = [chunk.text for chunk in processed_document.chunks]
+        embeddings = await self.embedding_service.generate_embeddings(chunk_texts)
+
+        # Create chunks with embeddings
+        for i, (chunk, embedding) in enumerate(
+            zip(processed_document.chunks, embeddings, strict=False)
+        ):
+            db_chunk = Chunk(
+                content=chunk.text,
+                document_id=document_id,
+                chunk_sequence_in_document=i,
+                embedding=embedding,
+            )
+            db.add(db_chunk)
+
+        db.commit()
+        return document_id
 
     async def store_document_vectors(
         self,
@@ -48,16 +98,15 @@ class VectorService:
             chunk_metadata = metadata[i] if metadata and i < len(metadata) else None
 
             # Create document chunk with embedding
-            db_chunk = DocumentChunk(
+            db_chunk = Chunk(
                 document_id=document_id,
-                chunk_index=i,
+                chunk_sequence_in_document=i,
                 content=text,
-                metadata=chunk_metadata,
                 embedding=embedding,
             )
             db.add(db_chunk)
             db.flush()
-            chunk_ids.append(db_chunk.id)
+            chunk_ids.append(db_chunk.chunk_id)
 
         db.commit()
         return chunk_ids
@@ -90,17 +139,15 @@ class VectorService:
                 chunk_ids, texts, embeddings, strict=False
             ):
                 stmt = (
-                    update(DocumentChunk)
-                    .where(DocumentChunk.id == chunk_id)
+                    update(Chunk)
+                    .where(Chunk.chunk_id == chunk_id)
                     .values(content=text, embedding=embedding)
                 )
                 result = db.execute(stmt)
                 updated_count += result.rowcount
         else:
             # Update only embeddings for existing content
-            chunks = (
-                db.query(DocumentChunk).filter(DocumentChunk.id.in_(chunk_ids)).all()
-            )
+            chunks = db.query(Chunk).filter(Chunk.chunk_id.in_(chunk_ids)).all()
             if chunks:
                 texts = [chunk.content for chunk in chunks]
                 embeddings = await self.embedding_service.generate_embeddings(texts)
@@ -141,23 +188,20 @@ class VectorService:
         # Build the query
         stmt = (
             select(
-                DocumentChunk,
-                func.cosine_similarity(DocumentChunk.embedding, query_embedding).label(
+                Chunk,
+                func.cosine_similarity(Chunk.embedding, query_embedding).label(
                     "similarity"
                 ),
             )
-            .where(DocumentChunk.embedding.is_not(None))
-            .order_by(
-                func.cosine_similarity(DocumentChunk.embedding, query_embedding).desc()
-            )
+            .where(Chunk.embedding.is_not(None))
+            .order_by(func.cosine_similarity(Chunk.embedding, query_embedding).desc())
             .limit(limit)
         )
 
         # Add minimum score filter if provided
         if min_score is not None:
             stmt = stmt.where(
-                func.cosine_similarity(DocumentChunk.embedding, query_embedding)
-                >= min_score
+                func.cosine_similarity(Chunk.embedding, query_embedding) >= min_score
             )
 
         # Apply additional filters
@@ -168,16 +212,15 @@ class VectorService:
                     stmt = stmt.where(text(f"{field} = :value").bindparams(value=value))
                 else:
                     # Handle regular columns
-                    stmt = stmt.where(getattr(DocumentChunk, field) == value)
+                    stmt = stmt.where(getattr(Chunk, field) == value)
 
         # Execute query and format results
         results = db.execute(stmt).all()
         return [
             {
-                "chunk_id": chunk.id,
+                "chunk_id": chunk.chunk_id,
                 "document_id": chunk.document_id,
                 "content": chunk.content,
-                "metadata": chunk.metadata,
                 "similarity_score": float(score),
             }
             for chunk, score in results
