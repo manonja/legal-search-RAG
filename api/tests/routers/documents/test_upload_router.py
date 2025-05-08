@@ -12,7 +12,8 @@ from app.core.config import get_settings
 from app.main import app
 from app.services.documents.upload import process_uploaded_document
 from app.services.embeddings import process_chunks
-from app.services.process_docs import extract_docx_text, extract_pdf_text
+from app.services.document_processor.loaders.pdf_loader import PDFLoader
+from app.services.document_processor.loaders.docx_loader import DOCXLoader
 from tests.fixtures import (
     mock_process_uploaded_document_router,
     test_dir,

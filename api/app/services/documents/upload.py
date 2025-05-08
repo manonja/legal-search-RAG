@@ -6,6 +6,11 @@ This module provides functionality to process uploaded documents through the RAG
 3. Chunk the text
 4. Generate embeddings
 5. Store in ChromaDB
+
+DEPRECATED: This module is deprecated and will be replaced by the document_processor service.
+Future code should use app.services.document_processor instead of this module.
+The document_processor provides a more modular and maintainable implementation
+with clearer separation of concerns.
 """
 
 import logging
@@ -22,11 +27,9 @@ from fastapi import UploadFile
 from app.core.config import Settings
 from app.services.datastore import DocumentMetadata, get_datastore_service
 from app.services.embeddings import process_chunks
-from app.services.process_docs import (
-    extract_doc_text,
-    extract_docx_text,
-    extract_pdf_text,
-)
+from app.services.document_processor.loaders.pdf_loader import PDFLoader
+from app.services.document_processor.loaders.docx_loader import DOCXLoader
+from app.services.document_processor.loaders.doc_loader import DOCLoader
 
 # Configure logging
 try:
@@ -40,6 +43,9 @@ async def process_uploaded_document(
     file: UploadFile, settings: Settings
 ) -> Dict[str, Any]:
     """Process an uploaded document through the RAG pipeline.
+
+    DEPRECATED: This function is deprecated. Use DocumentProcessor.process_file() instead,
+    which provides a more modular approach with better separation of concerns.
 
     Args:
         file: The uploaded file
@@ -83,16 +89,19 @@ async def process_uploaded_document(
             elif file.filename.lower().endswith(".doc"):
                 content_type = "application/msword"
 
-        # Extract text based on content type
+        # Extract text based on content type using document_processor loaders
         if content_type == "application/pdf":
-            extracted_text = extract_pdf_text(str(file_path))
+            loader = PDFLoader()
+            extracted_text, _ = loader.load(file_path)
         elif (
             content_type
             == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ):
-            extracted_text = extract_docx_text(str(file_path))
+            loader = DOCXLoader()
+            extracted_text, _ = loader.load(file_path)
         elif content_type == "application/msword":
-            extracted_text = extract_doc_text(str(file_path))
+            loader = DOCLoader()
+            extracted_text, _ = loader.load(file_path)
         else:
             raise ValueError(
                 f"Unsupported file content type: {content_type}. Could not determine how to extract text."
