@@ -1,11 +1,11 @@
 # Legal Search RAG API
 
-The API backend for the Legal Document Search RAG system, built with FastAPI, ChromaDB, and LangChain.
+The API backend for the Legal Document Search RAG system, built with FastAPI, PostgreSQL/pgvector, and SQLAlchemy.
 
 ## Features
 
 - **Document Processing**: Extract, chunk, and embed documents
-- **Vector Search**: Semantic search using ChromaDB
+- **Vector Search**: Semantic search using PostgreSQL/pgvector
 - **RAG Implementation**: LLM-powered question answering
 - **Cost Control**: Token counting and usage monitoring
 
@@ -30,7 +30,7 @@ The API backend for the Legal Document Search RAG system, built with FastAPI, Ch
 3. Set up environment variables:
    ```bash
    cp .env.example .env
-   # Edit .env to add your API keys
+   # Edit .env to add your API keys and DATABASE_URI
    ```
 
 4. Process documents:
@@ -55,10 +55,10 @@ docker build -t legal-search-api .
 
 # Run the container with proper volume mounting for data persistence
 docker run -p 8000:8000 \
-  -v $(pwd)/data/chroma:/data/chroma \
   -v $(pwd)/data/data:/data/data \
   -e OPENAI_API_KEY=your_openai_key \
   -e GOOGLE_API_KEY=your_google_key \
+  -e DATABASE_URI=postgresql://postgres:postgres@host.docker.internal:5432/legal_search \
   --env-file .env \
   legal-search-api
 ```
@@ -111,6 +111,20 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  db:
+    image: ankane/pgvector:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=legal_search
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
 ```
 
 Start services with:
@@ -127,7 +141,7 @@ The API provides the following endpoints:
 - `GET /api/health/auth-test`: Test endpoint for authentication (requires token)
 
 ### Document Management
-- `POST /api/documents/upload`: Upload and process documents (PDF, DOCX)
+- `POST /api/documents/upload`: Upload and process documents (PDF, DOCX) with vector embeddings
 - `GET /api/documents/{document_id}`: Retrieve document content by ID
 - `GET /api/documents/{document_id}/download`: Download the original document file by ID
 - `GET /api/documents`: List all available document IDs
@@ -175,8 +189,8 @@ Key environment variables:
 OPENAI_API_KEY=your_openai_api_key
 GOOGLE_API_KEY=your_google_api_key
 
-# Vector DB Configuration
-CHROMA_DB_PATH=/data/chroma
+# Database Configuration
+DATABASE_URI=postgresql://postgres:postgres@localhost:5432/legal_search
 EMBEDDING_MODEL=text-embedding-3-small
 
 # Document Processing

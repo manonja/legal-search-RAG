@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func, update, text
 
 from app.services.database.models import Document, Chunk
-from app.services.embedding_service import EmbeddingService
+from app.services.embeddings_service import EmbeddingService
 from app.models.document_processor import ProcessedDocument
 
 logger = logging.getLogger(__name__)

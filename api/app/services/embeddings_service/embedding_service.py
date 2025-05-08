@@ -3,7 +3,7 @@ import requests
 
 from app.core.config import get_settings
 from app.core.struct_logger import log
-from app.services.embeddings.factory import get_embedding_client
+from app.services.embeddings_service.factory import get_embedding_client
 
 settings = get_settings()
 
