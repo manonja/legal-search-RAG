@@ -4,6 +4,24 @@ This module provides an easy API for saving and loading documents:
 - Saves original documents with UUID4 names
 - Organizes files in a structured directory (settings.DATA_DIR)
 - Manages extracted text and metadata
+
+###############################################################################
+# TODO: MIGRATE TO POSTGRESQL/PGVECTOR
+#
+# DEPRECATION NOTICE: This module is being deprecated in favor of a full
+# PostgreSQL/pgvector implementation for document storage and retrieval.
+#
+# Current issues:
+# - The filesystem storage is separate from database storage, creating a dual system
+# - File deletion doesn't remove entries from PostgreSQL database
+# - Still contains references to deprecated ChromaDB
+#
+# Future plans:
+# - Store document binaries directly in PostgreSQL
+# - Consolidate all document operations in PostgreSQL/pgvector
+# - Remove filesystem dependency for improved scalability and deployment simplicity
+# - Create a migration path for existing documents
+###############################################################################
 """
 
 import json
@@ -80,7 +98,17 @@ class DocumentMetadata(BaseModel):
 
 
 class DatastoreService:
-    """Service for managing document storage and retrieval."""
+    """Service for managing document storage and retrieval.
+
+    DEPRECATED: This filesystem-based document storage is being phased out in favor of
+    PostgreSQL/pgvector for document storage. New code should aim to store documents
+    directly in the database for improved integration with vector search capabilities.
+
+    Current limitations:
+    - Maintains separate storage systems (filesystem + database)
+    - Document deletion only removes files, not database entries
+    - Lacks integration with the PostgreSQL-based document storage
+    """
 
     def __init__(self, settings: Settings):
         """Initialize the datastore service.
@@ -249,6 +277,12 @@ class DatastoreService:
 
         Returns:
             True if the document was deleted, False otherwise.
+
+        Warning:
+            DEPRECATED: This method only deletes files from the filesystem and
+            does NOT remove entries from the PostgreSQL database. This creates
+            orphaned database records. Future implementations should use a unified
+            PostgreSQL approach for all document operations.
         """
         doc_dir = self.data_dir / document_id
         if not doc_dir.exists() or not doc_dir.is_dir():
@@ -258,36 +292,17 @@ class DatastoreService:
             return False
 
         try:
-            # First, delete document chunks from ChromaDB
-            try:
-                from app.core.config import get_settings
-                from app.services.database.chroma import get_chroma_client
+            # WARNING: This deletion only removes files from the filesystem
+            # It does NOT delete entries from the PostgreSQL database (documents and chunks tables)
+            # This can result in orphaned database records
+            log.warning(
+                "Deleting document from filesystem only - not removing from PostgreSQL",
+                document_id=document_id,
+            )
 
-                settings = get_settings()
-                # Get ChromaDB client
-                chroma_client = get_chroma_client()
-
-                # Get the collection
-                collection = chroma_client.get_collection(name=settings.COLLECTION_NAME)
-
-                # Use the where filter to find and delete all chunks with this document_id
-                collection.delete(where={"document_id": document_id})
-
-                log.info(
-                    "Deleted document chunks from ChromaDB", document_id=document_id
-                )
-            except Exception as e:
-                log.warning(
-                    "Error deleting document chunks from ChromaDB",
-                    document_id=document_id,
-                    error=str(e),
-                    exc_info=True,
-                )
-                # Continue with file deletion even if ChromaDB deletion fails
-
-            # Then delete files from filesystem
+            # Delete files from filesystem
             shutil.rmtree(doc_dir)
-            log.info("Document deleted successfully", document_id=document_id)
+            log.info("Document deleted from filesystem", document_id=document_id)
             return True
         except OSError as e:
             log.error(

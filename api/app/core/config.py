@@ -39,7 +39,6 @@ class Settings(BaseSettings):
     # File Storage Settings
     _temp_dir: str = tempfile.mkdtemp(prefix="legal-search-")
     DATA_DIR: Path = Path(os.getenv("DATA_DIR", os.path.join(_temp_dir, "data")))
-    CHROMA_DIR: Path = Path(os.getenv("CHROMA_DIR", os.path.join(_temp_dir, "chroma")))
 
     # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = None
@@ -57,10 +56,7 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 768
     USE_RUNPOD: bool = False
 
-    # ChromaDB Settings
-    COLLECTION_NAME: str = "legal_docs"
-
-    # Supabase Settings
+    # Database Settings
     DATABASE_URI: str = Path(os.getenv("DATABASE_URI"))
 
     # Google Settings
