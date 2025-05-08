@@ -7,10 +7,17 @@ This module provides functionality to process uploaded documents through the RAG
 4. Generate embeddings
 5. Store in ChromaDB
 
-DEPRECATED: This module is deprecated and will be replaced by the document_processor service.
-Future code should use app.services.document_processor instead of this module.
-The document_processor provides a more modular and maintainable implementation
-with clearer separation of concerns.
+###############################################################################
+# TODO: REMOVE THIS ENTIRE FILE
+#
+# DEPRECATED: This module is DEPRECATED and should not be used in new code.
+# It will be REMOVED in a future release.
+#
+# - The functionality has been replaced by app.services.document_processor and
+#   app.services.database.vector_service using PostgreSQL/pgvector
+# - New code should use the document_processor.py and vector_service.py instead
+# - Only kept temporarily for backward compatibility with existing API endpoints
+###############################################################################
 """
 
 import logging
@@ -39,13 +46,19 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 
+# TODO: REMOVE THIS FUNCTION
+# DEPRECATED: This function uses ChromaDB which is being phased out.
+# New code should use DocumentProcessor.process_file() + vector_service.insert_document()
+# which handles document processing and stores embeddings in PostgreSQL/pgvector.
 async def process_uploaded_document(
     file: UploadFile, settings: Settings
 ) -> Dict[str, Any]:
     """Process an uploaded document through the RAG pipeline.
 
-    DEPRECATED: This function is deprecated. Use DocumentProcessor.process_file() instead,
-    which provides a more modular approach with better separation of concerns.
+    DEPRECATED: This function is deprecated and will be removed in a future release.
+    Use DocumentProcessor.process_file() with vector_service.insert_document() instead,
+    which provides a modular approach with better separation of concerns and uses
+    PostgreSQL/pgvector instead of ChromaDB.
 
     Args:
         file: The uploaded file

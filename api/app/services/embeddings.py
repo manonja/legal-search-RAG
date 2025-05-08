@@ -3,10 +3,16 @@
 This module provides functionality to generate embeddings using RunPod's serverless API
 with HuggingFace models and store them in a Chroma vector database for efficient retrieval.
 
-DEPRECATED: This module is deprecated and will be replaced by a dedicated VectorDBService.
-Future code should not directly use the functions in this module.
-Instead, use app.services.document_processor for document processing and
-the planned app.services.vector_db service for embedding storage.
+###############################################################################
+# TODO: REMOVE THIS ENTIRE FILE
+#
+# DEPRECATED: This module is DEPRECATED and should not be used in new code.
+# It will be REMOVED in a future release.
+#
+# - The functionality has been replaced by vector_service.py using PostgreSQL/pgvector
+# - New code should use app.services.database.vector_service instead
+# - Only kept temporarily for backward compatibility with old API endpoints
+###############################################################################
 """
 
 import json
@@ -27,6 +33,9 @@ settings = get_settings()
 BATCH_SIZE = 100
 
 
+# TODO: REMOVE THIS FUNCTION
+# DEPRECATED: This function uses ChromaDB which is being phased out.
+# New code should use vector_service.insert_document() which stores embeddings in PostgreSQL/pgvector.
 def process_chunks(
     chunks: List[str],
     chroma_dir: Path,
@@ -34,8 +43,8 @@ def process_chunks(
 ) -> None:
     """Process document chunks and store their embeddings in Chroma.
 
-    DEPRECATED: This function is deprecated. In the future, use VectorDBService for
-    embedding generation and storage instead of calling this function directly.
+    DEPRECATED: This function is deprecated. Use vector_service.insert_document() which uses
+    PostgreSQL with pgvector. This function will be removed in a future release.
 
     Args:
         chunks: List of text chunks for the document

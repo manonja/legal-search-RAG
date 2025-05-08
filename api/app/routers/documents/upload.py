@@ -1,6 +1,17 @@
 """Router for document upload operations.
 
 This module provides endpoints for uploading and processing legal documents.
+
+###############################################################################
+# TODO: MIGRATE TO NEW API
+#
+# DEPRECATED: This router uses deprecated ChromaDB-based functionality.
+# It should be migrated to use the new document_processor router and
+# PostgreSQL/pgvector storage in a future update.
+#
+# - The /documents/upload endpoint should be migrated to use document_processor.py
+#   and vector_service instead of the deprecated upload.py and embeddings.py
+###############################################################################
 """
 
 from pathlib import Path
@@ -17,9 +28,13 @@ from app.services.documents.upload import process_uploaded_document
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
+# TODO: MIGRATE TO NEW API - This endpoint uses deprecated ChromaDB-based storage
 @router.post("/upload")
 async def upload_document(file: UploadFile) -> Dict[str, Any]:
     """Upload and process a document.
+
+    DEPRECATED: This endpoint uses deprecated ChromaDB-based functionality and
+    will be migrated to use PostgreSQL/pgvector in a future update.
 
     This endpoint:
     1. Saves the uploaded file
