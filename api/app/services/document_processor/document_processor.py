@@ -7,20 +7,18 @@ This module provides the main service for processing documents through the RAG p
 """
 
 import tempfile
-import uuid
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from fastapi import UploadFile
 
 from app.core.config import get_settings
 from app.core.struct_logger import log
 from app.models.document_processor import DocumentChunk, ProcessedDocument
-from app.services.datastore import DocumentMetadata, get_datastore_service
+from app.services.datastore import get_datastore_service
 from app.services.document_processor.loaders import DocumentLoader
 from app.services.document_processor.preprocessors import TextPreprocessor
 from app.services.document_processor.chunkers import SemChunkChunker
-from app.services.embeddings import process_chunks
 
 
 class DocumentProcessor:
@@ -36,7 +34,7 @@ class DocumentProcessor:
         self.chunker = SemChunkChunker()
 
     async def process_file(self, file: UploadFile) -> ProcessedDocument:
-        """Process an uploaded file through the entire RAG pipeline.
+        """Process an uploaded file through the document processing pipeline.
 
         Args:
             file: The uploaded file
@@ -106,9 +104,6 @@ class DocumentProcessor:
                     )
                 )
 
-            # 4. STORE EMBEDDINGS: Process chunks and store in vector database
-            self._store_embeddings(chunks, document_metadata)
-
             # Return processed document
             return ProcessedDocument(
                 document_id=document_metadata.document_id,
@@ -117,28 +112,3 @@ class DocumentProcessor:
                 metadata=doc_metadata,
                 total_chunks=len(chunks),
             )
-
-    def _store_embeddings(
-        self, chunks: List[DocumentChunk], document_metadata: DocumentMetadata
-    ) -> None:
-        """Store document chunks in the vector database.
-
-        Args:
-            chunks: List of processed document chunks
-            document_metadata: Document metadata
-        """
-        # Convert chunks to the format expected by process_chunks
-        chunk_texts = [chunk.text for chunk in chunks]
-
-        # Process chunks
-        process_chunks(
-            chunks=chunk_texts,
-            chroma_dir=self.settings.CHROMA_DIR,
-            document_metadata=document_metadata.model_dump(),
-        )
-
-        log.info(
-            "Stored embeddings for document chunks",
-            document_id=document_metadata.document_id,
-            chunk_count=len(chunks),
-        )
