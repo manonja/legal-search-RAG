@@ -8,7 +8,7 @@ authors = [
 readme = "README.md"
 # We need a python version that is compatible with pytorch
 requires-python = ">= 3.11,<3.13"
-dependencies = ["runpod>=1.7.9,<2"]
+dependencies = ["runpod>=1.7.9,<2", "hf-xet>=1.1.0,<2"]
 
 [tool.pixi.project]
 channels = ["https://prefix.dev/conda-forge"]
