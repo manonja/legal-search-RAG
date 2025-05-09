@@ -193,6 +193,8 @@ app.include_router(
 app.include_router(
     search_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
 )
+# For development testing without authentication:
+# app.include_router(search_router, prefix=settings.API_PREFIX)
 app.include_router(
     document_router, prefix=settings.API_PREFIX, dependencies=[Depends(auth_dependency)]
 )

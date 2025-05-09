@@ -4,9 +4,7 @@ This module provides functionality for initializing application components
 on startup.
 """
 
-import os
 import sentry_sdk
-from pathlib import Path
 from app.core.struct_logger import log
 
 from app.core.config import get_settings

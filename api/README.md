@@ -328,7 +328,7 @@ When making requests to protected endpoints, include the token in the Authorizat
 ```bash
 # Example: Uploading a document
 curl -X POST \
-  http://localhost:8000/api/documents/upload \
+  http://localhost:8000/api/documents/process-and-save \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -F "file=@document.pdf"
 
