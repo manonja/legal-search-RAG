@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["search"])
 
+# Create a module-level singleton to avoid B008 errors with Depends
+db_dependency = Depends(get_db)
+
 
 @router.post("/", response_model=List[SearchResult])
 async def search_documents_endpoint(request: SearchQuery):
@@ -86,7 +89,9 @@ async def legacy_search_endpoint(request: QueryRequest) -> QueryResponse:
 
 
 @router.post("/legal", response_model=None)
-async def legal_document_search(request: LegalSearchRequest, db: Session = None):
+async def legal_document_search(
+    request: LegalSearchRequest, db: Session = db_dependency
+):
     """Search for legal documents using semantic vector similarity with context.
 
     This endpoint provides specialized search for legal documents with options
@@ -103,10 +108,6 @@ async def legal_document_search(request: LegalSearchRequest, db: Session = None)
     Raises:
         HTTPException: If search fails
     """
-    # Resolve the dependency here instead of in the parameter default
-    if db is None:
-        db = get_db()
-
     try:
         if not request.query.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
