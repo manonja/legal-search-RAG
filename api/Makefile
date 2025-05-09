@@ -27,18 +27,6 @@ format:
 check-format:
 	ruff format . --check --exclude=.pixi
 
-# Process documents
-process-docs:
-	python -m app.services.process_docs
-
-# Chunk documents
-chunk-docs:
-	python -m app.services.chunk
-
-# Embed documents
-embed-docs:
-	python -m app.services.embeddings
-
 # Start the API server
 serve-api:
 	uvicorn app.main:app --reload --reload-exclude=.venv/* --host 0.0.0.0 --port 8000 --timeout-keep-alive 30 --timeout-graceful-shutdown 10 --env-file .env
