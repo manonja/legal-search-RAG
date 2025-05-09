@@ -22,7 +22,6 @@ async def process_query(
     max_results: Optional[int] = 5,
     temperature: Optional[float] = 0.7,
     max_tokens: Optional[int] = 1000,
-    collection_name: Optional[str] = None,
 ) -> QueryResponse:
     """Process a query and generate a response using RAG.
 
@@ -31,13 +30,12 @@ async def process_query(
         max_results: Maximum number of results to return
         temperature: Temperature for response generation
         max_tokens: Maximum tokens in the response
-        collection_name: Optional name of collection to search in
 
     Returns:
         QueryResponse containing the answer, sources, and confidence
     """
     settings = get_settings()
-    log.info("Processing query", query=query, collection=collection_name or "default")
+    log.info("Processing query", query=query)
 
     try:
         # First, search for relevant documents
@@ -45,12 +43,11 @@ async def process_query(
             max_results if max_results is not None else 5
         )  # Use default if None
         search_results = await search_documents(
-            SearchQuery(query=query, limit=search_limit),
-            collection_name=collection_name,
+            SearchQuery(query=query, limit=search_limit)
         )
 
         if not search_results:
-            log.warning("No search results found for query", collection=collection_name)
+            log.warning("No search results found for query")
             return QueryResponse(
                 answer="I couldn't find any relevant information to answer your question.",
                 sources=[],
@@ -61,12 +58,12 @@ async def process_query(
         context_parts = []
         for result in search_results:
             # Prioritize the direct original_filename metadata key
-            clean_source_name = result.metadata.get("original_filename")
+            clean_source_name = result.metadata.get("document_file_path")
 
             # If clean name isn't directly available, fallback to path cleaning
             if not clean_source_name:
                 source_path = result.metadata.get(
-                    "original_source"
+                    "document_source"
                 ) or result.metadata.get("source")
                 if source_path:
                     base_name = os.path.basename(source_path)
@@ -99,7 +96,7 @@ async def process_query(
         seen_document_ids = set()
         for result in search_results:
             doc_id = result.metadata.get("document_id")
-            original_filename = result.metadata.get("original_filename")
+            original_filename = result.metadata.get("document_file_path")
 
             # Ensure we have both ID and filename, and haven't seen this ID
             if doc_id and original_filename and doc_id not in seen_document_ids:
@@ -161,11 +158,7 @@ async def process_query(
         # Convert to confidence (1.0 - normalized distance)
         confidence = max(0.0, min(1.0, 1.0 - (avg_distance / 2.0)))
 
-        log.info(
-            "Query processed successfully",
-            confidence=round(confidence, 2),
-            collection=collection_name,
-        )
+        log.info("Query processed successfully", confidence=round(confidence, 2))
 
         return QueryResponse(
             answer=answer,
@@ -174,5 +167,5 @@ async def process_query(
         )
 
     except Exception as e:
-        log.error("Error processing query", error=str(e), collection=collection_name)
+        log.error("Error processing query", error=str(e))
         raise

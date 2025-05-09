@@ -5,14 +5,16 @@ This module provides functionality for searching documents using vector similari
 
 from typing import Any, Dict, List, cast
 
-import chromadb
-from chromadb.api.models.Collection import Collection
-from chromadb.api.types import IncludeEnum
-from app.core.struct_logger import log
+from sqlalchemy.orm import Session
+from fastapi import Depends
 
+from app.core.struct_logger import log
 from app.core.config import get_settings
 from app.models.search import QueryRequest, QueryResponse, SearchQuery, SearchResult
-from app.services.database.chroma import get_collection
+from app.services.database.vector_service import vector_service
+from app.services.database.database import get_db
+
+settings = get_settings()
 
 
 async def search_documents(request: SearchQuery) -> List[SearchResult]:
@@ -28,40 +30,38 @@ async def search_documents(request: SearchQuery) -> List[SearchResult]:
         # Log the request
         log.info("Search query", query=request.query)
 
-        # Get collection
-        collection = await get_collection()
+        # Create database session
+        db = next(get_db())
 
-        # Check if collection exists
-        if collection is None:
-            log.error("Failed to get Chroma collection - collection is None")
-            raise ValueError("Document collection not available")
-
-        # Query the collection
-        results = collection.query(
-            query_texts=[request.query],
-            n_results=request.limit,
-            include=[
-                IncludeEnum.documents,
-                IncludeEnum.metadatas,
-                IncludeEnum.distances,
-            ],
+        # Use vector_service for search
+        results = await vector_service.vector_search(
+            db=db,
+            query_text=request.query,
+            limit=request.limit,
+            include_document_metadata=True,
         )
 
         # Format results
         search_results = []
-        if (
-            results["documents"] is None
-            or results["metadatas"] is None
-            or results["distances"] is None
-        ):
-            return []
+        for result in results:
+            # Field names need to match what's returned by vector_service
+            content_field = "chunk_content" if "chunk_content" in result else "content"
+            sequence_field = "chunk_sequence" if "chunk_sequence" in result else None
 
-        for i in range(len(results["documents"][0])):
             search_results.append(
                 SearchResult(
-                    text=results["documents"][0][i],
-                    metadata=dict(results["metadatas"][0][i]),
-                    distance=float(results["distances"][0][i]),
+                    text=result[content_field],
+                    metadata={
+                        "document_id": result["document_id"],
+                        "document_source": result.get("document_source"),
+                        "document_file_path": result.get("document_file_path"),
+                        "chunk_id": result["chunk_id"],
+                        "chunk_sequence": result.get(sequence_field)
+                        if sequence_field
+                        else None,
+                    },
+                    distance=1.0
+                    - result["similarity_score"],  # Convert similarity to distance
                 )
             )
 
@@ -87,70 +87,59 @@ async def legacy_search_documents(request: QueryRequest) -> QueryResponse:
 
         log.info("Processing search request", query=request.query_text)
 
-        # Get collection
-        collection = await get_collection()
+        # Create database session
+        db = next(get_db())
 
-        # Check if collection exists
-        if collection is None:
-            log.error("Failed to get Chroma collection - collection is None")
-            raise ValueError("Document collection not available")
+        # Prepare filters
+        filters = {}
+        if request.metadata_filter:
+            for key, value in request.metadata_filter.items():
+                # Map metadata filter to appropriate filters for vector_service
+                if key.startswith("document_"):
+                    filters[key] = value
+                else:
+                    # For chunk-level filters
+                    filters[key] = value
 
-        # Query Chroma
-        results = collection.query(
-            query_texts=[request.query_text],
-            n_results=request.n_results,
-            where=request.metadata_filter,
-            include=[
-                IncludeEnum.documents,
-                IncludeEnum.metadatas,
-                IncludeEnum.distances,
-            ],
+        # Use vector_service for search
+        results = await vector_service.vector_search(
+            db=db,
+            query_text=request.query_text,
+            limit=request.n_results,
+            min_score=request.min_similarity,
+            filters=filters,
+            include_document_metadata=True,
         )
 
-        if not results or not results.get("documents"):
+        if not results:
             log.warning("No results found for query")
-            return QueryResponse(results=[], total_found=0)
-
-        if (
-            results["documents"] is None
-            or results["metadatas"] is None
-            or results["distances"] is None
-        ):
-            return QueryResponse(results=[], total_found=0)
-
-        documents = results["documents"][0]
-        metadatas = results["metadatas"][0]
-        distances = results["distances"][0]
-
-        if not documents:
-            log.warning("No documents found in results")
             return QueryResponse(results=[], total_found=0)
 
         # Process results
         formatted_results = []
-        for _, (doc, metadata, distance) in enumerate(
-            zip(documents, metadatas, distances, strict=False)
-        ):
-            # Convert distance to similarity score (0 to 1)
-            similarity = 1 - (distance / 2)
-
-            # Skip results below similarity threshold
-            if similarity < request.min_similarity:
-                continue
+        for result in results:
+            # Field names need to match what's returned by vector_service
+            content_field = "chunk_content" if "chunk_content" in result else "content"
+            sequence_field = "chunk_sequence" if "chunk_sequence" in result else None
 
             formatted_results.append(
                 SearchResult(
-                    text=doc,
-                    metadata=dict(metadata),
-                    distance=distance,
+                    text=result[content_field],
+                    metadata={
+                        "document_id": result["document_id"],
+                        "document_source": result.get("document_source"),
+                        "document_file_path": result.get("document_file_path"),
+                        "chunk_id": result["chunk_id"],
+                        "chunk_sequence": result.get(sequence_field)
+                        if sequence_field
+                        else None,
+                    },
+                    distance=1.0
+                    - result["similarity_score"],  # Convert similarity to distance
                 )
             )
 
-        log.info(
-            "Search results found",
-            count=len(formatted_results),
-            threshold="above similarity threshold",
-        )
+        log.info("Search results found", count=len(formatted_results))
         return QueryResponse(
             results=formatted_results,
             total_found=len(formatted_results),

@@ -4,9 +4,13 @@ Core operations for vector storage, updates, and similarity search using pgvecto
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Union
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, update, text
+import numpy as np
+
+# Import proper pgvector adapter for psycopg v3
+from pgvector.psycopg import register_vector
 
 from app.services.database.models import Document, Chunk
 from app.services.embeddings_service import EmbeddingService
@@ -21,6 +25,20 @@ class VectorService:
     def __init__(self, embedding_service: Optional[EmbeddingService] = None):
         """Initialize the vector service."""
         self.embedding_service = embedding_service or EmbeddingService()
+
+    def _prepare_embedding_for_query(self, embedding):
+        """Prepare embedding for use in pgvector queries."""
+        # Make sure embedding is flat list of floats
+        if isinstance(embedding, (list, tuple)):
+            return list(embedding)
+        # If numpy array, convert to list
+        try:
+            if isinstance(embedding, np.ndarray):
+                return embedding.tolist()
+        except ImportError:
+            pass
+        # Return as is
+        return embedding
 
     async def insert_document(
         self,
@@ -193,64 +211,230 @@ class VectorService:
         limit: int = 5,
         min_score: Optional[float] = None,
         filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        include_document_metadata: bool = False,
+        context_window: int = 0,
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """Search for similar documents using vector similarity.
 
         Args:
             db: Database session
             query_text: Query text
             limit: Maximum number of results
-            min_score: Minimum similarity score threshold
-            filters: Optional filters to apply to the search
+            min_score: Minimum similarity score threshold (defaults to None)
+            filters: Optional filters to apply to the search, format:
+                     {'field': value} or {'document_field': value} for document filters
+            include_document_metadata: Whether to include document metadata in the response
+            context_window: Number of chunks before and after the matching chunk to include
 
         Returns:
-            List of search results with similarity scores
+            List of matching chunks with similarity scores
         """
-        # Generate embedding for query
-        query_embedding = (
-            await self.embedding_service.generate_embeddings([query_text])
-        )[0]
+        try:
+            # First generate an embedding for the query text
+            embedding = await self.embedding_service.generate_embeddings([query_text])
+            if not embedding or len(embedding) == 0:
+                logger.error("Failed to generate embeddings for query text")
+                return []
 
-        # Build the query
-        stmt = (
-            select(
-                Chunk,
-                func.cosine_similarity(Chunk.embedding, query_embedding).label(
-                    "similarity"
-                ),
-            )
-            .where(Chunk.embedding.is_not(None))
-            .order_by(func.cosine_similarity(Chunk.embedding, query_embedding).desc())
-            .limit(limit)
-        )
+            # Get the first embedding (we only sent one text)
+            query_embedding = embedding[0]
 
-        # Add minimum score filter if provided
-        if min_score is not None:
-            stmt = stmt.where(
-                func.cosine_similarity(Chunk.embedding, query_embedding) >= min_score
-            )
+            # Prepare the vector embedding properly formatted for PostgreSQL
+            # Print some debug info
+            print(f"Original embedding type: {type(query_embedding)}")
+            print(f"Original embedding structure: {type(query_embedding).__name__}")
+            print(f"Embedding length: {len(query_embedding)}")
 
-        # Apply additional filters
-        if filters:
-            for field, value in filters.items():
-                if "->" in field:
-                    # Handle JSON path expressions
-                    stmt = stmt.where(text(f"{field} = :value").bindparams(value=value))
-                else:
-                    # Handle regular columns
-                    stmt = stmt.where(getattr(Chunk, field) == value)
+            # Transform embedding to proper format if needed
+            query_embedding = self._prepare_embedding_for_query(query_embedding)
 
-        # Execute query and format results
-        results = db.execute(stmt).all()
-        return [
-            {
-                "chunk_id": chunk.chunk_id,
-                "document_id": chunk.document_id,
-                "content": chunk.content,
-                "similarity_score": float(score),
+            # Print more debug info after transformation
+            print(f"Final embedding type: {type(query_embedding)}")
+            print(f"Final embedding length: {len(query_embedding)}")
+            print(f"First few elements: {query_embedding[:5]}")
+
+            # Format the embedding as a proper SQL array with square brackets
+            vector_str = f"[{','.join(map(str, query_embedding))}]"
+
+            # Use proper SQL with the vector cast that doesn't conflict with parameter binding
+            sql = """
+                SELECT
+                    chunks.chunk_id,
+                    chunks.content,
+                    chunks.document_id,
+                    chunks.chunk_sequence_in_document,
+                    1 - (chunks.embedding <=> %s::vector) AS similarity
+                FROM chunks
+                WHERE chunks.embedding IS NOT NULL
+                 AND 1 - (chunks.embedding <=> %s::vector) >= %s ORDER BY similarity DESC LIMIT %s
+            """
+            print(f"Executing SQL:\n{sql}")
+
+            # Execute the query with positional parameters
+            # Use raw execution to avoid SQLAlchemy parameter style conflicts
+            conn = db.get_bind().raw_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    sql,
+                    (
+                        vector_str,
+                        vector_str,
+                        min_score if min_score is not None else 0.0,
+                        limit,
+                    ),
+                )
+                rows = cur.fetchall()
+
+            # Process results...
+            results = []
+            for row in rows:
+                chunk_id = row[0]
+                content = row[1]
+                document_id = row[2]
+                chunk_seq = row[3]
+                similarity = float(row[4])
+
+                chunk_result = {
+                    "chunk_id": chunk_id,
+                    "content": content,
+                    "document_id": document_id,
+                    "chunk_sequence": chunk_seq,
+                    "similarity": similarity,
+                }
+
+                results.append(chunk_result)
+
+            # Handle context window if specified
+            if context_window > 0 and results:
+                return self._add_context_to_results(
+                    db, results, context_window, include_document_metadata
+                )
+            elif include_document_metadata and results:
+                return self._add_document_metadata_to_results(db, results)
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Error in vector_search: {e}")
+            print(f"Vector search error: {e}")
+            raise
+
+    def _add_context_to_results(
+        self, db, results, context_window, include_document_metadata
+    ):
+        """Add surrounding context chunks to search results."""
+        enhanced_results = []
+
+        for result in results:
+            document_id = result["document_id"]
+            chunk_sequence = result["chunk_sequence"]
+            chunk_id = result["chunk_id"]
+
+            # Calculate the range for context chunks
+            start_seq = max(1, chunk_sequence - context_window)
+            end_seq = chunk_sequence + context_window
+
+            # Get context chunks
+            context_sql = """
+                SELECT chunk_id, content, chunk_sequence_in_document
+                FROM chunks
+                WHERE document_id = %s
+                AND chunk_sequence_in_document BETWEEN %s AND %s
+                AND chunk_id != %s
+                ORDER BY chunk_sequence_in_document
+            """
+
+            # Get a raw connection
+            conn = db.get_bind().raw_connection()
+            with conn.cursor() as cur:
+                cur.execute(context_sql, (document_id, start_seq, end_seq, chunk_id))
+                context_results = cur.fetchall()
+
+            context_chunks = [
+                {"chunk_id": ctx[0], "content": ctx[1], "sequence": ctx[2]}
+                for ctx in context_results
+            ]
+
+            # Add document metadata if requested
+            document = {}
+            if include_document_metadata:
+                doc_sql = """
+                    SELECT document_source, document_file_path, title, author, publication_date
+                    FROM documents
+                    WHERE document_id = %s
+                """
+                with db.get_bind().raw_connection().cursor() as cur:
+                    cur.execute(doc_sql, (document_id,))
+                    doc_result = cur.fetchone()
+
+                if doc_result:
+                    document = {
+                        "document_id": document_id,
+                        "document_source": doc_result[0],
+                        "document_file_path": doc_result[1],
+                        "title": doc_result[2],
+                        "author": doc_result[3],
+                        "publication_date": doc_result[4],
+                    }
+            else:
+                document = {"document_id": document_id}
+
+            # Format the enhanced result
+            enhanced_result = {
+                "chunk": {
+                    "chunk_id": chunk_id,
+                    "content": result["content"],
+                    "sequence": chunk_sequence,
+                },
+                "document": document,
+                "similarity": result["similarity"],
+                "context_chunks": context_chunks,
             }
-            for chunk, score in results
-        ]
+
+            enhanced_results.append(enhanced_result)
+
+        return {"total_results": len(enhanced_results), "results": enhanced_results}
+
+    def _add_document_metadata_to_results(self, db, results):
+        """Add document metadata to search results without context."""
+        enhanced_results = []
+
+        for result in results:
+            document_id = result["document_id"]
+
+            # Get document metadata
+            doc_sql = """
+                SELECT document_source, document_file_path, title, author, publication_date
+                FROM documents
+                WHERE document_id = %s
+            """
+            with db.get_bind().raw_connection().cursor() as cur:
+                cur.execute(doc_sql, (document_id,))
+                doc_result = cur.fetchone()
+
+            if doc_result:
+                document = {
+                    "document_id": document_id,
+                    "document_source": doc_result[0],
+                    "document_file_path": doc_result[1],
+                    "title": doc_result[2],
+                    "author": doc_result[3],
+                    "publication_date": doc_result[4],
+                }
+            else:
+                document = {"document_id": document_id}
+
+            # Format the enhanced result
+            enhanced_result = {
+                "chunk_id": result["chunk_id"],
+                "content": result["content"],
+                "document": document,
+                "similarity": result["similarity"],
+            }
+
+            enhanced_results.append(enhanced_result)
+
+        return enhanced_results
 
 
 # Create a singleton instance

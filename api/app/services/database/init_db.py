@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.database.database import Base, engine
+from pgvector.psycopg import register_vector
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,10 @@ def init_vector_db():
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
             conn.commit()
             logger.info("Vector extension enabled in PostgreSQL")
+
+            # Register the vector type with psycopg at initialization
+            # No need to register here, we'll do it per connection when needed
+            # as SQLAlchemy connection pooling makes this complex
 
         # Create tables
         Base.metadata.create_all(bind=engine)
